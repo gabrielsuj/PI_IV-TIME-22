@@ -1,1 +1,43 @@
+# Dependências
+node_modules/
+vendor/
+.venv/
+venv/
+packages/
+
+# Artefatos de build e compilação
+dist/
+build/
+target/
+*.class
+*.pyc
+*.o
+*.jar
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+*.swp
+.ipynb_checkpoints/
+
+# Arquivos do sistema operacional
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Configurações locais e IDEs
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Arquivos sensíveis e de ambiente
+.env
+.env.local
+*.pem
+*.key
+secrets.json   
