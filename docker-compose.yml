@@ -1,0 +1,14 @@
+services: 
+  mongo:
+    image: mongo:7
+    container_name: consultafacil-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: consultafacil
+    volumes:
+      - mongo-data:/data/db
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mongo-data:
