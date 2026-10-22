@@ -131,8 +131,19 @@ cp .env.example .env
 Com Docker Compose:
 
 ```bash
-docker compose up -d mongo   # TODO: docker-compose.yml e scripts em database/init/
+docker compose up -d mongo
 ```
+
+Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices. Eles só rodam com o volume vazio; para recriar o banco local, use `docker compose down -v` antes do `up`.
+
+Para carregar os dados fictícios de demonstração e verificar a modelagem:
+
+```bash
+docker exec -i consultafacil-mongo mongosh consultafacil --quiet < database/seed/01-agenda.js
+docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
+```
+
+Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md).
 
 Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
