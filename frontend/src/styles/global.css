@@ -1,0 +1,247 @@
+/*
+ * Estilos globais e tokens provisórios. As cores, a tipografia e os
+ * componentes visuais definitivos virão do protótipo no Figma.
+ */
+
+:root {
+  --color-primary: #0f766e;
+  --color-primary-hover: #115e59;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-bg: #f5f7f8;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+
+  --color-success-bg: #dcfce7;
+  --color-success-text: #166534;
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #991b1b;
+  --color-neutral-bg: #f3f4f6;
+  --color-neutral-text: #374151;
+
+  --radius: 8px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+h1,
+h2 {
+  line-height: 1.2;
+  margin: 0;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.875rem;
+}
+
+/* Layout */
+
+.app-header {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__inner,
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-inline: var(--space-3);
+}
+
+.app-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+}
+
+.app-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-nav__link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.app-nav__link:hover,
+.app-nav__link.active {
+  color: var(--color-primary);
+}
+
+.app-main {
+  padding-block: var(--space-5);
+}
+
+/* Páginas */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.page--standalone {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-3);
+}
+
+.page__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.page__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+/* Componentes */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.card__title {
+  font-size: 1.125rem;
+}
+
+.button {
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius);
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.badge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.badge--loading {
+  background-color: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+}
+
+.badge--online {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.badge--offline {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+/* Status da API */
+
+.api-status {
+  width: 100%;
+}
+
+.api-status__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.api-status__error {
+  margin: 0;
+  color: var(--color-danger-text);
+}
+
+.api-status__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.api-status__details dt {
+  color: var(--color-text-muted);
+}
+
+.api-status__details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.api-status__payload {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  background-color: var(--color-neutral-bg);
+  border-radius: var(--radius);
+}
