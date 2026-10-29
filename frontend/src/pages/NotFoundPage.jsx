@@ -1,15 +1,13 @@
-import { Link } from 'react-router';
+import Button from '../components/ui/Button';
+import PageHeader from '../components/ui/PageHeader';
 
 export default function NotFoundPage() {
   return (
     <div className="page">
-      <header className="page__header">
-        <h1>Página não encontrada</h1>
-        <p className="page__lead">O endereço acessado não existe ou foi alterado.</p>
-      </header>
-      <Link to="/" className="button">
+      <PageHeader title="Página não encontrada" description="O endereço acessado não existe ou foi alterado." />
+      <div><Button to="/">
         Voltar ao início
-      </Link>
+      </Button></div>
     </div>
   );
 }

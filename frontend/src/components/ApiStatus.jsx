@@ -1,5 +1,8 @@
 import { useApiHealth } from '../hooks/useApiHealth';
 import { API_BASE_URL } from '../services/api';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
+import Card from './ui/Card';
 
 const LABELS = {
   loading: 'Verificando…',
@@ -17,15 +20,7 @@ export default function ApiStatus({ detailed = false }) {
   const { status, data, error, latencyMs, checkedAt, refresh } = useApiHealth();
 
   return (
-    <section className="card api-status" aria-labelledby="api-status-title">
-      <div className="api-status__header">
-        <h2 id="api-status-title" className="card__title">
-          Conexão com a API
-        </h2>
-        <span className={`badge badge--${status}`} role="status">
-          {LABELS[status]}
-        </span>
-      </div>
+    <Card className="api-status" title="Conexão com a API" action={<Badge status={status} role="status">{LABELS[status]}</Badge>}>
 
       {status === 'offline' && error && <p className="api-status__error">{error.message}</p>}
 
@@ -62,9 +57,9 @@ export default function ApiStatus({ detailed = false }) {
         </pre>
       )}
 
-      <button type="button" className="button" onClick={refresh} disabled={status === 'loading'}>
+      <Button onClick={refresh} loading={status === 'loading'}>
         Verificar novamente
-      </button>
-    </section>
+      </Button>
+    </Card>
   );
 }

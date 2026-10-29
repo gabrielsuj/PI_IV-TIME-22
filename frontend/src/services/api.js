@@ -102,6 +102,8 @@ export async function request(
 ) {
   const timeoutSignal = AbortSignal.timeout(timeout);
   const finalHeaders = { Accept: 'application/json', ...headers };
+  const accessToken = sessionStorage.getItem('consultafacil.accessToken');
+  if (accessToken && !finalHeaders.Authorization) finalHeaders.Authorization = `Bearer ${accessToken}`;
   const init = {
     method,
     headers: finalHeaders,

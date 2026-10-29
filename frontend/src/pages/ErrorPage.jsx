@@ -1,4 +1,6 @@
-import { isRouteErrorResponse, Link, useRouteError } from 'react-router';
+import { isRouteErrorResponse, useRouteError } from 'react-router';
+import Button from '../components/ui/Button';
+import PageHeader from '../components/ui/PageHeader';
 
 /** Exibida quando uma rota lança um erro inesperado durante a renderização. */
 export default function ErrorPage() {
@@ -11,18 +13,15 @@ export default function ErrorPage() {
 
   return (
     <div className="page page--standalone">
-      <header className="page__header">
-        <h1>Algo deu errado</h1>
-        <p className="page__lead">Ocorreu um erro inesperado ao exibir esta tela.</p>
-      </header>
+      <PageHeader title="Algo deu errado" description="Ocorreu um erro inesperado ao exibir esta tela." />
       {detail && (
         <pre className="api-status__payload">
           <code>{detail}</code>
         </pre>
       )}
-      <Link to="/" className="button">
+      <div><Button to="/">
         Voltar ao início
-      </Link>
+      </Button></div>
     </div>
   );
 }
