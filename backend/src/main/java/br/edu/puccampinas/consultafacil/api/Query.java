@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Leitura dos parâmetros da query string (o Router não suporta parâmetros no caminho). */
+/** Leitura dos parâmetros da query string */
 public final class Query {
     private Query() {}
 
