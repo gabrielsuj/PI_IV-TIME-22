@@ -230,7 +230,7 @@ Este cenário considera apenas jornada e bloqueio. Quando as consultas existente
 | D4 | Horários da jornada em minutos desde a meia-noite | Facilita os cálculos de vagas | Adotada |
 | D5 | CRM como texto | Preserva zeros à esquerda | Adotada |
 
-**Ponto a alinhar:** o índice atual de `consultas` (`uk_consulta_ativa`) usa `data` e `horario` separados, enquanto os bloqueios usam instantes (`Date`). Convém definir a representação das consultas de forma compatível ao modelar essa coleção.
+**Ponto resolvido:** o índice `uk_consulta_ativa` usava `data` e `horario` separados, enquanto os bloqueios usam instantes (`Date`). Na modelagem de consultas (#26), as consultas passaram a usar `inicio` e `fim` como `Date`, na mesma representação dos bloqueios (decisão D6 em [consultas.md](consultas.md)).
 
 ---
 
