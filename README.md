@@ -138,14 +138,31 @@ docker compose up -d mongo
 
 Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices. Eles só rodam com o volume vazio; para recriar o banco local, use `docker compose down -v` antes do `up`.
 
-Para carregar os dados fictícios de demonstração e verificar a modelagem:
+#### Bancos por ambiente
+
+| Banco | Uso | Dados de exemplo |
+|---|---|---|
+| `consultafacil` | Desenvolvimento (padrão do `.env.example`) | sim |
+| `consultafacil_test` | Testes JUnit (os testes limpam as coleções que usam) | não |
+| `consultafacil_demo` | Apresentações, sem interferir no banco de desenvolvimento | sim |
+
+A API usa o banco definido em `MONGODB_DATABASE` no `.env`.
+
+Para recriar qualquer um deles do zero (apaga o banco, executa `database/init/` e, exceto no de testes, `database/seed/`):
 
 ```bash
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet < database/seed/01-agenda.js
+scripts/recriar-banco.sh                      # consultafacil
+scripts/recriar-banco.sh consultafacil_test
+scripts/recriar-banco.sh consultafacil_demo
+```
+
+Para verificar a modelagem:
+
+```bash
 docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
 ```
 
-Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md).
+Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md) e [`docs/modelagem/consultas.md`](docs/modelagem/consultas.md).
 
 Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
@@ -176,15 +193,16 @@ cd backend && mvn test       # TODO: testes de unidade e de integração (JUnit 
 cd frontend && npm test      # testes do frontend (Vitest + Testing Library)
 ```
 
-### Variáveis de ambiente (previstas)
+### Variáveis de ambiente
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
-| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017` |
-| `MONGODB_DATABASE` | Base de dados da aplicação | `consultafacil` |
-| `SERVER_PORT` | Porta da API | `8080` |
-| `CORS_ALLOWED_ORIGIN` | Origem permitida do frontend | `http://localhost:5173` |
-| `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:8080` |
+| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017/?serverSelectionTimeoutMS=5000` |
+| `MONGODB_DATABASE` | Banco usado pela API (ver "Bancos por ambiente") | `consultafacil` |
+| `SERVER_PORT` | Porta da API | `3000` |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
+| `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
+| `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:3000` |
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.
 
