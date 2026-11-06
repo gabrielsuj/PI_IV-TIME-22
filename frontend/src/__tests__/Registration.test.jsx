@@ -5,7 +5,7 @@ import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
 
-const patient = { id: 'p1', nome: 'Ana Souza', cpf: 'paciente-1', email: 'ana@example.com', telefone: '11999990000', preferenciaContato: 'E-mail' };
+const patient = { id: 'p1', nome: 'Ana Souza', cpf: '52998224725', email: 'ana@example.com' };
 
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -24,6 +24,23 @@ beforeEach(() => {
 });
 
 describe('cadastros padronizados', () => {
+  it('exibe a mensagem de CPF duplicado devolvida pelo CRUD', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_url, options) => options.method === 'POST'
+      ? response({ mensagem: 'CPF já cadastrado para outro paciente.' }, 400)
+      : response([])));
+    const user = userEvent.setup();
+    renderAt('/pacientes');
+    await screen.findByText('Nenhum registro encontrado.');
+    await user.click(screen.getByRole('button', { name: 'Novo paciente' }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Nome/), 'Ana');
+    await user.type(within(dialog).getByLabelText(/CPF/), '52998224725');
+    await user.type(within(dialog).getByLabelText(/E-mail/), 'ana@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('CPF já cadastrado para outro paciente.');
+  });
+
+
   it('filtra pacientes e mantém a estrutura acessível da tabela', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => response([patient])));
     const user = userEvent.setup();
@@ -53,6 +70,8 @@ describe('cadastros padronizados', () => {
     expect(name).toHaveFocus();
     expect(name).toHaveAttribute('aria-invalid', 'true');
     expect(name).toHaveAccessibleDescription('Preencha este campo.');
+    expect(within(dialog).getByLabelText(/E-mail/)).toHaveAttribute('aria-invalid', 'true');
+    expect(within(dialog).queryByLabelText(/Telefone/)).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -71,7 +90,8 @@ describe('cadastros padronizados', () => {
     await user.click(screen.getByRole('button', { name: 'Novo paciente' }));
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText(/Nome/), 'Beatriz Lima');
-    await user.type(within(dialog).getByLabelText(/CPF ou identificador/), 'paciente-2');
+    await user.type(within(dialog).getByLabelText(/CPF/), '11144477735');
+    await user.type(within(dialog).getByLabelText(/E-mail/), 'beatriz@example.com');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Serviço indisponível.');
@@ -81,7 +101,7 @@ describe('cadastros padronizados', () => {
     expect(await screen.findByText('Cadastro realizado.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     const [, options] = fetchMock.mock.calls.find(([, init]) => init.method === 'POST');
-    expect(JSON.parse(options.body)).toMatchObject({ nome: 'Beatriz Lima', cpf: 'paciente-2' });
+    expect(JSON.parse(options.body)).toEqual({ nome: 'Beatriz Lima', cpf: '11144477735', email: 'beatriz@example.com' });
   });
 
   it('envia a edição para o registro selecionado', async () => {

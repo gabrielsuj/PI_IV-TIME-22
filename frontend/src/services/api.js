@@ -75,6 +75,8 @@ async function parseBody(response) {
 function errorMessageFrom(data, status) {
   if (data && typeof data === 'object') {
     if (typeof data.message === 'string') return data.message;
+    if (typeof data.mensagem === 'string') return data.mensagem;
+    if (typeof data.erro === 'string') return data.erro;
     if (typeof data.error === 'string') return data.error;
     if (typeof data.error?.message === 'string') return data.error.message;
   }
