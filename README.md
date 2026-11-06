@@ -109,7 +109,7 @@ Os dados são organizados nas coleções `pacientes`, `medicos`, `especialidades
 | Git | 2.x | `git --version` |
 | Java JDK | 21 | `java -version` |
 | Maven | 3.9+ (ou Maven Wrapper do projeto) | `mvn -version` |
-| Node.js e npm | 20 LTS ou superior | `node -v` e `npm -v` |
+| Node.js e npm | 22.22+ (exigido pelo React Router 8) | `node -v` e `npm -v` |
 | MongoDB | 7.x (local) **ou** Docker + Docker Compose | `mongod --version` / `docker --version` |
 
 ### 1. Clonar o repositório
@@ -126,6 +126,8 @@ cp .env.example .env
 # TODO: ajustar os valores em .env (string de conexão do MongoDB, porta da API, segredo do token)
 ```
 
+O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT`.
+
 ### 3. Subir o banco de dados (MongoDB)
 
 Com Docker Compose:
@@ -136,14 +138,31 @@ docker compose up -d mongo
 
 Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices. Eles só rodam com o volume vazio; para recriar o banco local, use `docker compose down -v` antes do `up`.
 
-Para carregar os dados fictícios de demonstração e verificar a modelagem:
+#### Bancos por ambiente
+
+| Banco | Uso | Dados de exemplo |
+|---|---|---|
+| `consultafacil` | Desenvolvimento (padrão do `.env.example`) | sim |
+| `consultafacil_test` | Testes JUnit (os testes limpam as coleções que usam) | não |
+| `consultafacil_demo` | Apresentações, sem interferir no banco de desenvolvimento | sim |
+
+A API usa o banco definido em `MONGODB_DATABASE` no `.env`.
+
+Para recriar qualquer um deles do zero (apaga o banco, executa `database/init/` e, exceto no de testes, `database/seed/`):
 
 ```bash
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet < database/seed/01-agenda.js
+scripts/recriar-banco.sh                      # consultafacil
+scripts/recriar-banco.sh consultafacil_test
+scripts/recriar-banco.sh consultafacil_demo
+```
+
+Para verificar a modelagem:
+
+```bash
 docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
 ```
 
-Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md).
+Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md) e [`docs/modelagem/consultas.md`](docs/modelagem/consultas.md).
 
 Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
@@ -161,26 +180,29 @@ Em outro terminal:
 
 ```bash
 cd frontend
-npm install                  # TODO: instalar as dependências
-npm run dev                  # TODO: iniciar em modo de desenvolvimento (porta padrão prevista: 5173)
+npm install                  # instala as dependências
+npm run dev                  # inicia em http://localhost:5173
 ```
+
+A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API e indicam se ela está disponível. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build) e `npm run lint` (ESLint).
 
 ### 6. Executar os testes
 
 ```bash
 cd backend && mvn test       # TODO: testes de unidade e de integração (JUnit 5)
-cd frontend && npm test      # TODO: testes do frontend, se adotados
+cd frontend && npm test      # testes do frontend (Vitest + Testing Library)
 ```
 
-### Variáveis de ambiente (previstas)
+### Variáveis de ambiente
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
-| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017` |
-| `MONGODB_DATABASE` | Base de dados da aplicação | `consultafacil` |
-| `SERVER_PORT` | Porta da API | `8080` |
-| `CORS_ALLOWED_ORIGIN` | Origem permitida do frontend | `http://localhost:5173` |
-| `VITE_API_BASE_URL` | URL da API usada pelo frontend | `http://localhost:8080` |
+| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017/?serverSelectionTimeoutMS=5000` |
+| `MONGODB_DATABASE` | Banco usado pela API (ver "Bancos por ambiente") | `consultafacil` |
+| `SERVER_PORT` | Porta da API | `3000` |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
+| `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
+| `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:3000` |
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.
 
@@ -197,12 +219,18 @@ consultafacil/
 │   └── src/
 │       ├── main/java/       # handlers, serviços, repositórios e domínio
 │       └── test/java/       # testes JUnit (unidade e integração)
-├── frontend/                # Aplicação React (JavaScript)
+├── frontend/                # Aplicação React (JavaScript) com Vite
 │   ├── package.json
+│   ├── vite.config.js       # build, servidor de desenvolvimento e testes
 │   └── src/
+│       ├── main.jsx         # ponto de entrada
+│       ├── routes/          # tabela de rotas (React Router)
 │       ├── pages/           # telas
 │       ├── components/      # componentes reutilizáveis
-│       └── services/        # comunicação com a API
+│       ├── hooks/           # hooks de estado e efeitos
+│       ├── services/        # cliente HTTP centralizado (api.js) e serviços por recurso
+│       ├── styles/          # estilos globais
+│       └── __tests__/       # testes (Vitest + Testing Library)
 ├── database/                # Scripts de inicialização do MongoDB (coleções, índices, dados de demonstração)
 ├── docs/                    # Relatórios, modelagem, protótipo e demais artefatos acadêmicos
 ├── docker-compose.yml       # MongoDB para desenvolvimento local
