@@ -212,3 +212,15 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Agenda (#22) */
+.agenda-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); align-items: start; }
+.jornada-form, .bloqueio-form { display: flex; flex-direction: column; gap: var(--space-3); width: 100%; }
+.jornada-dia { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-3) 0; border: 0; border-top: 1px solid var(--color-border); }
+.jornada-dia__toggle { align-self: flex-start; font-weight: 500; }
+.jornada-dia__faixas { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.faixa-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3); }
+.faixa-row .field { width: 140px; }
+.bloqueio-form { padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.bloqueio-form__titulo { font-size: 1rem; }
+@media (max-width: 1100px) { .agenda-grid { grid-template-columns: minmax(0, 1fr); } }

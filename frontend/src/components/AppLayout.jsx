@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/pacientes', label: 'Pacientes' },
   { to: '/medicos', label: 'Médicos' },
   { to: '/especialidades', label: 'Especialidades' },
+  { to: '/agenda', label: 'Agenda' },
   { to: '/perfis', label: 'Perfis de acesso' },
   { to: '/status', label: 'Status do sistema' },
 ];

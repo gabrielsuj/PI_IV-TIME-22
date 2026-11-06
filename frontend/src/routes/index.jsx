@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import AppLayout from '../components/AppLayout';
+import AgendaPage from '../pages/AgendaPage';
 import ErrorPage from '../pages/ErrorPage';
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -25,6 +26,7 @@ export const routes = [
       { path: 'pacientes', element: <RegistrationPage key="pacientes" resource="pacientes" /> },
       { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
       { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
+      { path: 'agenda', element: <AgendaPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
