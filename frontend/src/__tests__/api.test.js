@@ -30,6 +30,15 @@ describe('buildUrl', () => {
 });
 
 describe('request', () => {
+  it.each([
+    [{ mensagem: 'CPF já cadastrado.' }, 'CPF já cadastrado.'],
+    [{ status: 400, erro: 'Dados inválidos.' }, 'Dados inválidos.'],
+  ])('preserva a mensagem no formato dos backends: %j', async (body, message) => {
+    mockFetch(async () => jsonResponse(body, { status: 400 }));
+    await expect(api.post('/pacientes', {})).rejects.toMatchObject({ status: 400, message, data: body });
+  });
+
+
   it('faz GET com cabeçalho Accept e devolve o JSON da resposta', async () => {
     const fetchMock = mockFetch(async () => jsonResponse({ status: 'ok' }));
 

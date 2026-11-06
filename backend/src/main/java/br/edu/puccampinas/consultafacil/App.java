@@ -65,19 +65,12 @@ public class App {
             .add("DELETE", "/bloqueios", bloqueioHandler);
      
 
-            // Rotas do CRUD de pacientes
-            .add("GET", "/pacientes", pacienteHandler)
-            .add("POST", "/pacientes", pacienteHandler)
-            .add("PUT", "/pacientes", pacienteHandler)
-            .add("DELETE", "/pacientes", pacienteHandler);
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0
         );
 
-        /*server.createContext("/", router);
-        server.start();*/
-                server.createContext("/", router);
+        server.createContext("/", router);
 
         // Inclui /pacientes/{id} para consulta e edição.
         server.createContext("/pacientes", exchange -> {

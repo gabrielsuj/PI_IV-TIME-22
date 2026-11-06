@@ -9,19 +9,13 @@ export const registrationSchemas = {
     searchKeys: ['nome', 'cpf', 'email'],
     fields: [
       { name: 'nome', label: 'Nome', required: true, wide: true, autoComplete: 'name' },
-      { name: 'nascimento', label: 'Data de nascimento', type: 'date', autoComplete: 'bday' },
-      { name: 'cpf', label: 'CPF ou identificador', required: true },
-      { name: 'telefone', label: 'Telefone', type: 'tel', autoComplete: 'tel' },
-      { name: 'email', label: 'E-mail', type: 'email', autoComplete: 'email' },
-      { name: 'endereco', label: 'Endereço', wide: true, autoComplete: 'street-address' },
-      { name: 'preferenciaContato', label: 'Preferência de contato', options: ['E-mail', 'Notificação no sistema'], defaultValue: 'E-mail' },
+      { name: 'cpf', label: 'CPF', required: true, pattern: '[0-9]{11}|[0-9]{3}[.][0-9]{3}[.][0-9]{3}-[0-9]{2}', patternMessage: 'Informe 11 dígitos ou use 000.000.000-00.' },
+      { name: 'email', label: 'E-mail', type: 'email', required: true, autoComplete: 'email' },
     ],
     columns: [
       { key: 'nome', label: 'Nome' },
-      { key: 'cpf', label: 'CPF ou identificador' },
-      { key: 'telefone', label: 'Telefone' },
+      { key: 'cpf', label: 'CPF' },
       { key: 'email', label: 'E-mail' },
-      { key: 'preferenciaContato', label: 'Contato', badge: true },
     ],
   },
   medicos: {
