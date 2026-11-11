@@ -7,6 +7,8 @@
  * convertida em ApiError, para que as telas tratem erros de forma uniforme.
  */
 
+import { encerrarSessaoExpirada, TOKEN_KEY } from './sessao';
+
 const FALLBACK_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -104,7 +106,7 @@ export async function request(
 ) {
   const timeoutSignal = AbortSignal.timeout(timeout);
   const finalHeaders = { Accept: 'application/json', ...headers };
-  const accessToken = sessionStorage.getItem('consultafacil.accessToken');
+  const accessToken = sessionStorage.getItem(TOKEN_KEY);
   if (accessToken && !finalHeaders.Authorization) finalHeaders.Authorization = `Bearer ${accessToken}`;
   const init = {
     method,
@@ -135,6 +137,8 @@ export async function request(
 
   const data = await parseBody(response);
   if (!response.ok) {
+    // Token recusado (expirado, inválido ou encerrado no servidor): volta para o login.
+    if (response.status === 401 && accessToken) encerrarSessaoExpirada();
     throw new ApiError(errorMessageFrom(data, response.status), {
       status: response.status,
       data,
