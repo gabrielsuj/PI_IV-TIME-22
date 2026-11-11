@@ -19,7 +19,7 @@ public class AgendaHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange ex) throws IOException {
-        // TODO #10: permitir só o próprio médico e a secretaria
+        // Perfil verificado em Rotas (#10). Pendente: restringir o MEDICO à própria agenda (medicos.usuarioId).
         ObjectId medicoId = Query.objectId(Query.obrigatorio(ex, "medicoId"), "medicoId");
         switch (ex.getRequestMethod()) {
             case "GET" -> Http.sendJson(ex, 200, service.buscar(medicoId));
