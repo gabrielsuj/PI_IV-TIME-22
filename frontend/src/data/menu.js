@@ -6,26 +6,36 @@ export const NOME_PERFIL = {
 };
 
 const TODOS = ['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'];
+const EQUIPE = ['SECRETARIA_ADMIN', 'MEDICO'];
+const SECRETARIA = ['SECRETARIA_ADMIN'];
 
 /**
- * Itens do menu lateral e os perfis que enxergam cada um.
+ * Itens do menu lateral e os perfis que podem abrir cada tela.
  *
- * O servidor continua sendo quem bloqueia o acesso (403, ver api/Rotas.java);
- * esta lista só evita mostrar no menu o que o perfil não pode usar.
+ * Regra: cadastros-base (médicos, especialidades) e a área técnica (status)
+ * ficam só com a secretaria. Médico usa pacientes (consulta) e agenda.
+ * Paciente vê apenas o início e os perfis; a tela com as próprias consultas
+ * entra com a #30.
  *
- * TODO(Gabriel): ajustar `perfis` de cada item conforme a matriz de permissões.
- * Hoje todos os itens aparecem para os três perfis.
+ * O servidor continua sendo quem bloqueia o acesso aos dados (403, ver
+ * api/Rotas.java); aqui decidimos o que aparece no menu e quais telas abrem.
  */
 export const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true, perfis: TODOS },
-  { to: '/pacientes', label: 'Pacientes', perfis: TODOS },
-  { to: '/medicos', label: 'Médicos', perfis: TODOS },
-  { to: '/especialidades', label: 'Especialidades', perfis: TODOS },
-  { to: '/agenda', label: 'Agenda', perfis: TODOS },
+  { to: '/pacientes', label: 'Pacientes', perfis: EQUIPE },
+  { to: '/medicos', label: 'Médicos', perfis: SECRETARIA },
+  { to: '/especialidades', label: 'Especialidades', perfis: SECRETARIA },
+  { to: '/agenda', label: 'Agenda', perfis: EQUIPE },
   { to: '/perfis', label: 'Perfis de acesso', perfis: TODOS },
-  { to: '/status', label: 'Status do sistema', perfis: TODOS },
+  { to: '/status', label: 'Status do sistema', perfis: SECRETARIA },
 ];
 
 export function itensDoMenu(perfil) {
   return NAV_ITEMS.filter((item) => item.perfis.includes(perfil));
+}
+
+/** Se o perfil pode abrir a tela do endereço. Endereços fora do menu (ex.: 404) ficam liberados. */
+export function podeAbrir(pathname, perfil) {
+  const item = NAV_ITEMS.find(({ to }) => (to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)));
+  return !item || item.perfis.includes(perfil);
 }
