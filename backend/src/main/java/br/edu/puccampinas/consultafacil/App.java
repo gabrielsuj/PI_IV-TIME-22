@@ -3,6 +3,7 @@ package br.edu.puccampinas.consultafacil;
 
 import br.edu.puccampinas.consultafacil.api.Router;
 import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
@@ -10,11 +11,14 @@ import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 
 import br.edu.puccampinas.consultafacil.config.*;
 import br.edu.puccampinas.consultafacil.repository.*;
+import br.edu.puccampinas.consultafacil.security.*;
 import br.edu.puccampinas.consultafacil.service.*;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
+import java.time.Duration;
 
 public class App {
     public static void main(String[] args) throws IOException {
@@ -54,10 +58,21 @@ public class App {
             )
         );
 
+        // Login e sessão (#9)
+        var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));
+        var autenticador = new Autenticador(sessoes);
+        var authHandler = new AuthHandler(
+            new AuthService(new UsuarioRepository.Mongo(db), new SenhaHasher(), sessoes, Clock.systemUTC()),
+            autenticador
+        );
+
         // Rotas da aplicação
         var cors = new Cors(config.corsAllowedOrigins());
         Router router = new Router(cors)
             .add("GET", "/health", new HealthHandler())
+            .add("POST", "/auth/login", authHandler)
+            .add("POST", "/auth/logout", authHandler)
+            .add("GET", "/auth/me", authHandler)
             .add("GET", "/agendas", agendaHandler)
             .add("PUT", "/agendas", agendaHandler)
             .add("GET", "/bloqueios", bloqueioHandler)
