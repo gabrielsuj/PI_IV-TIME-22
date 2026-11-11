@@ -29,13 +29,13 @@ mongo --eval 'db.dropDatabase()' > /dev/null
 
 for f in "$RAIZ"/database/init/*.js; do
   echo "  init: $(basename "$f")"
-  mongo < "$f" > /dev/null
+  mongo --file /dev/stdin < "$f" > /dev/null
 done
 
 if [ "$BANCO" != "consultafacil_test" ]; then
   for f in "$RAIZ"/database/seed/*.js; do
     echo "  seed: $(basename "$f")"
-    mongo < "$f" > /dev/null
+    mongo --file /dev/stdin < "$f" > /dev/null
   done
 fi
 

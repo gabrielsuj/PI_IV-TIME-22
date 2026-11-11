@@ -1,7 +1,7 @@
 // Executado automaticamente somente na inicialização de um volume Mongo vazio.
 // Para uma base existente, executar este arquivo no mongosh da base consultafacil.
 // Não remove ou corrige dados existentes; duplicidades devem ser resolvidas antes.
-db = db.getSiblingDB("consultafacil");
+// Usa o banco selecionado pelo mongosh (desenvolvimento, teste ou demonstração).
 const pacienteValidator = { $jsonSchema: {
   bsonType: "object",
   required: ["nome", "cpf", "email"],
