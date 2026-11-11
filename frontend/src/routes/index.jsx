@@ -1,5 +1,7 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Outlet } from 'react-router';
 import AppLayout from '../components/AppLayout';
+import RequireAuth from '../components/RequireAuth';
+import AuthProvider from '../contexts/AuthProvider';
 import AgendaPage from '../pages/AgendaPage';
 import ErrorPage from '../pages/ErrorPage';
 import HomePage from '../pages/HomePage';
@@ -10,24 +12,41 @@ import ProfilesPage from '../pages/ProfilesPage';
 import RegistrationPage from '../pages/RegistrationPage';
 
 /**
- * Tabela de rotas da aplicação. Novas telas entram como filhas de AppLayout
- * para herdar o cabeçalho e a navegação.
+ * Tabela de rotas da aplicação.
+ *
+ * /login fica fora do layout (sem menu lateral). Todas as outras telas exigem
+ * login (RequireAuth) e entram como filhas de AppLayout para herdar o
+ * cabeçalho e a navegação.
  */
 export const routes = [
   {
-    path: '/',
-    element: <AppLayout />,
+    element: (
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    ),
     errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: 'status', element: <StatusPage /> },
-      { path: 'login', element: <LoginPage /> },
-      { path: 'perfis', element: <ProfilesPage /> },
-      { path: 'pacientes', element: <RegistrationPage key="pacientes" resource="pacientes" /> },
-      { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
-      { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
-      { path: 'agenda', element: <AgendaPage /> },
-      { path: '*', element: <NotFoundPage /> },
+      { path: '/login', element: <LoginPage /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            path: '/',
+            element: <AppLayout />,
+            children: [
+              { index: true, element: <HomePage /> },
+              { path: 'status', element: <StatusPage /> },
+              { path: 'perfis', element: <ProfilesPage /> },
+              { path: 'pacientes', element: <RegistrationPage key="pacientes" resource="pacientes" /> },
+              { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
+              { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
+              { path: 'agenda', element: <AgendaPage /> },
+              { path: '*', element: <NotFoundPage /> },
+            ],
+          },
+        ],
+      },
     ],
   },
 ];

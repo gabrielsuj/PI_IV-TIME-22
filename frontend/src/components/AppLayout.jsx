@@ -1,17 +1,11 @@
 import { NavLink, Outlet } from 'react-router';
-import Button from './ui/Button';
-
-const NAV_ITEMS = [
-  { to: '/', label: 'Início', end: true },
-  { to: '/pacientes', label: 'Pacientes' },
-  { to: '/medicos', label: 'Médicos' },
-  { to: '/especialidades', label: 'Especialidades' },
-  { to: '/agenda', label: 'Agenda' },
-  { to: '/perfis', label: 'Perfis de acesso' },
-  { to: '/status', label: 'Status do sistema' },
-];
+import { itensDoMenu } from '../data/menu';
+import { useAuth } from '../hooks/useAuth';
+import UserMenu from './UserMenu';
 
 export default function AppLayout() {
+  const { usuario } = useAuth();
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -20,13 +14,13 @@ export default function AppLayout() {
             <span className="app-brand__mark" aria-hidden="true">+</span>
             <span>ConsultaFácil<small>Agendamento de consultas médicas</small></span>
           </NavLink>
-          <Button to="/login" variant="outline">Acessar conta</Button>
+          <UserMenu />
         </div>
       </header>
       <div className="app-body">
         <nav className="app-sidebar" aria-label="Navegação principal">
           <ul className="app-nav">
-            {NAV_ITEMS.map(({ to, label, end }) => (
+            {itensDoMenu(usuario?.perfil).map(({ to, label, end }) => (
               <li key={to}>
                 <NavLink to={to} end={end} className="app-nav__link">
                   {label}
