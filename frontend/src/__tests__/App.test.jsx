@@ -2,8 +2,14 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
+import { entrarComo } from './sessaoTeste';
+
+beforeEach(() => {
+  sessionStorage.clear();
+  entrarComo();
+});
 
 function renderAt(path) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });

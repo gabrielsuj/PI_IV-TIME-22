@@ -4,6 +4,7 @@ import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
+import { entrarComo } from './sessaoTeste';
 import { formatarPeriodo, horaParaMinutos, minutosParaHora } from '../utils/horario';
 
 const ANA = { id: 'm1', nome: 'Ana Martins', crmNumero: '000123', crmUf: 'SP', especialidadeIds: ['e1'], ativo: true };
@@ -45,6 +46,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true; } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; } });
   sessionStorage.clear();
+  entrarComo();
 });
 
 describe('conversões de horário', () => {

@@ -4,6 +4,7 @@ import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
+import { entrarComo } from './sessaoTeste';
 
 const patient = { id: 'p1', nome: 'Ana Souza', cpf: '52998224725', email: 'ana@example.com' };
 
@@ -21,6 +22,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true; } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; } });
   sessionStorage.clear();
+  entrarComo();
 });
 
 describe('cadastros padronizados', () => {
@@ -180,6 +182,7 @@ describe('telas de acesso', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
+    sessionStorage.clear();
     renderAt('/login');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
     expect(screen.getByLabelText(/E-mail/)).toHaveAccessibleDescription('Informe um e-mail válido.');
