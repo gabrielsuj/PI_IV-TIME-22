@@ -1,10 +1,12 @@
-import { NavLink, Outlet } from 'react-router';
-import { itensDoMenu } from '../data/menu';
+import { NavLink, Outlet, useLocation } from 'react-router';
+import { itensDoMenu, podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
+import AccessDeniedPage from '../pages/AccessDeniedPage';
 import UserMenu from './UserMenu';
 
 export default function AppLayout() {
   const { usuario } = useAuth();
+  const { pathname } = useLocation();
 
   return (
     <div className="app-shell">
@@ -30,7 +32,7 @@ export default function AppLayout() {
           </ul>
         </nav>
         <main className="app-main">
-          <Outlet />
+          {podeAbrir(pathname, usuario?.perfil) ? <Outlet /> : <AccessDeniedPage />}
         </main>
       </div>
     </div>
