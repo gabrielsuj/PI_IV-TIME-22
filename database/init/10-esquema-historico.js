@@ -32,7 +32,7 @@ const NULO = { bsonType: "null" };
 // Domínio único de status da consulta (definição de referência: historico.md)
 const STATUS_CONSULTA = ["AGENDADA", "CONFIRMADA", "CANCELADA", "CONCLUIDA", "FALTA"];
 
-const ATORES = ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR", "SISTEMA"];
+const ATORES = ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN", "SISTEMA"];
 const ATIVAS = ["AGENDADA", "CONFIRMADA"];
 
 // Monta o ramo de validação de um evento (tabela "Eventos" de historico.md)
@@ -88,6 +88,9 @@ aplicarEsquema("historico", {
           statusNovo: { enum: STATUS_CONSULTA },
           pacienteId: OID,
           medicoId: OID, // médico da consulta após o evento
+          // Opcionais para preservar eventos antigos; novos eventos Java preenchem ambos.
+          especialidadeId: OID,
+          fimConsulta: DATA,
           dataHoraConsulta: DATA, // início do horário após o evento
           ator: {
             bsonType: "object",
@@ -107,8 +110,8 @@ aplicarEsquema("historico", {
               additionalProperties: false,
               properties: {
                 campo: { bsonType: "string", minLength: 1 },
-                valorAnterior: { bsonType: ["string", "number", "date", "objectId"] },
-                valorNovo: { bsonType: ["string", "number", "date", "objectId"] }
+                valorAnterior: { bsonType: ["string", "number", "date", "objectId", "null"] },
+                valorNovo: { bsonType: ["string", "number", "date", "objectId", "null"] }
               }
             }
           },
@@ -124,32 +127,32 @@ aplicarEsquema("historico", {
         anyOf: [
           ramoHistorico({
             evento: "CRIACAO", anterior: null, novo: ["AGENDADA"],
-            atores: ["PACIENTE", "SECRETARIA", "ADMINISTRADOR"],
+            atores: ["PACIENTE", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             proibe: ["alteracoes", "totalSinalizados"]
           }),
           ramoHistorico({
             evento: "CONFIRMACAO", anterior: ["AGENDADA"], novo: ["CONFIRMADA"],
-            atores: ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR"],
+            atores: ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             proibe: ["alteracoes", "totalSinalizados"]
           }),
           ramoHistorico({
             evento: "ALTERACAO", anterior: ATIVAS, novo: ATIVAS, // igualdade validada no $expr abaixo
-            atores: ["SECRETARIA", "ADMINISTRADOR"],
+            atores: ["SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             exige: ["alteracoes"], proibe: ["totalSinalizados"]
           }),
           ramoHistorico({
             evento: "CANCELAMENTO", anterior: ATIVAS, novo: ["CANCELADA"],
-            atores: ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR"],
+            atores: ["PACIENTE", "MEDICO", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             proibe: ["alteracoes", "totalSinalizados"]
           }),
           ramoHistorico({
             evento: "CONCLUSAO", anterior: ATIVAS, novo: ["CONCLUIDA"],
-            atores: ["MEDICO", "SECRETARIA", "ADMINISTRADOR"],
+            atores: ["MEDICO", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             proibe: ["alteracoes", "totalSinalizados"]
           }),
           ramoHistorico({
             evento: "FALTA", anterior: ATIVAS, novo: ["FALTA"],
-            atores: ["MEDICO", "SECRETARIA", "ADMINISTRADOR"],
+            atores: ["MEDICO", "SECRETARIA", "ADMINISTRADOR", "SECRETARIA_ADMIN"],
             proibe: ["alteracoes", "totalSinalizados"]
           }),
           ramoHistorico({

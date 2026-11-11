@@ -1,5 +1,7 @@
 # Dicionário de Dados da Coleção `historico` do Banco de Dados MongoDB do ConsultaFácil – Sistema de Agendamento de Consultas com Fila de Espera para Clínicas e Consultórios
 
+> Implementação Java e compatibilidade com a autenticação atual: [registro e recuperação de histórico](historico-implementacao.md). O documento abaixo mantém a modelagem original; o complemento descreve os ajustes de atores, campos e sequência para a implementação.
+
 ## Histórico de Versões/Revisões
 
 | Data | Autor | Versão | Comentários |
