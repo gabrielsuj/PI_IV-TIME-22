@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -67,5 +67,37 @@ describe('sessão e rotas protegidas', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(await screen.findByText('Sua sessão expirou. Entre novamente para continuar.')).toBeInTheDocument();
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+});
+
+describe('menu e telas por perfil', () => {
+  const menu = () => within(screen.getByRole('navigation', { name: 'Navegação principal' }))
+    .getAllByRole('link').map((link) => link.textContent);
+
+  it('secretaria vê todos os itens', () => {
+    entrarComo();
+    renderAt('/perfis');
+    expect(menu()).toEqual(['Início', 'Pacientes', 'Médicos', 'Especialidades', 'Agenda', 'Perfis de acesso', 'Status do sistema']);
+  });
+
+  it('médico vê pacientes e agenda, sem cadastros-base nem status', () => {
+    entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
+    renderAt('/perfis');
+    expect(menu()).toEqual(['Início', 'Pacientes', 'Agenda', 'Perfis de acesso']);
+  });
+
+  it('paciente vê apenas início e perfis', () => {
+    entrarComo({ id: 'u-paciente', nome: 'Paulo Paciente', perfil: 'PACIENTE' });
+    renderAt('/perfis');
+    expect(menu()).toEqual(['Início', 'Perfis de acesso']);
+  });
+
+  it('bloqueia a tela aberta pelo endereço quando o perfil não tem acesso', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
+    renderAt('/medicos');
+    expect(screen.getByRole('heading', { name: 'Acesso não permitido' })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
