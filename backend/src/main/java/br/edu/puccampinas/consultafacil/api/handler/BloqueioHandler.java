@@ -19,7 +19,7 @@ public class BloqueioHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange ex) throws IOException {
-        // TODO #10: permitir só o próprio médico e a secretaria
+        // Perfil verificado em Rotas (#10). Pendente: restringir o MEDICO aos próprios bloqueios (medicos.usuarioId).
         Map<String, String> q = Query.params(ex);
         switch (ex.getRequestMethod()) {
             case "GET" -> Http.sendJson(ex, 200, service.listar(

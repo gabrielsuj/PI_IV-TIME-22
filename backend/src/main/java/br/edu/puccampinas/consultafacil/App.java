@@ -1,6 +1,7 @@
 
 package br.edu.puccampinas.consultafacil;
 
+import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.Router;
 import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
@@ -66,20 +67,11 @@ public class App {
             autenticador
         );
 
-        // Rotas da aplicação
+        // Rotas e permissões por perfil (#10): a tabela fica em api/Rotas.java
         var cors = new Cors(config.corsAllowedOrigins());
-        Router router = new Router(cors)
-            .add("GET", "/health", new HealthHandler())
-            .add("POST", "/auth/login", authHandler)
-            .add("POST", "/auth/logout", authHandler)
-            .add("GET", "/auth/me", authHandler)
-            .add("GET", "/agendas", agendaHandler)
-            .add("PUT", "/agendas", agendaHandler)
-            .add("GET", "/bloqueios", bloqueioHandler)
-            .add("POST", "/bloqueios", bloqueioHandler)
-            .add("DELETE", "/bloqueios", bloqueioHandler);
-     
-
+        var autorizacao = new Autorizacao(autenticador);
+        Router router = Rotas.router(cors, autorizacao, new Rotas.Handlers(
+            new HealthHandler(), authHandler, agendaHandler, bloqueioHandler, pacienteHandler));
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0
@@ -88,20 +80,7 @@ public class App {
         server.createContext("/", router);
 
         // Inclui /pacientes/{id} para consulta e edição.
-        server.createContext("/pacientes", exchange -> {
-            try {
-                cors.addHeaders(exchange);
-
-                if ("OPTIONS".equals(exchange.getRequestMethod())) {
-                    exchange.sendResponseHeaders(204, -1);
-                    return;
-                }
-
-                pacienteHandler.handle(exchange);
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
 
         server.start();
 
