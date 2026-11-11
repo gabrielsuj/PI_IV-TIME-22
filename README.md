@@ -156,6 +156,38 @@ scripts/recriar-banco.sh consultafacil_test
 scripts/recriar-banco.sh consultafacil_demo
 ```
 
+#### Demonstração com dados prontos
+
+Com o container Mongo em funcionamento, execute na raiz do projeto:
+
+PowerShell (Windows):
+
+```powershell
+.\scripts\recriar-banco.ps1 consultafacil_demo
+```
+
+Bash (Linux, macOS ou Git Bash):
+
+```bash
+bash scripts/recriar-banco.sh consultafacil_demo
+```
+
+O comando apaga **somente o banco selecionado**, reaplica os schemas e índices e carrega, em ordem, os scripts de `database/seed/`. A recriação de `consultafacil_demo` não apaga os bancos de desenvolvimento ou testes. O script PowerShell usa demonstração como padrão; o Bash mantém o padrão existente de desenvolvimento. Ambos deixam `consultafacil_test` sem seeds.
+
+A carga inclui 2 especialidades, 2 médicos, 2 agendas semanais, 1 bloqueio de exemplo, 3 usuários e 3 pacientes fictícios. Os IDs fixos permitem repetir os seeds sem duplicar registros. O seed de usuários preserva senhas existentes; a recriação completa restaura a senha de demonstração.
+
+| Perfil | E-mail | Senha de demonstração |
+|---|---|---|
+| Secretaria/administrador | secretaria@consultafacil.demo | Demo@123 |
+| Médico | ana.martins@consultafacil.demo | Demo@123 |
+| Paciente | paciente@consultafacil.demo | Demo@123 |
+
+As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `SenhaHasher`. O login da médica está vinculado ao cadastro de Ana; Paulo aparece tanto como usuário quanto como paciente, com o mesmo CPF e e-mail.
+
+Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. Use a conta da secretaria para cadastrar e editar pacientes; médicos têm acesso de leitura aos pacientes e acesso às agendas e bloqueios. O perfil paciente pode autenticar, mas não tem acesso a essas rotas administrativas.
+
+Enquanto a listagem de médicos não possui endpoint, abra a agenda de Ana diretamente em `/agenda?medicoId=100000000000000000000001`. O bloqueio existente é de **26/10/2026, das 09h às 10h**, no fuso de São Paulo; sua data foi preservada.
+
 Para verificar a modelagem:
 
 ```bash
