@@ -29,6 +29,19 @@ const healthy = async () =>
   });
 
 describe('roteamento', () => {
+  it.each(['MEDICO', 'PACIENTE'])('os atalhos iniciais respeitam o perfil %s', async (perfil) => {
+    entrarComo({ id: 'u-perfil', nome: 'Teste', perfil });
+    mockHealth(healthy);
+    renderAt('/');
+    expect(await screen.findByText('API disponível')).toBeInTheDocument();
+    const main = within(screen.getByRole('main'));
+    expect(main.queryByRole('link', { name: 'Gerenciar médicos' })).not.toBeInTheDocument();
+    expect(main.queryByRole('link', { name: 'Gerenciar especialidades' })).not.toBeInTheDocument();
+    expect(main.queryByRole('link', { name: 'Ver detalhes da conexão' })).not.toBeInTheDocument();
+    if (perfil === 'MEDICO') expect(main.getByRole('link', { name: 'Consultar pacientes' })).toHaveAttribute('href', '/pacientes');
+    else expect(main.queryByRole('link', { name: /pacientes/i })).not.toBeInTheDocument();
+  });
+
   it('renderiza a página inicial com o cabeçalho de navegação', async () => {
     mockHealth(healthy);
     renderAt('/');

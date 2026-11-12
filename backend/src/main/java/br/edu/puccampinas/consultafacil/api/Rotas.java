@@ -17,6 +17,8 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET/POST/DELETE /bloqueios   |    -     |   ✓    |   ✓
  *  GET  /pacientes[/{id}]       |    -     |   ✓    |   ✓
  *  POST/PUT /pacientes[/{id}]   |    -     |   -    |   ✓
+ *  GET /medicos, /especialidades[/{id}] | ✓ | ✓ | ✓
+ *  POST/PUT desses cadastros    |    -     |   -    |   ✓
  */
 public final class Rotas {
     private Rotas() {}
@@ -44,6 +46,26 @@ public final class Rotas {
     public static HttpHandler pacientes(Cors cors, Autorizacao autz, HttpHandler pacientes) {
         HttpHandler leitura = autz.exigir(pacientes, MEDICO, SECRETARIA_ADMIN);
         HttpHandler escrita = autz.exigir(pacientes, SECRETARIA_ADMIN);
+        return ex -> {
+            try {
+                cors.addHeaders(ex);
+                if ("OPTIONS".equals(ex.getRequestMethod())) {
+                    ex.sendResponseHeaders(204, -1);
+                    return;
+                }
+                ("GET".equals(ex.getRequestMethod()) ? leitura : escrita).handle(ex);
+            } catch (ApiException e) {
+                Http.sendError(ex, e.status(), e.getMessage());
+            } finally {
+                ex.close();
+            }
+        };
+    }
+
+    /** Leitura de catálogos para todos os perfis; manutenção exclusiva da secretaria/admin. */
+    public static HttpHandler catalogo(Cors cors, Autorizacao autz, HttpHandler handler) {
+        HttpHandler leitura = autz.exigir(handler, PACIENTE, MEDICO, SECRETARIA_ADMIN);
+        HttpHandler escrita = autz.exigir(handler, SECRETARIA_ADMIN);
         return ex -> {
             try {
                 cors.addHeaders(ex);

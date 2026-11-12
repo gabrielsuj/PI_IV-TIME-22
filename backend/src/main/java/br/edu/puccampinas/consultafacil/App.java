@@ -6,6 +6,7 @@ import br.edu.puccampinas.consultafacil.api.Router;
 import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
+import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
@@ -45,6 +46,9 @@ public class App {
 
         // Agendas (develop)
         var medicos = new MedicoRepository(db);
+        var especialidades = new EspecialidadeRepository.Mongo(db);
+        var medicoHandler = CadastroHandler.medicos(new MedicoService(medicos, especialidades));
+        var especialidadeHandler = CadastroHandler.especialidades(new EspecialidadeService(especialidades, medicos));
         var agendaRepo = new AgendaRepository(db);
         var agendaHandler = new AgendaHandler(
             new AgendaService(agendaRepo, medicos)
@@ -81,6 +85,8 @@ public class App {
 
         // Inclui /pacientes/{id} para consulta e edição.
         server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
+        server.createContext("/medicos", Rotas.catalogo(cors, autorizacao, medicoHandler));
+        server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
 
         server.start();
 

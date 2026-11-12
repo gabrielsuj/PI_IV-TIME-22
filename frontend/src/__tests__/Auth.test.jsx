@@ -38,7 +38,7 @@ describe('sessão e rotas protegidas', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/perfis'));
-    expect(screen.getByRole('button', { name: 'Conta de Sofia Secretaria' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Conta de Sofia Secretaria' })).toBeInTheDocument();
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe('abc');
   });
 

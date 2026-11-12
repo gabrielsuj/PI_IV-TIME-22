@@ -42,12 +42,11 @@ export const registrationSchemas = {
     description: 'Especialidades oferecidas pela clínica, usadas no agendamento e na fila de espera.',
     formDescription: 'Cadastre as áreas de atendimento da clínica.',
     searchLabel: 'Buscar especialidade',
-    searchKeys: ['nome', 'descricao'],
+    searchKeys: ['nome', 'codigo'],
     cards: true,
     fields: [
       { name: 'nome', label: 'Nome', required: true, wide: true },
       { name: 'codigo', label: 'Código', required: true, wide: true, pattern: '[a-z0-9-]+', patternMessage: 'Use letras minúsculas, números e hífens.', hint: 'Identificador único, por exemplo: cardiologia.' },
-      { name: 'descricao', label: 'Descrição', as: 'textarea', rows: 3, wide: true },
       { name: 'ativa', label: 'Status', options: [{ value: 'true', label: 'Ativo' }, { value: 'false', label: 'Inativo' }], defaultValue: 'true', dataType: 'boolean' },
     ],
   },

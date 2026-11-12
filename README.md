@@ -186,7 +186,7 @@ As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `Senha
 
 Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. Use a conta da secretaria para cadastrar e editar pacientes; médicos têm acesso de leitura aos pacientes e acesso às agendas e bloqueios. O perfil paciente pode autenticar, mas não tem acesso a essas rotas administrativas.
 
-Enquanto a listagem de médicos não possui endpoint, abra a agenda de Ana diretamente em `/agenda?medicoId=100000000000000000000001`. O bloqueio existente é de **26/10/2026, das 09h às 10h**, no fuso de São Paulo; sua data foi preservada.
+A agenda carrega os médicos de `GET /medicos`, disponível para médico e secretaria autenticados. Selecione Ana em `/agenda` ou abra diretamente `/agenda?medicoId=100000000000000000000001`. O bloqueio existente é de **26/10/2026, das 09h às 10h**, no fuso de São Paulo; sua data foi preservada. O contrato do cadastro está em [docs/api/medicos-especialidades.md](docs/api/medicos-especialidades.md).
 
 Para verificar a modelagem:
 

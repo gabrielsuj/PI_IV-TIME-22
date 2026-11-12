@@ -65,6 +65,16 @@ describe('conversões de horário', () => {
 });
 
 describe('tela de agenda', () => {
+  it('carrega o catálogo da API para o médico mesmo sem acesso à tela de cadastro', async () => {
+    entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
+    const fetchMock = mockApi({ 'GET /medicos': () => response([ANA]) });
+    renderAt('/agenda');
+    expect(await screen.findByRole('option', { name: /Ana Martins/ })).toBeInTheDocument();
+    const nav = within(screen.getByRole('navigation', { name: 'Navegação principal' }));
+    expect(nav.queryByRole('link', { name: 'Médicos' })).not.toBeInTheDocument();
+    expect(chamadas(fetchMock, 'GET', '/medicos')).toHaveLength(1);
+  });
+
   it('pede para escolher um médico quando nenhum está selecionado', async () => {
     mockApi({ 'GET /medicos': () => response([ANA]) });
     renderAt('/agenda');
