@@ -11,6 +11,7 @@ import StatusPage from '../pages/StatusPage';
 import LoginPage from '../pages/LoginPage';
 import ProfilesPage from '../pages/ProfilesPage';
 import RegistrationPage from '../pages/RegistrationPage';
+import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
 
 /**
  * Tabela de rotas da aplicação.
@@ -43,7 +44,10 @@ export const routes = [
               { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
               { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
               { path: 'agenda', element: <AgendaPage /> },
-              { path: 'nova-consulta', element: <NovaConsultaPage /> },
+              {
+                path: 'nova-consulta',
+                element: <NovaConsultaPage buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />,
+              },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

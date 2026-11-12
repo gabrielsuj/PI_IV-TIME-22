@@ -71,6 +71,6 @@ export default function PacienteAgendamento({ value, onChange, disabled = false 
   if (usuario?.perfil === 'SECRETARIA_ADMIN') return <SelecaoPaciente value={value} onChange={onChange} disabled={disabled} />;
   if (usuario?.perfil !== 'PACIENTE') return null;
 
-  // Necessita issue #21 para resolver o paciente da sessão no servidor.
+  // O servidor descobre o cadastro do paciente pela sessão (pacientes.usuarioId, #21).
   return <Card title="Quem será atendido"><p>Você está escolhendo um atendimento para você, {usuario.nome}.</p></Card>;
 }
