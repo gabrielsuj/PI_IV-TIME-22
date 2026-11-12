@@ -53,8 +53,11 @@ public class App {
         var medicoHandler = CadastroHandler.medicos(new MedicoService(medicos, especialidades));
         var especialidadeHandler = CadastroHandler.especialidades(new EspecialidadeService(especialidades, medicos));
         var agendaRepo = new AgendaRepository(db);
+        var consultaRepo = new ConsultaRepository(db);
+        // Consultas atingidas por mudança de jornada ou bloqueio (#44)
+        var consultasAfetadas = new ConsultasAfetadas(consultaRepo, new NomesRepository.Mongo(db));
         var agendaHandler = new AgendaHandler(
-            new AgendaService(agendaRepo, medicos)
+            new AgendaService(agendaRepo, medicos, consultasAfetadas, Clock.systemUTC())
         );
 
         // Bloqueios (develop)
@@ -63,12 +66,12 @@ public class App {
             new BloqueioService(
                 bloqueioRepo,
                 agendaRepo,
-                medicos
+                medicos,
+                consultasAfetadas
             )
         );
 
         // Disponibilidade (#20) e busca de vagas + agendamento (#21)
-        var consultaRepo = new ConsultaRepository(db);
         var historico = new HistoricoProcessor(consultaRepo, new HistoricoRepository.Mongo(db));
         var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC());
         var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, Clock.systemUTC());

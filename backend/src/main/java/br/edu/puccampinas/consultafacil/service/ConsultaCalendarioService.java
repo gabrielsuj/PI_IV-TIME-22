@@ -10,15 +10,11 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Leitura das consultas de um médico num período, para o calendário operacional (#23).
@@ -57,26 +53,7 @@ public class ConsultaCalendarioService {
                 Date.from(inicio.atStartOfDay(fuso).toInstant()),
                 Date.from(fim.plusDays(1).atStartOfDay(fuso).toInstant()));
 
-        Map<ObjectId, String> pacientes = nomes.pacientes(ids(docs, "pacienteId"));
-        Map<ObjectId, String> especialidades = nomes.especialidades(ids(docs, "especialidadeId"));
-        return docs.stream().map(d -> new ConsultaCalendarioResponse(
-                d.getObjectId("_id").toHexString(),
-                medicoId.toHexString(),
-                d.getObjectId("pacienteId").toHexString(),
-                pacientes.get(d.getObjectId("pacienteId")),
-                d.getObjectId("especialidadeId").toHexString(),
-                especialidades.get(d.getObjectId("especialidadeId")),
-                local(d.getDate("inicio"), fuso),
-                local(d.getDate("fim"), fuso),
-                d.getString("status"))).toList();
-    }
-
-    private static Set<ObjectId> ids(List<Document> docs, String campo) {
-        return docs.stream().map(d -> d.getObjectId(campo)).collect(Collectors.toSet());
-    }
-
-    private static String local(Date instante, ZoneId fuso) {
-        return LocalDateTime.ofInstant(instante.toInstant(), fuso).toString();
+        return new ConsultasAfetadas(consultas, nomes).resumir(docs, medicoId, fuso);
     }
 
     private static LocalDate data(String valor, String campo) {

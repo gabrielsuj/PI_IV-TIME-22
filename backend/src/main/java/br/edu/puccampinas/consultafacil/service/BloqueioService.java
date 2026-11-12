@@ -1,6 +1,7 @@
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
 import br.edu.puccampinas.consultafacil.api.Query;
 import br.edu.puccampinas.consultafacil.api.dto.BloqueioRequest;
 import br.edu.puccampinas.consultafacil.api.dto.BloqueioResponse;
@@ -22,14 +23,24 @@ public class BloqueioService {
     private final BloqueioRepository bloqueios;
     private final AgendaRepository agendas;
     private final MedicoRepository medicos;
+    private final ConsultasAfetadas afetadas;
 
-    public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos) {
+    public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos,
+                           ConsultasAfetadas afetadas) {
         this.bloqueios = bloqueios;
         this.agendas = agendas;
         this.medicos = medicos;
+        this.afetadas = afetadas;
     }
 
-    public BloqueioResponse criar(BloqueioRequest r) {
+    public BloqueioResponse criar(BloqueioRequest r) { return criar(r, false); }
+
+    /**
+     * Cria o bloqueio. Se houver consultas ativas no período e o usuário ainda não confirmou,
+     * recusa com 409 listando as consultas (#44). Confirmado, grava o bloqueio e mantém as
+     * consultas, que aparecem como "Remarcar" no calendário (#23).
+     */
+    public BloqueioResponse criar(BloqueioRequest r, boolean confirmado) {
         ObjectId medicoId = Query.objectId(r.medicoId(), "medicoId");
         if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
 
@@ -41,7 +52,12 @@ public class BloqueioService {
 
         if (!bloqueios.sobrepostos(medicoId, Date.from(inicio), Date.from(fim)).isEmpty())
             throw ApiException.conflict("Já existe um bloqueio nesse período");
-        // TODO #44: listar consultas ativas dentro do período e recusar ou exigir confirmação
+        if (!confirmado) {
+            var atingidas = afetadas.noPeriodo(medicoId, inicio, fim, fuso);
+            if (!atingidas.isEmpty())
+                throw new ConflitoComConsultasException("O período tem " + atingidas.size()
+                        + " consulta(s) marcada(s). Confirme para bloquear mesmo assim; elas precisarão ser remarcadas.", atingidas);
+        }
 
         Document d = new Document("medicoId", medicoId)
                 .append("inicio", Date.from(inicio))

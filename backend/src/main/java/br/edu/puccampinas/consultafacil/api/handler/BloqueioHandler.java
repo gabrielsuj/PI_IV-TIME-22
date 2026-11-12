@@ -1,6 +1,7 @@
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
 import br.edu.puccampinas.consultafacil.api.Http;
 import br.edu.puccampinas.consultafacil.api.Query;
 import br.edu.puccampinas.consultafacil.api.dto.BloqueioRequest;
@@ -24,7 +25,13 @@ public class BloqueioHandler implements HttpHandler {
         switch (ex.getRequestMethod()) {
             case "GET" -> Http.sendJson(ex, 200, service.listar(
                     Query.objectId(Query.obrigatorio(ex, "medicoId"), "medicoId"), q.get("de"), q.get("ate")));
-            case "POST" -> Http.sendJson(ex, 201, service.criar(Http.readJson(ex, BloqueioRequest.class)));
+            case "POST" -> {
+                try {
+                    Http.sendJson(ex, 201, service.criar(Http.readJson(ex, BloqueioRequest.class), Query.confirmado(ex)));
+                } catch (ConflitoComConsultasException e) {
+                    Http.sendJson(ex, 409, e.resposta()); // 409 com a lista das consultas afetadas (#44)
+                }
+            }
             case "DELETE" -> {
                 service.remover(Query.objectId(Query.obrigatorio(ex, "id"), "id"));
                 Http.sendJson(ex, 200, Map.of("removido", true));

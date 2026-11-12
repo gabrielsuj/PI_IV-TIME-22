@@ -1,6 +1,7 @@
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
 import br.edu.puccampinas.consultafacil.api.Http;
 import br.edu.puccampinas.consultafacil.api.Query;
 import br.edu.puccampinas.consultafacil.api.dto.AgendaRequest;
@@ -23,7 +24,13 @@ public class AgendaHandler implements HttpHandler {
         ObjectId medicoId = Query.objectId(Query.obrigatorio(ex, "medicoId"), "medicoId");
         switch (ex.getRequestMethod()) {
             case "GET" -> Http.sendJson(ex, 200, service.buscar(medicoId));
-            case "PUT" -> Http.sendJson(ex, 200, service.salvar(medicoId, Http.readJson(ex, AgendaRequest.class)));
+            case "PUT" -> {
+                try {
+                    Http.sendJson(ex, 200, service.salvar(medicoId, Http.readJson(ex, AgendaRequest.class), Query.confirmado(ex)));
+                } catch (ConflitoComConsultasException e) {
+                    Http.sendJson(ex, 409, e.resposta()); // 409 com a lista das consultas afetadas (#44)
+                }
+            }
             default -> throw new ApiException(405, "Método não permitido");
         }
     }
