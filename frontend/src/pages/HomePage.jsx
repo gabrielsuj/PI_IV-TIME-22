@@ -17,7 +17,8 @@ export default function HomePage() {
   const action = usuario?.perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
   return (
     <div className="page">
-      <PageHeader title="ConsultaFácil" description="Centralize os cadastros e organize a rotina de atendimento da clínica." />
+      <PageHeader title="ConsultaFácil" description="Centralize os cadastros e organize a rotina de atendimento da clínica."
+        action={podeAbrir('/nova-consulta', usuario?.perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
       {shortcuts.length > 0 && <div className="record-grid">
         {shortcuts.map(({ to, title, description, resource }) => (
           <Card key={to} title={title} description={description}><Button to={to} variant="outline">{action} {resource}</Button></Card>
