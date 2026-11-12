@@ -67,17 +67,20 @@ const quando = (dias, minutos = 0) => new Date(hojeUtc + dias * 86400000 + (minu
 const diaIso = (dias) => { const d = new Date(hojeUtc + dias * 86400000).getUTCDay(); return d === 0 ? 7 : d; };
 const proximaSegunda = ((8 - diaIso(0)) % 7) || 7;
 
+// Ancorados na semana para cair sempre em dias de atendimento de cada médico,
+// qualquer que seja o dia da carga (0 = segunda desta semana).
+const segunda = proximaSegunda - 7;
 upsert("bloqueios", [
-  { _id: ObjectId("300000000000000000000002"), medicoId: med(2), // Bruno: semana inteira de férias
-    inicio: quando(proximaSegunda), fim: quando(proximaSegunda + 5), motivo: "Férias" },
-  { _id: ObjectId("300000000000000000000003"), medicoId: med(4),
-    inicio: quando(9), fim: quando(11), motivo: "Congresso de Cardiologia" },
-  { _id: ObjectId("300000000000000000000004"), medicoId: med(3),
-    inicio: quando(3, 8 * 60), fim: quando(3, 10 * 60), motivo: "Reunião clínica" },
-  { _id: ObjectId("300000000000000000000005"), medicoId: med(6),
-    inicio: quando(-8), fim: quando(-7), motivo: "Plantão hospitalar" },
-  { _id: ObjectId("300000000000000000000006"), medicoId: med(9),
-    inicio: quando(15), fim: quando(18), motivo: "Curso de atualização" }
+  { _id: ObjectId("300000000000000000000002"), medicoId: med(2), // Bruno (ter/qui): semana seguinte de férias
+    inicio: quando(segunda + 7), fim: quando(segunda + 12), motivo: "Férias" },
+  { _id: ObjectId("300000000000000000000003"), medicoId: med(4), // Rafael (ter/qui): ter a qui da semana seguinte
+    inicio: quando(segunda + 8), fim: quando(segunda + 11), motivo: "Congresso de Cardiologia" },
+  { _id: ObjectId("300000000000000000000004"), medicoId: med(3), // Carolina (qua de manhã): quarta da semana seguinte
+    inicio: quando(segunda + 9, 8 * 60), fim: quando(segunda + 9, 10 * 60), motivo: "Reunião clínica" },
+  { _id: ObjectId("300000000000000000000005"), medicoId: med(6), // Marcelo (qui de manhã): quinta da semana passada
+    inicio: quando(segunda - 4), fim: quando(segunda - 3), motivo: "Plantão hospitalar" },
+  { _id: ObjectId("300000000000000000000006"), medicoId: med(9), // Fernanda (ter a qui): daqui a duas semanas
+    inicio: quando(segunda + 15), fim: quando(segunda + 18), motivo: "Curso de atualização" }
 ]);
 
 print("OK carga 04: " + db.especialidades.countDocuments() + " especialidades, " +
