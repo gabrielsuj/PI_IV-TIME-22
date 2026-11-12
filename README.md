@@ -174,13 +174,13 @@ bash scripts/recriar-banco.sh consultafacil_demo
 
 O comando apaga **somente o banco selecionado**, reaplica os schemas e índices e carrega, em ordem, os scripts de `database/seed/`. A recriação de `consultafacil_demo` não apaga os bancos de desenvolvimento ou testes. O script PowerShell usa demonstração como padrão; o Bash mantém o padrão existente de desenvolvimento. Ambos deixam `consultafacil_test` sem seeds.
 
-A carga inclui 2 especialidades, 2 médicos, 2 agendas semanais, 1 bloqueio de exemplo, 3 usuários e 3 pacientes fictícios. Os IDs fixos permitem repetir os seeds sem duplicar registros. O seed de usuários preserva senhas existentes; a recriação completa restaura a senha de demonstração.
+A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico completo, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas: recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Os IDs fixos permitem repetir os seeds sem duplicar registros; o seed de usuários preserva senhas existentes, e a recriação completa restaura a senha de demonstração. Detalhes em [`docs/modelagem/carga-demonstracao.md`](docs/modelagem/carga-demonstracao.md).
 
 | Perfil | E-mail | Senha de demonstração |
 |---|---|---|
-| Secretaria/administrador | secretaria@consultafacil.demo | Demo@123 |
-| Médico | ana.martins@consultafacil.demo | Demo@123 |
-| Paciente | paciente@consultafacil.demo | Demo@123 |
+| Secretaria/administrador | secretaria@consultafacil.demo, lucas.andrade@consultafacil.demo | Demo@123 |
+| Médico | ana.martins@consultafacil.demo (e os demais médicos: nome.sobrenome@consultafacil.demo) | Demo@123 |
+| Paciente | paciente@consultafacil.demo, carla.souza@consultafacil.demo, diego.santos@consultafacil.demo | Demo@123 |
 
 As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `SenhaHasher`. O login da médica está vinculado ao cadastro de Ana; Paulo aparece tanto como usuário quanto como paciente, com o mesmo CPF e e-mail.
 
@@ -192,6 +192,12 @@ Para verificar a modelagem:
 
 ```bash
 docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
+```
+
+Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobreposições, histórico e logins):
+
+```bash
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/verificar-carga.js
 ```
 
 Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md) e [`docs/modelagem/consultas.md`](docs/modelagem/consultas.md).
