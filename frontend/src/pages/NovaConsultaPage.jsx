@@ -7,7 +7,8 @@ import PageHeader from '../components/ui/PageHeader';
 import { buscarCatalogosAgendamento } from '../services/catalogoAgendamentoService';
 import { useAuth } from '../hooks/useAuth';
 
-// Necessita issue #21 para fornecer buscarVagas e confirmarAgendamento pelo serviço da API.
+// buscarVagas e confirmarAgendamento vêm de services/agendamentoService.js (GET /vagas e POST /consultas, #21),
+// ligados em routes/index.jsx. Os testes podem trocar por funções falsas.
 export default function NovaConsultaPage({ buscarVagas, confirmarAgendamento }) {
   const { usuario } = useAuth();
   const [catalogos, setCatalogos] = useState({ especialidades: [], medicos: [] });

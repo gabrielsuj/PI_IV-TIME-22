@@ -8,8 +8,10 @@ import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
+import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 
 import br.edu.puccampinas.consultafacil.config.*;
@@ -56,17 +58,26 @@ public class App {
         );
 
         // Bloqueios (develop)
+        var bloqueioRepo = new BloqueioRepository(db);
         var bloqueioHandler = new BloqueioHandler(
             new BloqueioService(
-                new BloqueioRepository(db),
+                bloqueioRepo,
                 agendaRepo,
                 medicos
             )
         );
 
+        // Disponibilidade (#20) e busca de vagas + agendamento (#21)
+        var consultaRepo = new ConsultaRepository(db);
+        var historico = new HistoricoProcessor(consultaRepo, new HistoricoRepository.Mongo(db));
+        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC());
+        var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, Clock.systemUTC());
+        var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
+            pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);
+
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
-            new ConsultaRepository(db), agendaRepo, medicos, new NomesRepository.Mongo(db)));
+            consultaRepo, agendaRepo, medicos, new NomesRepository.Mongo(db)));
 
         // Login e sessão (#9)
         var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));
@@ -81,7 +92,7 @@ public class App {
         var autorizacao = new Autorizacao(autenticador);
         Router router = Rotas.router(cors, autorizacao, new Rotas.Handlers(
             new HealthHandler(), authHandler, agendaHandler, bloqueioHandler, pacienteHandler,
-            consultaCalendarioHandler));
+            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler));
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0

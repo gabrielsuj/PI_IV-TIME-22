@@ -188,6 +188,8 @@ Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes
 
 A agenda carrega os médicos de `GET /medicos`, disponível para médico e secretaria autenticados. Selecione Ana em `/agenda` ou abra diretamente `/agenda?medicoId=100000000000000000000001`. O bloqueio existente é de **26/10/2026, das 09h às 10h**, no fuso de São Paulo; sua data foi preservada. O contrato do cadastro está em [docs/api/medicos-especialidades.md](docs/api/medicos-especialidades.md).
 
+Em **Nova consulta** (`/nova-consulta`), a secretaria escolhe o paciente, a especialidade, o médico e a data, e confirma um dos horários livres. O paciente Paulo também pode agendar para si mesmo. Os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. O contrato está em [docs/api/agendamento.md](docs/api/agendamento.md).
+
 Para verificar a modelagem:
 
 ```bash
