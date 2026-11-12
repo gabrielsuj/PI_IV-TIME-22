@@ -104,6 +104,11 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       setConfirmacao(resultado);
     } catch (error) {
       if (!montado.current) return;
+      // Sem resposta HTTP completa, a consulta pode ter sido gravada.
+      if (error?.status === 0 || !Number.isInteger(error?.status)) {
+        setResultadoIncerto(true);
+        return;
+      }
       setErroConfirmacao(error);
       if (error?.status === 409) {
         setHorario(null);

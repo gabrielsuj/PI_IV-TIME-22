@@ -5,9 +5,10 @@ import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NovaConsultaPage from '../pages/NovaConsultaPage';
 import { routes } from '../routes';
+import { buscarVagas as buscarVagasApi, confirmarAgendamento as confirmarAgendamentoApi } from '../services/agendamentoService';
 import { entrarComo } from './sessaoTeste';
 
-// Operações e respostas isoladas de teste. A rota real aguarda o serviço da issue #21.
+// Operações e respostas isoladas de teste, com casos usando o serviço HTTP real.
 const horario = { inicio: '2026-12-01T12:00:00Z', fim: '2026-12-01T12:30:00Z' };
 const outroHorario = { inicio: '2026-12-01T13:00:00Z', fim: '2026-12-01T13:30:00Z' };
 const vagas = { horarios: [horario, outroHorario], fusoHorario: 'America/Sao_Paulo' };
@@ -118,7 +119,7 @@ describe('fluxo integrado do frontend de agendamento', () => {
     expect(confirmarAgendamento).toHaveBeenCalledTimes(1);
   });
 
-  it.each([0, 403, 500])('mantém os dados após erro %s de confirmação e só repete com novo comando do usuário', async (status) => {
+  it.each([400, 403, 404, 500])('mantém os dados após erro %s de confirmação e só repete com novo comando do usuário', async (status) => {
     const confirmarAgendamento = vi.fn().mockRejectedValueOnce({ status, message: 'Falha ao confirmar.' }).mockResolvedValueOnce({ id: 'c1' });
     renderFluxo({ confirmarAgendamento });
     const user = userEvent.setup();
@@ -133,6 +134,51 @@ describe('fluxo integrado do frontend de agendamento', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
     await screen.findByRole('heading', { name: 'Agendamento realizado' });
     expect(confirmarAgendamento).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['rede', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ['timeout', (_url, init) => {
+      vi.spyOn(init.signal, 'aborted', 'get').mockReturnValue(true);
+      return Promise.reject(new DOMException('Tempo esgotado', 'TimeoutError'));
+    }],
+    ['leitura interrompida', () => Promise.resolve({
+      status: 201,
+      ok: true,
+      text: () => Promise.reject(new TypeError('Conexão interrompida')),
+    })],
+    ['timeout na leitura', () => Promise.resolve({
+      status: 201,
+      ok: true,
+      text: () => Promise.reject(new DOMException('Tempo esgotado', 'TimeoutError')),
+    })],
+  ])('orienta conferência após falha de %s no POST, sem reenviar nem perder os filtros', async (_caso, responder) => {
+    const { fetchMock } = renderFluxo({ buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    const catalogos = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, init) => {
+      if (new URL(url).pathname === '/vagas') return Promise.resolve(json(vagas));
+      if (init.method === 'POST') return responder(url, init);
+      return catalogos(url, init);
+    });
+    const user = userEvent.setup();
+    await preencher(user);
+    await revisar(user);
+    const confirmar = screen.getByRole('button', { name: 'Confirmar agendamento' });
+    const form = confirmar.closest('form');
+    await user.click(confirmar);
+    const painel = await screen.findByRole('region', { name: 'Verifique o agendamento' });
+    expect(painel).toHaveFocus();
+    expect(within(painel).getByRole('alert')).toHaveTextContent('Confira o agendamento antes de tentar novamente.');
+    expect(screen.queryByRole('button', { name: 'Confirmar agendamento' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Agendamento realizado' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('p1');
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1');
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('m1');
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('2026-12-01');
+    // Mesmo um evento atrasado do formulário anterior não reenvia o POST.
+    fireEvent.submit(form);
+    expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/vagas')).toHaveLength(1);
   });
 
   it('recarrega vagas após 409, descarta o horário ocupado e preserva paciente e filtros', async () => {
