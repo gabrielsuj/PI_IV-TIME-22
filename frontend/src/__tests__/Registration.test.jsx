@@ -26,6 +26,22 @@ beforeEach(() => {
 });
 
 describe('cadastros padronizados', () => {
+  it('permite ao médico consultar pacientes sem oferecer cadastro ou edição', async () => {
+    entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
+    const fetchMock = vi.fn(async () => response([patient]));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAt('/pacientes');
+    const table = await screen.findByRole('table', { name: 'Pacientes cadastrados' });
+    expect(await within(table).findByText(patient.nome)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Novo paciente' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Editar/ })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument();
+    await user.type(screen.getByRole('searchbox'), 'sem correspondência');
+    expect(screen.getByText('Nenhum registro encontrado.')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+  });
+
   it('exibe a mensagem de CPF duplicado devolvida pelo CRUD', async () => {
     vi.stubGlobal('fetch', vi.fn(async (_url, options) => options.method === 'POST'
       ? response({ mensagem: 'CPF já cadastrado para outro paciente.' }, 400)
@@ -174,6 +190,23 @@ describe('cadastros padronizados', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
     expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription('Use letras minúsculas, números e hífens.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('envia somente os campos de especialidade aceitos pelo schema da API', async () => {
+    const fetchMock = vi.fn(async (_url, options) => options.method === 'POST' ? response({ id: 'e1' }, 201) : response([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAt('/especialidades');
+    await screen.findByText('Nenhum registro encontrado.');
+    await user.click(screen.getByRole('button', { name: 'Nova especialidade' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByLabelText(/Descrição/)).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/Nome/), 'Cardiologia');
+    await user.type(within(dialog).getByLabelText(/Código/), 'cardiologia');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByText('Cadastro realizado.')).toBeInTheDocument();
+    const [, options] = fetchMock.mock.calls.find(([, init]) => init.method === 'POST');
+    expect(JSON.parse(options.body)).toEqual({ nome: 'Cardiologia', codigo: 'cardiologia', ativa: true });
   });
 });
 

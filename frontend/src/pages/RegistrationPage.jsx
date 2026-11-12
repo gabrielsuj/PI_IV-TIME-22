@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { registrationSchemas } from '../data/registrationSchemas';
 import { useRecords } from '../hooks/useRecords';
+import { useAuth } from '../hooks/useAuth';
 import RegistrationForm from '../components/RegistrationForm';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
@@ -11,6 +12,8 @@ import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
 
 export default function RegistrationPage({ resource }) {
+  const { usuario } = useAuth();
+  const canEdit = usuario?.perfil === 'SECRETARIA_ADMIN';
   const schema = registrationSchemas[resource];
   const { records, loading, error, refresh } = useRecords(resource);
   const [search, setSearch] = useState('');
@@ -18,7 +21,7 @@ export default function RegistrationPage({ resource }) {
   const [notice, setNotice] = useState('');
   const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const visible = records.filter((record) => schema.searchKeys.some((key) => normalize(record[key]).includes(normalize(search))));
-  const editAction = (record) => <Button variant="ghost" size="sm" aria-label={`Editar ${record.nome}`} onClick={() => setEditor({ record })}>Editar</Button>;
+  const editAction = (record) => canEdit && <Button variant="ghost" size="sm" aria-label={`Editar ${record.nome}`} onClick={() => setEditor({ record })}>Editar</Button>;
   const columns = schema.columns?.map(({ badge, ...column }) => ({ ...column, ...(badge ? { render: (record) => <Badge tone="info">{record[column.key] || '—'}</Badge> } : {}) }));
 
   function saved(message) {
@@ -29,7 +32,7 @@ export default function RegistrationPage({ resource }) {
 
   return (
     <div className="page">
-      <PageHeader title={schema.title} description={schema.description} action={<Button onClick={() => { setNotice(''); setEditor({ record: null }); }}><span aria-hidden="true">＋</span>{schema.createLabel}</Button>} />
+      <PageHeader title={schema.title} description={schema.description} action={canEdit && <Button onClick={() => { setNotice(''); setEditor({ record: null }); }}><span aria-hidden="true">＋</span>{schema.createLabel}</Button>} />
       {notice && <Alert tone="success">{notice}</Alert>}
       <Card className="search-card">
         <Field type="search" label={schema.searchLabel} placeholder={schema.searchLabel} value={search} onChange={(event) => setSearch(event.target.value)} className="search-field" />
@@ -53,7 +56,7 @@ export default function RegistrationPage({ resource }) {
                       <p>{record.especialidadeIds?.length || 0} especialidade(s)</p>
                       <div className="record-card__actions">{editAction(record)}</div>
                     </>
-                  ) : <><p>{record.descricao || record.codigo}</p><Badge status={record.ativa === false ? 'Inativo' : 'Ativo'} /></>}
+                  ) : <><p>{record.codigo}</p><Badge status={record.ativa === false ? 'Inativo' : 'Ativo'} /></>}
                 </Card>
               ))}
             </div>
@@ -61,10 +64,10 @@ export default function RegistrationPage({ resource }) {
         </>
       ) : (
         <Card className="table-card">
-          <DataTable caption="Pacientes cadastrados" columns={[...columns, { key: 'actions', label: 'Ações', align: 'right', render: editAction }]} rows={visible} loading={loading} error={error} onRetry={refresh} />
+          <DataTable caption="Pacientes cadastrados" columns={canEdit ? [...columns, { key: 'actions', label: 'Ações', align: 'right', render: editAction }] : columns} rows={visible} loading={loading} error={error} onRetry={refresh} />
         </Card>
       )}
-      {editor && <RegistrationForm resource={resource} schema={schema} record={editor.record} onClose={() => setEditor(null)} onSaved={saved} />}
+      {canEdit && editor && <RegistrationForm resource={resource} schema={schema} record={editor.record} onClose={() => setEditor(null)} onSaved={saved} />}
     </div>
   );
 }
