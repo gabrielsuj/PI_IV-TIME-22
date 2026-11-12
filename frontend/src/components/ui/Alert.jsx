@@ -1,6 +1,6 @@
-export default function Alert({ children, tone = 'danger', action }) {
+export default function Alert({ children, tone = 'danger', action, ...props }) {
   return (
-    <div className={`alert alert--${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>
+    <div {...props} className={`alert alert--${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>
       <div>{children}</div>
       {action}
     </div>
