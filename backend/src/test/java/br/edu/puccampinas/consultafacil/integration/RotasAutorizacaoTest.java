@@ -49,7 +49,7 @@ class RotasAutorizacaoTest {
     @BeforeEach void iniciar() throws Exception {
         var cors = new Cors(List.of());
         var autz = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", router);
@@ -83,6 +83,10 @@ class RotasAutorizacaoTest {
         "GET,    /bloqueios,      PACIENTE,         403",
         "POST,   /bloqueios,      MEDICO,           200",
         "DELETE, /bloqueios,      SECRETARIA_ADMIN, 200",
+        // Calendário (#23): leitura das consultas por médico e secretaria
+        "GET,    /consultas,      PACIENTE,         403",
+        "GET,    /consultas,      MEDICO,           200",
+        "GET,    /consultas,      SECRETARIA_ADMIN, 200",
         // Pacientes: leitura médico e secretaria; escrita só secretaria
         "GET,    /pacientes,      PACIENTE,         403",
         "GET,    /pacientes,      MEDICO,           200",

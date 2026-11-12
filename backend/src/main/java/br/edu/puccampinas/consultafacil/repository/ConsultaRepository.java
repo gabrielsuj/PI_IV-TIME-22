@@ -35,6 +35,16 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
+    /** Todas as consultas do médico (qualquer status) que tocam a janela, em ordem de início. Usada pelo calendário (#23). */
+    public List<Document> doMedicoNoPeriodo(ObjectId medicoId, Date inicio, Date fim) {
+        return col.find(Filters.and(
+                        Filters.eq("medicoId", medicoId),
+                        Filters.lt("inicio", fim),
+                        Filters.gt("fim", inicio)))
+                .sort(Sorts.ascending("inicio"))
+                .into(new ArrayList<>());
+    }
+
     @Override public java.util.Optional<Document> buscar(ObjectId id) {
         return java.util.Optional.ofNullable(col.find(Filters.eq("_id", id)).first());
     }
