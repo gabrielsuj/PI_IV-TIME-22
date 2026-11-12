@@ -6,6 +6,7 @@ import AgendaPage from '../pages/AgendaPage';
 import ErrorPage from '../pages/ErrorPage';
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
+import NovaConsultaPage from '../pages/NovaConsultaPage';
 import StatusPage from '../pages/StatusPage';
 import LoginPage from '../pages/LoginPage';
 import ProfilesPage from '../pages/ProfilesPage';
@@ -42,6 +43,7 @@ export const routes = [
               { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
               { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
               { path: 'agenda', element: <AgendaPage /> },
+              { path: 'nova-consulta', element: <NovaConsultaPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

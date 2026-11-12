@@ -8,20 +8,22 @@ export const NOME_PERFIL = {
 const TODOS = ['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'];
 const EQUIPE = ['SECRETARIA_ADMIN', 'MEDICO'];
 const SECRETARIA = ['SECRETARIA_ADMIN'];
+const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
 
 /**
  * Itens do menu lateral e os perfis que podem abrir cada tela.
  *
  * Regra: cadastros-base (médicos, especialidades) e a área técnica (status)
  * ficam só com a secretaria. Médico usa pacientes (consulta) e agenda.
- * Paciente vê apenas o início e os perfis; a tela com as próprias consultas
- * entra com a #30.
+ * Secretaria e paciente podem iniciar agendamento; a tela com as próprias
+ * consultas do paciente entra com a #30.
  *
  * O servidor continua sendo quem bloqueia o acesso aos dados (403, ver
  * api/Rotas.java); aqui decidimos o que aparece no menu e quais telas abrem.
  */
 export const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true, perfis: TODOS },
+  { to: '/nova-consulta', label: 'Nova consulta', perfis: AGENDAMENTO },
   { to: '/pacientes', label: 'Pacientes', perfis: EQUIPE },
   { to: '/medicos', label: 'Médicos', perfis: SECRETARIA },
   { to: '/especialidades', label: 'Especialidades', perfis: SECRETARIA },
