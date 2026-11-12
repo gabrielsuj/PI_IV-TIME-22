@@ -18,7 +18,7 @@ Executados em ordem alfabética, cada um depende dos anteriores.
 | `01-agenda.js` | Clínica Geral, Cardiologia, Ana e Bruno, agendas e o bloqueio de 26/10 |
 | `02-usuarios.js` | Logins da secretaria, da Ana e do paciente Paulo |
 | `03-pacientes.js` | Paulo, Carla e Diego |
-| `04-especialidades-medicos.js` | Mais 7 especialidades (Acupuntura desativada), 9 médicos (Helena inativa), 8 agendas e 5 bloqueios com datas relativas |
+| `04-especialidades-medicos.js` | Mais 7 especialidades (Acupuntura desativada), 9 médicos (Helena inativa), 8 agendas e 5 bloqueios em dias de atendimento de cada médico, relativos à semana da carga |
 | `05-usuarios-equipe.js` | Login de cada médico ativo, uma segunda secretária (Lucas) e logins de Carla e Diego |
 | `06-pacientes-ampliados.js` | 147 pacientes gerados com semente fixa, CPFs válidos e e-mails `@example.com` |
 | `07-consultas-historico.js` | Consultas e histórico de 3 semanas antes a 3 semanas depois do dia da carga |

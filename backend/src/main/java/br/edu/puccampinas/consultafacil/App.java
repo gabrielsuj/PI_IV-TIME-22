@@ -7,6 +7,7 @@ import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
@@ -74,6 +75,10 @@ public class App {
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);
 
+        // Calendário operacional (#23): leitura das consultas do médico no período
+        var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
+            consultaRepo, agendaRepo, medicos, new NomesRepository.Mongo(db)));
+
         // Login e sessão (#9)
         var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));
         var autenticador = new Autenticador(sessoes);
@@ -87,7 +92,7 @@ public class App {
         var autorizacao = new Autorizacao(autenticador);
         Router router = Rotas.router(cors, autorizacao, new Rotas.Handlers(
             new HealthHandler(), authHandler, agendaHandler, bloqueioHandler, pacienteHandler,
-            new VagasHandler(agendamento), new ConsultaHandler(agendamento)));
+            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler));
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0

@@ -15,6 +15,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET  /health, /auth/*        | público (o /auth/me exige token)
  *  GET/PUT /agendas             |    -     |   ✓    |   ✓
  *  GET/POST/DELETE /bloqueios   |    -     |   ✓    |   ✓
+ *  GET  /consultas (calendário) |    -     |   ✓    |   ✓
  *  GET  /pacientes[/{id}]       |    -     |   ✓    |   ✓
  *  POST/PUT /pacientes[/{id}]   |    -     |   -    |   ✓
  *  GET /medicos, /especialidades[/{id}] | ✓ | ✓ | ✓
@@ -27,7 +28,7 @@ public final class Rotas {
 
     public record Handlers(HttpHandler health, HttpHandler auth, HttpHandler agendas,
                            HttpHandler bloqueios, HttpHandler pacientes,
-                           HttpHandler vagas, HttpHandler consultas) {}
+                           HttpHandler vagas, HttpHandler consultas, HttpHandler calendario) {}
 
     public static Router router(Cors cors, Autorizacao autz, Handlers h) {
         return new Router(cors)
@@ -41,7 +42,8 @@ public final class Rotas {
             .add("POST", "/bloqueios", autz.exigir(h.bloqueios(), MEDICO, SECRETARIA_ADMIN))
             .add("DELETE", "/bloqueios", autz.exigir(h.bloqueios(), MEDICO, SECRETARIA_ADMIN))
             .add("GET", "/vagas", autz.exigir(h.vagas(), PACIENTE, MEDICO, SECRETARIA_ADMIN))
-            .add("POST", "/consultas", autz.exigir(h.consultas(), PACIENTE, SECRETARIA_ADMIN));
+            .add("POST", "/consultas", autz.exigir(h.consultas(), PACIENTE, SECRETARIA_ADMIN))
+            .add("GET", "/consultas", autz.exigir(h.calendario(), MEDICO, SECRETARIA_ADMIN));
     }
 
     /**
