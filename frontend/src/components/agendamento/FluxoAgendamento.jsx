@@ -29,7 +29,7 @@ function validarVagas(resultado, data) {
 
 const mesmoHorario = (a, b) => a?.inicio === b?.inicio && a?.fim === b?.fim;
 
-// Necessita issue #21 para adaptar as operações aos endpoints e respostas reais da API.
+// Contrato da API em docs/api/agendamento.md (GET /vagas e POST /consultas, #21).
 export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta }) {
   const [vagas, setVagas] = useState({ status: 'aguardando', horarios: [], fusoHorario: null, error: null });
   const [horario, setHorario] = useState(null);

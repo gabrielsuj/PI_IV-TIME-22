@@ -18,7 +18,7 @@ function prepararHorarios(horarios, fusoHorario) {
   }
 }
 
-// Necessita issue #21 para receber as vagas reais e o fuso da agenda.
+// Recebe as vagas e o fuso da agenda vindos de GET /vagas (#21).
 export default function HorariosDisponiveis({ status = 'aguardando', horarios = [], fusoHorario, value, onChange, error, onRetry, disabled = false }) {
   const groupId = useId();
   const opcoes = status === 'sucesso' && horarios.length > 0 ? prepararHorarios(horarios, fusoHorario) : [];

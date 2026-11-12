@@ -49,7 +49,7 @@ class RotasAutorizacaoTest {
     @BeforeEach void iniciar() throws Exception {
         var cors = new Cors(List.of());
         var autz = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", router);
@@ -91,6 +91,13 @@ class RotasAutorizacaoTest {
         "PUT,    /pacientes/abc,  MEDICO,           403",
         "POST,   /pacientes,      SECRETARIA_ADMIN, 200",
         "PUT,    /pacientes/abc,  SECRETARIA_ADMIN, 200",
+        // Busca de vagas: todos os perfis; agendamento: paciente e secretaria (#21)
+        "GET,    /vagas,          PACIENTE,         200",
+        "GET,    /vagas,          MEDICO,           200",
+        "GET,    /vagas,          SECRETARIA_ADMIN, 200",
+        "POST,   /consultas,      PACIENTE,         200",
+        "POST,   /consultas,      SECRETARIA_ADMIN, 200",
+        "POST,   /consultas,      MEDICO,           403",
     })
     void matrizDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
         var r = enviar(metodo, rota, token(perfil));
@@ -102,6 +109,8 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("GET", "/agendas", null).statusCode());
         assertEquals(401, enviar("GET", "/pacientes", null).statusCode());
         assertEquals(401, enviar("GET", "/bloqueios", "token-inventado").statusCode());
+        assertEquals(401, enviar("GET", "/vagas", null).statusCode());
+        assertEquals(401, enviar("POST", "/consultas", null).statusCode());
     }
 
     @Test void tokenDepoisDoLogoutRetorna401() throws Exception {
