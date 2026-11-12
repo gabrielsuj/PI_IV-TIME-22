@@ -28,6 +28,7 @@ export const NAV_ITEMS = [
   { to: '/medicos', label: 'Médicos', perfis: SECRETARIA },
   { to: '/especialidades', label: 'Especialidades', perfis: SECRETARIA },
   { to: '/agenda', label: 'Agenda', perfis: EQUIPE },
+  { to: '/calendario', label: 'Calendário', perfis: EQUIPE },
   { to: '/perfis', label: 'Perfis de acesso', perfis: TODOS },
   { to: '/status', label: 'Status do sistema', perfis: SECRETARIA },
 ];

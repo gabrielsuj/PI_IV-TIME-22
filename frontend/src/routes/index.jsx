@@ -3,6 +3,7 @@ import AppLayout from '../components/AppLayout';
 import RequireAuth from '../components/RequireAuth';
 import AuthProvider from '../contexts/AuthProvider';
 import AgendaPage from '../pages/AgendaPage';
+import CalendarioPage from '../pages/CalendarioPage';
 import ErrorPage from '../pages/ErrorPage';
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -43,6 +44,7 @@ export const routes = [
               { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
               { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
               { path: 'agenda', element: <AgendaPage /> },
+              { path: 'calendario', element: <CalendarioPage /> },
               { path: 'nova-consulta', element: <NovaConsultaPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],
