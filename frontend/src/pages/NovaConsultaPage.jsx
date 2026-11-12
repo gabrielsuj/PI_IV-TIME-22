@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import FiltrosAgendamento from '../components/agendamento/FiltrosAgendamento';
+import PacienteAgendamento from '../components/agendamento/PacienteAgendamento';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import { buscarCatalogosAgendamento } from '../services/catalogoAgendamentoService';
@@ -7,6 +8,7 @@ import { buscarCatalogosAgendamento } from '../services/catalogoAgendamentoServi
 export default function NovaConsultaPage() {
   const [catalogos, setCatalogos] = useState({ especialidades: [], medicos: [] });
   const [filtros, setFiltros] = useState({ especialidadeId: '', medicoId: '', data: '' });
+  const [paciente, setPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [revision, setRevision] = useState(0);
@@ -40,6 +42,7 @@ export default function NovaConsultaPage() {
     <div className="page">
       <PageHeader title="Nova consulta" description="Escolha a especialidade, o médico e a data para o atendimento."
         action={<Button to="/" variant="outline">Voltar ao início</Button>} />
+      <PacienteAgendamento value={paciente} onChange={setPaciente} />
       <FiltrosAgendamento {...catalogos} value={filtros} onChange={setFiltros} loading={loading} error={error} onRetry={retry} />
       {/* Necessita issue #21 para buscar vagas e confirmar o agendamento. */}
     </div>
