@@ -9,9 +9,10 @@ function deveRecusar(nome, acao) {
 }
 
 // ---------- Positivos: os dados certos aparecem ----------
-confere("total de médicos", db.medicos.countDocuments(), 2);
+// Valores da carga de demonstração (database/seed): 11 médicos, Ana e Rafael ativos em Cardiologia.
+confere("total de médicos", db.medicos.countDocuments(), 11);
 confere("médicos ativos de cardiologia", db.medicos.countDocuments(
-  { especialidadeIds: ObjectId("000000000000000000000002"), ativo: true }), 1);
+  { especialidadeIds: ObjectId("000000000000000000000002"), ativo: true }), 2);
 
 const manha26 = { medicoId: ana,
   inicio: { $lt: new Date("2026-10-26T15:00:00Z") },   // antes de 12h SP
