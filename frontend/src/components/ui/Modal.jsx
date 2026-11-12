@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import Button from './Button';
 
-export default function Modal({ title, description, onClose, busy = false, children }) {
+export default function Modal({ title, description, onClose, busy = false, returnFocusRef, children }) {
   const ref = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -9,15 +9,18 @@ export default function Modal({ title, description, onClose, busy = false, child
   useEffect(() => {
     const dialog = ref.current;
     const previousFocus = document.activeElement;
+    const fallbackFocus = returnFocusRef?.current;
     const previousOverflow = document.body.style.overflow;
     dialog.showModal();
+    dialog.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')?.focus();
     document.body.style.overflow = 'hidden';
     return () => {
       dialog.close();
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      if (previousFocus?.isConnected && previousFocus !== document.body) previousFocus.focus();
+      else if (fallbackFocus?.isConnected) fallbackFocus.focus();
     };
-  }, []);
+  }, [returnFocusRef]);
 
   return (
     <dialog

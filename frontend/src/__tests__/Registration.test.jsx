@@ -87,7 +87,7 @@ describe('cadastros padronizados', () => {
     const name = within(dialog).getByRole('textbox', { name: /Nome/ });
     expect(name).toHaveFocus();
     expect(name).toHaveAttribute('aria-invalid', 'true');
-    expect(name).toHaveAccessibleDescription('Preencha este campo.');
+    expect(name).toHaveAccessibleDescription('Informe o nome do paciente.');
     expect(within(dialog).getByLabelText(/E-mail/)).toHaveAttribute('aria-invalid', 'true');
     expect(within(dialog).queryByLabelText(/Telefone/)).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
