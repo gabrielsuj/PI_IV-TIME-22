@@ -10,9 +10,12 @@ import br.edu.puccampinas.consultafacil.api.dto.JornadaDto;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
 import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
+import br.edu.puccampinas.consultafacil.repository.ConsultaRepository;
 import br.edu.puccampinas.consultafacil.repository.MedicoRepository;
+import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.service.AgendaService;
 import br.edu.puccampinas.consultafacil.service.BloqueioService;
+import br.edu.puccampinas.consultafacil.service.ConsultasAfetadas;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
@@ -45,7 +49,7 @@ class AgendaBloqueioIntegrationTest {
     @BeforeEach
     void preparar() {
         var db = mongo.database();
-        for (String c : List.of("bloqueios", "agendas", "medicos")) db.getCollection(c).deleteMany(new Document());
+        for (String c : List.of("bloqueios", "agendas", "medicos", "consultas")) db.getCollection(c).deleteMany(new Document());
         db.getCollection("medicos").insertOne(new Document("_id", ANA)
                 .append("nome", "Ana Martins — Fictícia")
                 .append("crmNumero", "000123")
@@ -55,8 +59,9 @@ class AgendaBloqueioIntegrationTest {
 
         var medicos = new MedicoRepository(db);
         var agendaRepo = new AgendaRepository(db);
-        agendas = new AgendaService(agendaRepo, medicos);
-        bloqueios = new BloqueioService(new BloqueioRepository(db), agendaRepo, medicos);
+        var afetadas = new ConsultasAfetadas(new ConsultaRepository(db), new NomesRepository.Mongo(db));
+        agendas = new AgendaService(agendaRepo, medicos, afetadas, Clock.systemUTC());
+        bloqueios = new BloqueioService(new BloqueioRepository(db), agendaRepo, medicos, afetadas);
     }
 
     private static AgendaRequest agendaDaAna() {

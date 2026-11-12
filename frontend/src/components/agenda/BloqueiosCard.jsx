@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
+import { conflitoComConsultas, criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
 import { diaSeguinte, formatarPeriodo, hoje } from '../../utils/horario';
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
@@ -7,6 +7,7 @@ import Card from '../ui/Card';
 import DataTable from '../ui/DataTable';
 import Field from '../ui/Field';
 import Modal from '../ui/Modal';
+import ConflitoConsultas from './ConflitoConsultas';
 
 const NOVO = { dataInicio: '', dataFim: '', horaInicio: '08:00', horaFim: '12:00', diaInteiro: false, motivo: '' };
 
@@ -29,6 +30,7 @@ export default function BloqueiosCard({ medicoId }) {
   const [aviso, setAviso] = useState('');
   const [remover, setRemover] = useState(null);
   const [removendo, setRemovendo] = useState(false);
+  const [conflito, setConflito] = useState(null); // #44: consultas no período, aguardando confirmação
 
   useEffect(() => {
     const controller = new AbortController();
@@ -51,6 +53,26 @@ export default function BloqueiosCard({ medicoId }) {
     setForm((atual) => ({ ...atual, [name]: type === 'checkbox' ? checked : value }));
     setFalha('');
     setAviso('');
+    setConflito(null);
+  }
+
+  async function enviar(corpo, { confirmar = false, afetadas = 0 } = {}) {
+    setSalvando(true);
+    try {
+      await criarBloqueio(corpo, { confirmar });
+      setForm(NOVO);
+      setConflito(null);
+      setAviso(confirmar
+        ? `Bloqueio cadastrado. ${afetadas} consulta(s) precisam ser remarcadas.`
+        : 'Bloqueio cadastrado.');
+      recarregar();
+    } catch (error) {
+      const atingidas = conflitoComConsultas(error);
+      if (atingidas) setConflito({ ...atingidas, corpo });
+      else setFalha(error.message);
+    } finally {
+      setSalvando(false);
+    }
   }
 
   async function salvar(event) {
@@ -58,17 +80,11 @@ export default function BloqueiosCard({ medicoId }) {
     if (!form.dataInicio) { setFalha('Informe a data de início.'); return; }
     const corpo = paraApi(medicoId, form);
     if (corpo.inicio >= corpo.fim) { setFalha('O fim do bloqueio deve ser depois do início.'); return; }
-    setSalvando(true);
-    try {
-      await criarBloqueio(corpo);
-      setForm(NOVO);
-      setAviso('Bloqueio cadastrado.');
-      recarregar();
-    } catch (error) {
-      setFalha(error.message);
-    } finally {
-      setSalvando(false);
-    }
+    await enviar(corpo);
+  }
+
+  function bloquearMesmoAssim() {
+    return enviar(conflito.corpo, { confirmar: true, afetadas: conflito.consultas.length });
   }
 
   async function confirmarRemocao() {
@@ -119,9 +135,14 @@ export default function BloqueiosCard({ medicoId }) {
         </div>
         {falha && <Alert>{falha}</Alert>}
         {aviso && <Alert tone="success">{aviso}</Alert>}
-        <footer className="form-actions">
-          <Button type="submit" loading={salvando}>{salvando ? 'Salvando…' : 'Adicionar bloqueio'}</Button>
-        </footer>
+        {conflito ? (
+          <ConflitoConsultas conflito={conflito} medicoId={medicoId} acao="Bloquear mesmo assim" confirmando={salvando}
+            onConfirmar={bloquearMesmoAssim} onCancelar={() => setConflito(null)} />
+        ) : (
+          <footer className="form-actions">
+            <Button type="submit" loading={salvando}>{salvando ? 'Salvando…' : 'Adicionar bloqueio'}</Button>
+          </footer>
+        )}
       </form>
 
       {remover && (

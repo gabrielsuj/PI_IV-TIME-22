@@ -30,6 +30,11 @@ public final class Query {
         return v;
     }
 
+    /** ?confirmar=true: o usuário já viu as consultas afetadas e quer seguir mesmo assim (#44). */
+    public static boolean confirmado(HttpExchange ex) {
+        return "true".equalsIgnoreCase(params(ex).get("confirmar"));
+    }
+
     public static ObjectId objectId(String valor, String nome) {
         if (valor == null || !ObjectId.isValid(valor)) throw ApiException.badRequest(nome + " inválido");
         return new ObjectId(valor);
