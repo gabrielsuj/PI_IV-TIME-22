@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
@@ -23,12 +23,19 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [failure, setFailure] = useState('');
   const [loading, setLoading] = useState(false);
+  const sending = useRef(false);
+  const failureRef = useRef(null);
   const destino = destinoDepoisDoLogin(location);
+
+  useEffect(() => {
+    if (failure) failureRef.current?.focus();
+  }, [failure]);
 
   if (usuario && !loading) return <Navigate to={destino} replace />;
 
   async function submit(event) {
     event.preventDefault();
+    if (sending.current) return;
     const nextErrors = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) nextErrors.email = 'Informe um e-mail válido.';
     if (!password) nextErrors.password = 'Informe sua senha.';
@@ -37,6 +44,7 @@ export default function LoginPage() {
       event.currentTarget.querySelector(`[name="${Object.keys(nextErrors)[0]}"]`)?.focus();
       return;
     }
+    sending.current = true;
     setLoading(true);
     setFailure('');
     try {
@@ -45,6 +53,8 @@ export default function LoginPage() {
     } catch (error) {
       setFailure(error.message);
       setLoading(false);
+    } finally {
+      sending.current = false;
     }
   }
 
@@ -56,7 +66,7 @@ export default function LoginPage() {
             {sessaoExpirada && !failure && <Alert tone="info">Sua sessão expirou. Entre novamente para continuar.</Alert>}
             <Field name="email" label="E-mail" type="email" autoComplete="username" placeholder="seu@email.com" required value={email} onChange={(event) => { setEmail(event.target.value); setErrors((current) => ({ ...current, email: undefined })); }} error={errors.email} disabled={loading} />
             <Field name="password" label="Senha" type="password" autoComplete="current-password" required value={password} onChange={(event) => { setPassword(event.target.value); setErrors((current) => ({ ...current, password: undefined })); }} error={errors.password} disabled={loading} />
-            {failure && <Alert>{failure}</Alert>}
+            {failure && <Alert ref={failureRef} tabIndex={-1}>{failure}</Alert>}
             <Button type="submit" loading={loading}>{loading ? 'Entrando…' : 'Entrar'}</Button>
           </form>
         </Card>

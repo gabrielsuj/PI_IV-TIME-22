@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useLocation } from 'react-router';
 import { registrationSchemas } from '../data/registrationSchemas';
 import { useRecords } from '../hooks/useRecords';
 import { useAuth } from '../hooks/useAuth';
+import { recuperarRascunho, removerRascunho } from '../services/rascunhoPacientes';
 import RegistrationForm from '../components/RegistrationForm';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
@@ -14,10 +16,14 @@ import PageHeader from '../components/ui/PageHeader';
 export default function RegistrationPage({ resource }) {
   const { usuario } = useAuth();
   const canEdit = usuario?.perfil === 'SECRETARIA_ADMIN';
+  const location = useLocation();
+  const rota = `${location.pathname}${location.search}`;
+  const createButton = useRef(null);
+  const draftContext = resource === 'pacientes' ? { usuarioId: usuario?.id, rota } : null;
   const schema = registrationSchemas[resource];
   const { records, loading, error, refresh } = useRecords(resource);
   const [search, setSearch] = useState('');
-  const [editor, setEditor] = useState(null);
+  const [editor, setEditor] = useState(() => canEdit && resource === 'pacientes' ? recuperarRascunho(usuario.id, rota) : null);
   const [notice, setNotice] = useState('');
   const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const visible = records.filter((record) => schema.searchKeys.some((key) => normalize(record[key]).includes(normalize(search))));
@@ -25,14 +31,20 @@ export default function RegistrationPage({ resource }) {
   const columns = schema.columns?.map(({ badge, ...column }) => ({ ...column, ...(badge ? { render: (record) => <Badge tone="info">{record[column.key] || '—'}</Badge> } : {}) }));
 
   function saved(message) {
+    if (draftContext) removerRascunho(usuario.id, rota);
     setNotice(message);
     setEditor(null);
     refresh();
   }
 
+  function closeEditor() {
+    if (draftContext) removerRascunho(usuario.id, rota);
+    setEditor(null);
+  }
+
   return (
     <div className="page">
-      <PageHeader title={schema.title} description={schema.description} action={canEdit && <Button onClick={() => { setNotice(''); setEditor({ record: null }); }}><span aria-hidden="true">＋</span>{schema.createLabel}</Button>} />
+      <PageHeader title={schema.title} description={schema.description} action={canEdit && <Button ref={createButton} onClick={() => { setNotice(''); setEditor({ record: null }); }}><span aria-hidden="true">＋</span>{schema.createLabel}</Button>} />
       {notice && <Alert tone="success">{notice}</Alert>}
       <Card className="search-card">
         <Field type="search" label={schema.searchLabel} placeholder={schema.searchLabel} value={search} onChange={(event) => setSearch(event.target.value)} className="search-field" />
@@ -67,7 +79,7 @@ export default function RegistrationPage({ resource }) {
           <DataTable caption="Pacientes cadastrados" columns={canEdit ? [...columns, { key: 'actions', label: 'Ações', align: 'right', render: editAction }] : columns} rows={visible} loading={loading} error={error} onRetry={refresh} />
         </Card>
       )}
-      {canEdit && editor && <RegistrationForm resource={resource} schema={schema} record={editor.record} onClose={() => setEditor(null)} onSaved={saved} />}
+      {canEdit && editor && <RegistrationForm resource={resource} schema={schema} record={editor.record} initialValues={editor.initialValues} restored={editor.restored} draftContext={draftContext} returnFocusRef={createButton} onClose={closeEditor} onSaved={saved} />}
     </div>
   );
 }

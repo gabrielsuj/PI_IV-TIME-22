@@ -110,6 +110,8 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .field__control:disabled { cursor: not-allowed; opacity: 0.5; }
 .field__control--textarea { min-height: 88px; height: auto; resize: vertical; padding-block: var(--space-2); }
 .field__error, .field__hint { font-size: 0.75rem; }
+.field { min-width: 0; }
+.field__label, .field__error, .field__hint, .modal__header { overflow-wrap: anywhere; }
 .field__error { color: var(--color-danger-text); }
 .field__hint { color: var(--color-text-muted); }
 .checkbox-group { margin: 0; padding: 0; border: 0; }
@@ -160,6 +162,8 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .form-note { margin-bottom: var(--space-2); color: var(--color-text-muted); font-size: 0.75rem; }
 .form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-6); }
 .form-grid + .alert { margin-top: var(--space-4); }
+.form-note + .form-grid { margin-top: var(--space-2); }
+.modal form > .alert:first-child { margin-bottom: var(--space-4); }
 .search-card .card__content { padding: var(--space-4); }
 .search-field { width: 100%; max-width: 448px; }
 .record-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
@@ -206,7 +210,7 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
   .card__header, .card__content, .modal { padding: var(--space-4); }
   .card__header { padding-bottom: 0; }
   .api-status__details { grid-template-columns: minmax(0, 1fr); }
-  .form-actions .button { flex: 1; }
+  .form-actions .button { flex: 1 1 100%; min-height: 44px; white-space: normal; }
   .login-page { margin-block: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -9,8 +9,8 @@ export const registrationSchemas = {
     searchKeys: ['nome', 'cpf', 'email'],
     fields: [
       { name: 'nome', label: 'Nome', required: true, wide: true, autoComplete: 'name' },
-      { name: 'cpf', label: 'CPF', required: true, pattern: '[0-9]{11}|[0-9]{3}[.][0-9]{3}[.][0-9]{3}-[0-9]{2}', patternMessage: 'Informe 11 dígitos ou use 000.000.000-00.' },
-      { name: 'email', label: 'E-mail', type: 'email', required: true, autoComplete: 'email' },
+      { name: 'cpf', label: 'CPF', required: true, inputMode: 'numeric', maxLength: 14, placeholder: '000.000.000-00', hint: 'Informe 11 dígitos, com ou sem pontuação.', pattern: '[0-9]{11}|[0-9]{3}[.][0-9]{3}[.][0-9]{3}-[0-9]{2}', patternMessage: 'Informe 11 dígitos ou use 000.000.000-00.' },
+      { name: 'email', label: 'E-mail', type: 'email', required: true, maxLength: 254, autoComplete: 'email' },
     ],
     columns: [
       { key: 'nome', label: 'Nome' },
