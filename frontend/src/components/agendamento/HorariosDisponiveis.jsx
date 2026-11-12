@@ -1,23 +1,17 @@
 import { useId } from 'react';
+import { formatarHorarioAgendamento } from '../../utils/horarioAgendamento';
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 
 function prepararHorarios(horarios, fusoHorario) {
   try {
-    if (!fusoHorario) return null;
-    const hora = new Intl.DateTimeFormat('pt-BR', { timeZone: fusoHorario, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-    const dia = new Intl.DateTimeFormat('pt-BR', { timeZone: fusoHorario, dateStyle: 'short' });
     const vistos = new Set();
     return horarios.map((horario) => {
-      // Instantes precisam trazer Z ou offset; nunca interpretar a vaga no fuso do navegador.
-      const instante = (valor) => typeof valor === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(valor) ? Date.parse(valor) : NaN;
-      const inicio = instante(horario.inicio);
-      const fim = instante(horario.fim);
-      if (!Number.isFinite(inicio) || !Number.isFinite(fim) || inicio >= fim || vistos.has(inicio)) throw new Error('Horário inválido');
-      vistos.add(inicio);
-      const fimExibido = `${hora.format(fim)}${dia.format(inicio) === dia.format(fim) ? '' : ` (${dia.format(fim)})`}`;
-      return { horario, inicio, label: `${hora.format(inicio)} às ${fimExibido}` };
+      const exibicao = formatarHorarioAgendamento(horario, fusoHorario);
+      if (!exibicao || vistos.has(exibicao.inicio)) throw new Error('Horário inválido');
+      vistos.add(exibicao.inicio);
+      return { horario, inicio: exibicao.inicio, label: exibicao.periodo };
     }).sort((a, b) => a.inicio - b.inicio);
   } catch {
     return null;

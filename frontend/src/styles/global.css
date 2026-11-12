@@ -224,6 +224,11 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .horario-opcao--selecionado { background: var(--color-teal-bg); border-color: var(--color-primary); }
 .horario-opcao:focus-within { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 .horarios-disponiveis:disabled .horario-opcao { cursor: not-allowed; opacity: 0.5; }
+.resumo-agendamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-4); margin: 0; }
+.resumo-agendamento > div { min-width: 0; }
+.resumo-agendamento dt { color: var(--color-text-muted); font-size: 0.875rem; }
+.resumo-agendamento dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+.resumo-agendamento + .alert { margin-top: var(--space-4); }
 
 /* Agenda (#22) */
 .agenda-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); align-items: start; }
