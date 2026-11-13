@@ -31,6 +31,7 @@ public final class RegistroConsultaService {
     private final HistoricoProcessor processor;
     private final Clock relogio;
     private final Consumer<ObjectId> aposCancelar;
+    private final Consumer<Document> aposCriar;
 
     public RegistroConsultaService(PendenciasConsultaRepository consultas, HistoricoProcessor processor, Clock relogio) {
         this(consultas, processor, relogio, id -> {});
@@ -39,10 +40,17 @@ public final class RegistroConsultaService {
     /** aposCancelar roda depois que um CANCELAMENTO foi gravado (ex.: sinalização da fila, #32). */
     public RegistroConsultaService(PendenciasConsultaRepository consultas, HistoricoProcessor processor, Clock relogio,
                                    Consumer<ObjectId> aposCancelar) {
+        this(consultas, processor, relogio, aposCancelar, consulta -> {});
+    }
+
+    /** aposCriar roda depois que uma consulta nova foi gravada (ex.: vaga sinalizada da fila foi ocupada). */
+    public RegistroConsultaService(PendenciasConsultaRepository consultas, HistoricoProcessor processor, Clock relogio,
+                                   Consumer<ObjectId> aposCancelar, Consumer<Document> aposCriar) {
         this.consultas = consultas;
         this.processor = processor;
         this.relogio = relogio;
         this.aposCancelar = aposCancelar;
+        this.aposCriar = aposCriar;
     }
 
     public Document criar(Document dados, UsuarioLogado ator) {
@@ -55,6 +63,7 @@ public final class RegistroConsultaService {
         Document evento = evento(null, consulta, ator, EventoHistorico.CRIACAO, 1, List.of());
         consultas.inserirComEvento(consulta, evento);
         aposGravar(consulta.getObjectId("_id"));
+        executarDepois(() -> aposCriar.accept(consulta), consulta.getObjectId("_id"));
         return consulta; // DTOs futuros não devem expor a caixa interna de pendências.
     }
 
@@ -109,7 +118,7 @@ public final class RegistroConsultaService {
         if (!consultas.atualizarComEvento(id, versao, modificados, evento))
             throw ApiException.conflict("Consulta alterada simultaneamente ou limite de pendências atingido; recarregue os dados");
         aposGravar(id);
-        if (tipo == EventoHistorico.CANCELAMENTO) executarAposCancelar(id);
+        if (tipo == EventoHistorico.CANCELAMENTO) executarDepois(() -> aposCancelar.accept(id), id);
         return resposta(depois);
     }
 
@@ -119,11 +128,11 @@ public final class RegistroConsultaService {
         processor.tentarRecuperarLote();
     }
 
-    private void executarAposCancelar(ObjectId id) {
-        // O cancelamento já foi confirmado: uma falha aqui é registrada em log e não vira erro para quem cancelou.
-        try { aposCancelar.accept(id); }
+    private static void executarDepois(Runnable acao, ObjectId id) {
+        // A gravação já foi confirmada: uma falha aqui é registrada em log e não vira erro para quem chamou.
+        try { acao.run(); }
         catch (RuntimeException e) {
-            LOG.warn("Ação pós-cancelamento falhou para a consulta {} ({})", id, e.getClass().getSimpleName());
+            LOG.warn("Ação posterior à gravação falhou para a consulta {} ({})", id, e.getClass().getSimpleName());
         }
     }
 

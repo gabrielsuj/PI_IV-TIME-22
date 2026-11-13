@@ -108,7 +108,7 @@ public class FilaEsperaService {
         if (inicio != null) d.append("dataInicio", Date.from(inicio.atStartOfDay(FUSO).toInstant()));
         if (fim != null) d.append("dataFim", fimDoDia(fim));
 
-        fila.expirarVencidas(criadoEm); // uma inscrição vencida não pode bloquear a nova pelo índice único
+        fila.revisar(criadoEm); // uma inscrição vencida não pode bloquear a nova pelo índice único
         return respostas(List.of(fila.inserir(d))).get(0);
     }
 
@@ -131,7 +131,7 @@ public class FilaEsperaService {
             if (!vazio(especialidadeIdTexto))
                 filtros.add(Filters.eq("especialidadeId", Query.objectId(especialidadeIdTexto, "especialidadeId")));
         }
-        fila.expirarVencidas(Date.from(relogio.instant()));
+        fila.revisar(Date.from(relogio.instant()));
         return respostas(fila.listar(Filters.and(filtros)));
     }
 

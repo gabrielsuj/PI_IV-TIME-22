@@ -74,6 +74,7 @@ public final class SinalizacaoFilaService {
         Date fim = consulta.getDate("fim");
         String medicoNome = nomes.medicos(List.of(medicoId)).getOrDefault(medicoId, "o médico");
 
+        fila.revisar(agora); // sinalizações de vagas que já passaram voltam a concorrer
         // Quem cancelou não é avisado da própria vaga; e cada paciente recebe no máximo um aviso por vaga.
         Set<ObjectId> pacientesConsiderados = new HashSet<>();
         pacientesConsiderados.add(consulta.getObjectId("pacienteId"));
@@ -94,6 +95,28 @@ public final class SinalizacaoFilaService {
             else notificacoes.descartar(notificacaoId); // o interesse mudou nesse meio-tempo
         }
         return total;
+    }
+
+    /**
+     * Chamado logo após uma consulta ser criada. Se ela ocupa uma vaga sinalizada:
+     * o interessado que agendou passa a ATENDIDA; os demais avisados daquela vaga voltam a AGUARDANDO
+     * (mantendo a posição) e o aviso deles, se ainda não foi enviado, é descartado.
+     * Retorna quantas inscrições mudaram.
+     */
+    public int consultaAgendada(Document consulta) {
+        Date agora = Date.from(relogio.instant());
+        ObjectId pacienteId = consulta.getObjectId("pacienteId");
+        int alteradas = 0;
+        for (Document inscricao : fila.sinalizadasParaVaga(consulta.getObjectId("medicoId"), consulta.getDate("inicio"))) {
+            ObjectId id = inscricao.getObjectId("_id");
+            if (pacienteId.equals(inscricao.getObjectId("pacienteId"))) {
+                if (fila.marcarAtendida(id, consulta.getObjectId("_id"), agora)) alteradas++;
+            } else if (fila.voltarParaAguardando(id, agora)) {
+                notificacoes.descartar(inscricao.get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId"));
+                alteradas++;
+            }
+        }
+        return alteradas;
     }
 
     /**

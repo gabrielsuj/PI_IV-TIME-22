@@ -106,7 +106,17 @@ Regra de compatibilidade entre um interessado e a vaga liberada (todas devem ser
 - Todos os compatíveis são avisados; a vaga não fica reservada e quem agendar primeiro fica com ela (índices únicos de `consultas`).
 - A notificação `VAGA_LIBERADA` é criada com `status = AGENDADA`; exibir ou enviar o aviso fica para quem consome `notificacoes` (#57). Ela é gravada antes de o interesse passar a `SINALIZADA`, de modo que `ultimaSinalizacao.notificacaoId` sempre aponta para uma notificação existente.
 - O histórico da consulta recebe `SINALIZACAO_FILA` com `totalSinalizados`, inclusive quando é `0`.
-- O cadastro dos interesses pela API é da #31 ([docs/api/fila-espera.md](../api/fila-espera.md)). As transições `ATENDIDA` e a volta a `AGUARDANDO` ainda não estão implementadas.
+- O cadastro dos interesses pela API é da #31 ([docs/api/fila-espera.md](../api/fila-espera.md)).
+
+### Vaga sinalizada ocupada ou vencida
+
+`SinalizacaoFilaService.consultaAgendada`, acionado pelo `RegistroConsultaService` sempre que uma consulta é criada. A vaga é identificada pelo médico e pelo horário de início (`ultimaSinalizacao.medicoId` e `ultimaSinalizacao.dataHora`):
+
+- Se quem agendou é um dos sinalizados daquela vaga, a inscrição dele passa a `ATENDIDA` (`consultaAgendadaId`, `atendidaEm`).
+- Os outros sinalizados daquela vaga voltam a `AGUARDANDO`, mantendo `criadoEm` (a posição na fila). O aviso `VAGA_LIBERADA` deles, se ainda estiver `AGENDADA`, passa a `CANCELADA`.
+- Consulta em outro horário ou com outro médico não altera a fila.
+
+Como não há rotina agendada no MVP, a fila é revisada antes de cada leitura (listagem, inscrição e sinalização): sinalizações de vagas que já passaram voltam a `AGUARDANDO` (e podem ser sinalizadas de novo), e inscrições com `validoAte` vencido passam a `EXPIRADA`.
 
 ## Índices
 

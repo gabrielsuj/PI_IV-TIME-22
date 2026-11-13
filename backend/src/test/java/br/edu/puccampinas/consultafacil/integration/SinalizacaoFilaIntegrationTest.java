@@ -90,7 +90,7 @@ class SinalizacaoFilaIntegrationTest {
         var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
         var sinalizacao = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
                 consultas, new NomesRepository.Mongo(db), historico, relogio);
-        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar);
+        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
     }
 
     @Test void deveLiberarVagaRegistrarHistoricoESinalizarFila() {
@@ -111,9 +111,6 @@ class SinalizacaoFilaIntegrationTest {
 
         Document cancelada = cancelar(consulta);
         assertEquals("CANCELADA", cancelada.getString("status"));
-
-        // Vaga liberada: outro paciente consegue reservar o mesmo horário com o mesmo médico.
-        assertDoesNotThrow(() -> agendar(PACIENTES.get(9), MEDICO, VAGA));
 
         // Histórico: CRIACAO, CANCELAMENTO e SINALIZACAO_FILA em sequência, pelo SISTEMA, com o total.
         List<Document> eventos = historico(consulta);
@@ -147,7 +144,14 @@ class SinalizacaoFilaIntegrationTest {
             assertEquals("Dra. Fila Teste", aviso.get("dadosConsulta", Document.class).getString("medicoNome"));
             assertTrue(aviso.getString("mensagem").contains("26/10 às 10:00"), aviso.getString("mensagem"));
         }
-        for (ObjectId id : naoCompativeis) assertEquals("AGUARDANDO", fila(id).getString("status"));
+        for (ObjectId id : naoCompativeis) assertNotEquals("SINALIZADA", fila(id).getString("status"));
+        assertEquals("EXPIRADA", fila(naoCompativeis.get(3)).getString("status"), "o vencido é encerrado ao revisar a fila");
+
+        // Vaga liberada: outro paciente consegue reservar o mesmo horário com o mesmo médico,
+        // e os avisados daquela vaga voltam a aguardar.
+        assertDoesNotThrow(() -> agendar(PACIENTES.get(9), MEDICO, VAGA));
+        assertEquals("AGUARDANDO", fila(qualquerMedico).getString("status"));
+        assertEquals("AGUARDANDO", fila(medicoDaVagaManha).getString("status"));
     }
 
     @Test void semInteressadosRegistraSinalizacaoComTotalZero() {
@@ -184,7 +188,81 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals("AGUARDANDO", fila(proprio).getString("status"));
     }
 
+    // ---- vaga sinalizada ocupada ----
+
+    @Test void quemFoiAvisadoEAgendaAVagaFicaAtendidoEOsOutrosVoltamParaAFila() {
+        ObjectId cancelada = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId primeiro = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        ObjectId segundo = interesse(PACIENTES.get(2), ESPECIALIDADE, null, "QUALQUER", 2, null, null, 90);
+        cancelar(cancelada);
+        ObjectId avisoDoSegundo = fila(segundo).get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId");
+
+        ObjectId nova = agendar(PACIENTES.get(2), MEDICO, VAGA); // o segundo da fila agenda primeiro
+
+        Document atendida = fila(segundo);
+        assertEquals("ATENDIDA", atendida.getString("status"));
+        assertEquals(nova, atendida.getObjectId("consultaAgendadaId"));
+        assertEquals(Date.from(AGORA), atendida.getDate("atendidaEm"));
+        assertNull(atendida.get("ultimaSinalizacao"));
+        assertEquals("AGENDADA", aviso(avisoDoSegundo).getString("status"), "o aviso de quem agendou fica como está");
+
+        Document devolvida = fila(primeiro);
+        assertEquals("AGUARDANDO", devolvida.getString("status"));
+        assertNull(devolvida.get("ultimaSinalizacao"));
+        assertEquals(Date.from(AGORA.minus(Duration.ofDays(10)).plus(Duration.ofMinutes(1))), devolvida.getDate("criadoEm"),
+                "mantém a posição na fila");
+        assertEquals("CANCELADA", aviso(cancelada, PACIENTES.get(1)).getString("status"), "aviso não enviado é descartado");
+    }
+
+    @Test void pacienteForaDaFilaOcupaAVagaETodosOsAvisadosVoltam() {
+        ObjectId cancelada = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId interessado = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        cancelar(cancelada);
+        agendar(PACIENTES.get(9), MEDICO, VAGA);
+        assertEquals("AGUARDANDO", fila(interessado).getString("status"));
+
+        // Volta a concorrer: um novo cancelamento compatível sinaliza de novo.
+        ObjectId outra = agendar(PACIENTES.get(5), MEDICO, VAGA.plus(Duration.ofHours(1)));
+        cancelar(outra);
+        Document resinalizada = fila(interessado);
+        assertEquals("SINALIZADA", resinalizada.getString("status"));
+        assertEquals(outra, resinalizada.get("ultimaSinalizacao", Document.class).getObjectId("consultaOrigemId"));
+    }
+
+    @Test void consultaEmOutroHorarioNaoMexeNaFila() {
+        ObjectId cancelada = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId interessado = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        cancelar(cancelada);
+        agendar(PACIENTES.get(1), MEDICO, VAGA.plus(Duration.ofHours(1))); // mesmo paciente, outro horário
+        agendar(PACIENTES.get(9), OUTRO_MEDICO, VAGA); // mesmo horário, outro médico
+        assertEquals("SINALIZADA", fila(interessado).getString("status"));
+    }
+
+    @Test void sinalizacaoDeVagaQueJaPassouVoltaAConcorrer() {
+        // Sinalizado ontem para uma vaga que já passou, sem ter agendado.
+        Date ontem = Date.from(AGORA.minus(Duration.ofDays(1)));
+        ObjectId antigo = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        db.getCollection("filaEspera").updateOne(Filters.eq("_id", antigo), new Document("$set", new Document("status", "SINALIZADA")
+                .append("ultimaSinalizacao", new Document("consultaOrigemId", new ObjectId()).append("medicoId", MEDICO)
+                        .append("dataHora", ontem).append("sinalizadaEm", ontem).append("notificacaoId", new ObjectId()))));
+
+        ObjectId consulta = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        cancelar(consulta);
+        Document atual = fila(antigo);
+        assertEquals("SINALIZADA", atual.getString("status"));
+        assertEquals(consulta, atual.get("ultimaSinalizacao", Document.class).getObjectId("consultaOrigemId"),
+                "foi sinalizado de novo, para a vaga nova");
+    }
+
     // ---- apoio ----
+
+    private Document aviso(ObjectId id) { return db.getCollection("notificacoes").find(Filters.eq("_id", id)).first(); }
+
+    private Document aviso(ObjectId consultaOrigem, ObjectId paciente) {
+        return db.getCollection("notificacoes").find(Filters.and(Filters.eq("consultaId", consultaOrigem),
+                Filters.eq("destinatarioId", paciente))).first();
+    }
+
 
     private ObjectId agendar(ObjectId paciente, ObjectId medico, Instant inicio) {
         return registro.criar(new Document("pacienteId", paciente).append("medicoId", medico)
