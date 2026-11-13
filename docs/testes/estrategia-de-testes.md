@@ -1,6 +1,11 @@
 # Estratégia de testes
 
-Resultado em 13/11/2026: **217 testes JUnit** no back-end (216 passando e 1 desativado de propósito, pendente da #25) e **181 testes Vitest** no front-end, todos passando.
+Resultado em 13/11/2026: **181 testes Vitest** no front-end e, no back-end:
+
+| Comando | Resultado esperado |
+|---|---|
+| `./mvnw test` | **212 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
+| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **217 rodados, 0 falhas, 1 pulado** (só o da #25) |
 
 ## Como os testes são organizados
 
