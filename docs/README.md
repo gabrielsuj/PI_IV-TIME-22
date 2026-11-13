@@ -33,6 +33,7 @@ Todas as rotas, com os perfis autorizados, estão resumidas em `backend/.../api/
 |---|---|
 | [medicos-especialidades.md](api/medicos-especialidades.md) | `/medicos`, `/especialidades` (cadastro, edição, desativação) |
 | [agendamento.md](api/agendamento.md) | `GET /vagas` (disponibilidade) e `POST /consultas` (agendamento) |
+| [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as telas `/consultas` |
 | [cancelamento.md](api/cancelamento.md) | `POST /consultas/{id}/cancelamento` (cancelamento por paciente, médico ou secretaria) |
 | [alteracoes-agenda.md](api/alteracoes-agenda.md) | `PUT /agendas` e `POST /bloqueios` quando atingem consultas marcadas (409 + `?confirmar=true`) |
 

@@ -4,6 +4,7 @@ import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
+import br.edu.puccampinas.consultafacil.service.AcessoConsulta;
 import br.edu.puccampinas.consultafacil.service.AposCancelamento;
 import br.edu.puccampinas.consultafacil.service.CancelamentoService;
 import br.edu.puccampinas.consultafacil.service.HistoricoProcessor;
@@ -54,10 +55,10 @@ class CancelamentoServiceTest {
     private final Map<String, ObjectId> medicosPorLogin = Map.of(ANA_LOGADA.id(), DRA_ANA, BRUNO_LOGADO.id(), DR_BRUNO);
 
     private CancelamentoService criarService(AposCancelamento fila) {
-        return new CancelamentoService(consultas,
+        var acesso = new AcessoConsulta(
                 login -> Optional.ofNullable(pacientesPorLogin.get(login)),
-                login -> Optional.ofNullable(medicosPorLogin.get(login)),
-                registro, fila, relogio);
+                login -> Optional.ofNullable(medicosPorLogin.get(login)));
+        return new CancelamentoService(consultas, acesso, registro, fila, relogio);
     }
 
     private final CancelamentoService service = criarService(avisosFila::add);

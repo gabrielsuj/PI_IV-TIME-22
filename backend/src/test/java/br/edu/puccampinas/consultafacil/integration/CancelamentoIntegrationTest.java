@@ -97,8 +97,9 @@ class CancelamentoIntegrationTest {
                 new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio),
                 new MedicoRepository(db), new EspecialidadeRepository.Mongo(db), new PacienteRepository.Mongo(db),
                 pacienteDoUsuario, registro);
-        cancelamento = new CancelamentoService(consultas, pacienteDoUsuario::buscar,
-                new MedicoDoUsuarioRepository(db)::buscar, registro, avisosFila::add, relogio);
+        cancelamento = new CancelamentoService(consultas,
+                new AcessoConsulta(pacienteDoUsuario::buscar, new MedicoDoUsuarioRepository(db)::buscar),
+                registro, avisosFila::add, relogio);
     }
 
     private void salvar(String colecao, Document d) {

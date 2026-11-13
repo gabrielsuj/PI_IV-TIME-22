@@ -25,6 +25,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET  /vagas (#21)            |    ✓     |   ✓    |   ✓
  *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
  *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
+ *  GET  /consultas/lista, /consultas/{id} (#30) | ✓ | ✓ | ✓   (paciente e médico só as próprias)
  */
 public final class Rotas {
     private Rotas() {}
@@ -74,13 +75,18 @@ public final class Rotas {
 
     /** /consultas/{id}/cancelamento: o {id} vem no caminho. Só o que vem depois da barra fica aqui. */
     private static final Pattern CANCELAMENTO = Pattern.compile("^/consultas/[^/]+/cancelamento$");
+    /** /consultas/lista (#30) ou /consultas/{id} (#30): um segmento só depois de /consultas/. */
+    private static final Pattern UM_SEGMENTO = Pattern.compile("^/consultas/[^/]+$");
 
     /**
-     * Caminhos com id de consulta (contexto "/consultas/"). O GET/POST de "/consultas" sem barra
+     * Caminhos abaixo de "/consultas/" (contexto próprio). O GET/POST de "/consultas" sem barra
      * continua no Router, porque o servidor escolhe o contexto de prefixo mais longo.
-     * A #30 acrescenta aqui o GET /consultas/{id} (detalhe).
+     *  GET  /consultas/lista               → leitura (listagem, #30)
+     *  GET  /consultas/{id}                → leitura (detalhe, #30)
+     *  POST /consultas/{id}/cancelamento   → cancelamento (#27)
      */
-    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler cancelamento) {
+    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler leitura, HttpHandler cancelamento) {
+        HttpHandler ler = autz.exigir(leitura, PACIENTE, MEDICO, SECRETARIA_ADMIN);
         HttpHandler cancelar = autz.exigir(cancelamento, PACIENTE, MEDICO, SECRETARIA_ADMIN);
         return ex -> {
             try {
@@ -89,8 +95,13 @@ public final class Rotas {
                     ex.sendResponseHeaders(204, -1);
                     return;
                 }
+                String metodo = ex.getRequestMethod();
                 String caminho = ex.getRequestURI().getPath();
-                if ("POST".equals(ex.getRequestMethod()) && CANCELAMENTO.matcher(caminho).matches()) {
+                if ("GET".equals(metodo) && UM_SEGMENTO.matcher(caminho).matches()) {
+                    ler.handle(ex);
+                    return;
+                }
+                if ("POST".equals(metodo) && CANCELAMENTO.matcher(caminho).matches()) {
                     cancelar.handle(ex);
                     return;
                 }

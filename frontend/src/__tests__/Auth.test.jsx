@@ -77,19 +77,19 @@ describe('menu e telas por perfil', () => {
   it('secretaria vê todos os itens', () => {
     entrarComo();
     renderAt('/perfis');
-    expect(menu()).toEqual(['Início', 'Nova consulta', 'Pacientes', 'Médicos', 'Especialidades', 'Agenda', 'Calendário', 'Perfis de acesso', 'Status do sistema']);
+    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Pacientes', 'Médicos', 'Especialidades', 'Agenda', 'Calendário', 'Perfis de acesso', 'Status do sistema']);
   });
 
   it('médico vê pacientes e agenda, sem cadastros-base nem status', () => {
     entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['Início', 'Pacientes', 'Agenda', 'Calendário', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Consultas', 'Pacientes', 'Agenda', 'Calendário', 'Perfis de acesso']);
   });
 
   it('paciente vê início, nova consulta e perfis', () => {
     entrarComo({ id: 'u-paciente', nome: 'Paulo Paciente', perfil: 'PACIENTE' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['Início', 'Nova consulta', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Perfis de acesso']);
   });
 
   it('bloqueia a tela aberta pelo endereço quando o perfil não tem acesso', () => {

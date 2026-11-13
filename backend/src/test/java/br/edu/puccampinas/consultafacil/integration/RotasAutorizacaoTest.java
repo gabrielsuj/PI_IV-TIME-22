@@ -54,7 +54,7 @@ class RotasAutorizacaoTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", router);
         server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
-        server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO));
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO));
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
         client = HttpClient.newHttpClient();
@@ -108,6 +108,13 @@ class RotasAutorizacaoTest {
         "POST,   /consultas/abc/cancelamento, MEDICO,           200",
         "POST,   /consultas/abc/cancelamento, SECRETARIA_ADMIN, 200",
         "GET,    /consultas/abc/cancelamento, SECRETARIA_ADMIN, 404",
+        // Listagem e detalhe (#30): os três perfis; o serviço limita ao que cada um pode ver
+        "GET,    /consultas/lista,            PACIENTE,         200",
+        "GET,    /consultas/lista,            MEDICO,           200",
+        "GET,    /consultas/lista,            SECRETARIA_ADMIN, 200",
+        "GET,    /consultas/abc,              PACIENTE,         200",
+        "POST,   /consultas/abc,              SECRETARIA_ADMIN, 404",
+        "GET,    /consultas/abc/def/ghi,      SECRETARIA_ADMIN, 404",
         "POST,   /consultas/abc/outra-coisa,  SECRETARIA_ADMIN, 404",
     })
     void matrizDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
@@ -123,6 +130,8 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("GET", "/vagas", null).statusCode());
         assertEquals(401, enviar("POST", "/consultas", null).statusCode());
         assertEquals(401, enviar("POST", "/consultas/abc/cancelamento", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/lista", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/abc", null).statusCode());
     }
 
     /** O contexto "/consultas/" não pode engolir o "/consultas" sem barra, que continua no Router. */
