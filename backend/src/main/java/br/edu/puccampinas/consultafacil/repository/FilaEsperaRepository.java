@@ -1,6 +1,7 @@
 package br.edu.puccampinas.consultafacil.repository;
 
 import com.mongodb.client.MongoCollection;
+import org.bson.conversions.Bson;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -12,9 +13,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Leitura e sinalização da fila de espera (#32). O cadastro dos interesses é da #31.
+ * Inscrições na fila de espera: cadastro, consulta e remoção (#31) e sinalização após cancelamento (#32).
  * Regras de compatibilidade: docs/modelagem/filaEspera.md.
  */
 public class FilaEsperaRepository {
@@ -51,5 +53,52 @@ public class FilaEsperaRepository {
                         Updates.set("ultimaSinalizacao", ultimaSinalizacao),
                         Updates.set("atualizadoEm", agora)))
                 .getModifiedCount() == 1;
+    }
+
+    // ------------------------------------------------------------------ cadastro (#31)
+
+    /** Status que contam como inscrição ativa (índice único parcial uq_fila_interesse_ativo). */
+    public static final List<String> ATIVOS = List.of("AGUARDANDO", "SINALIZADA");
+
+    /** Insere a inscrição. 409 se o paciente já tem inscrição ativa igual (uq_fila_interesse_ativo). */
+    public Document inserir(Document inscricao) {
+        return MongoErros.traduzir(() -> { col.insertOne(inscricao); return inscricao; },
+                "Você já está na fila para esta especialidade e este médico");
+    }
+
+    public Optional<Document> buscar(ObjectId id) {
+        return Optional.ofNullable(col.find(Filters.eq("_id", id)).first());
+    }
+
+    /** Inscrições que atendem ao filtro, em ordem de chegada. filtro null = todas. */
+    public List<Document> listar(Bson filtro) {
+        return (filtro == null ? col.find() : col.find(filtro))
+                .sort(Sorts.ascending("criadoEm", "_id"))
+                .into(new ArrayList<>());
+    }
+
+    /** Ativa -> CANCELADA. Condicional: false se a inscrição já estava encerrada. */
+    public boolean cancelar(ObjectId id, Date agora) {
+        return col.updateOne(
+                Filters.and(Filters.eq("_id", id), Filters.in("status", ATIVOS)),
+                Updates.combine(
+                        Updates.set("status", "CANCELADA"),
+                        Updates.set("ultimaSinalizacao", null),
+                        Updates.set("atualizadoEm", agora)))
+                .getModifiedCount() == 1;
+    }
+
+    /**
+     * Ativas com validoAte vencido -> EXPIRADA. Feita antes de listar e de inscrever (não há rotina agendada no MVP),
+     * para a inscrição vencida não aparecer como ativa nem bloquear uma nova pelo índice único.
+     */
+    public long expirarVencidas(Date agora) {
+        return col.updateMany(
+                Filters.and(Filters.in("status", ATIVOS), Filters.lte("validoAte", agora)),
+                Updates.combine(
+                        Updates.set("status", "EXPIRADA"),
+                        Updates.set("ultimaSinalizacao", null),
+                        Updates.set("atualizadoEm", agora)))
+                .getModifiedCount();
     }
 }

@@ -55,6 +55,7 @@ class RotasAutorizacaoTest {
         server.createContext("/", router);
         server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
         server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO));
+        server.createContext("/fila-espera", Rotas.filaEspera(cors, autz, ECO));
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
         client = HttpClient.newHttpClient();
@@ -116,6 +117,16 @@ class RotasAutorizacaoTest {
         "POST,   /consultas/abc,              SECRETARIA_ADMIN, 404",
         "GET,    /consultas/abc/def/ghi,      SECRETARIA_ADMIN, 404",
         "POST,   /consultas/abc/outra-coisa,  SECRETARIA_ADMIN, 404",
+        // Fila de espera (#31): paciente e secretaria; o médico não usa a fila
+        "POST,   /fila-espera,                PACIENTE,         200",
+        "GET,    /fila-espera,                PACIENTE,         200",
+        "DELETE, /fila-espera/abc,            PACIENTE,         200",
+        "GET,    /fila-espera,                SECRETARIA_ADMIN, 200",
+        "DELETE, /fila-espera/abc,            SECRETARIA_ADMIN, 200",
+        "POST,   /fila-espera,                MEDICO,           403",
+        "GET,    /fila-espera,                MEDICO,           403",
+        "GET,    /fila-espera/abc/def,        PACIENTE,         404",
+        "GET,    /fila-esperaX,               PACIENTE,         404",
     })
     void matrizDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
         var r = enviar(metodo, rota, token(perfil));
@@ -132,6 +143,7 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("POST", "/consultas/abc/cancelamento", null).statusCode());
         assertEquals(401, enviar("GET", "/consultas/lista", null).statusCode());
         assertEquals(401, enviar("GET", "/consultas/abc", null).statusCode());
+        assertEquals(401, enviar("GET", "/fila-espera", null).statusCode());
     }
 
     /** O contexto "/consultas/" não pode engolir o "/consultas" sem barra, que continua no Router. */

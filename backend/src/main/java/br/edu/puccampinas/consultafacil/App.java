@@ -11,6 +11,7 @@ import br.edu.puccampinas.consultafacil.api.handler.CancelamentoHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaLeituraHandler;
+import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
@@ -89,6 +90,9 @@ public class App {
             new PacienteDoUsuarioRepository(db)::buscar, new MedicoDoUsuarioRepository(db)::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
             acessoConsulta, registroConsultas, AposCancelamento.NENHUM, Clock.systemUTC()));
+        // Fila de espera (#31): inscrição, consulta e saída
+        var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(new FilaEsperaRepository(db), especialidades,
+            medicos, pacienteRepo, new PacienteDoUsuarioRepository(db), new NomesRepository.Mongo(db), Clock.systemUTC()));
         // Listagem e detalhe de consultas (#30)
         var consultaLeituraHandler = new ConsultaLeituraHandler(new ConsultaLeituraService(
             consultaRepo, new NomesRepository.Mongo(db), acessoConsulta, Clock.systemUTC()));
@@ -124,6 +128,7 @@ public class App {
         server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
         // /consultas/lista, /consultas/{id} e /consultas/{id}/cancelamento (#27, #30); "/consultas" sem barra continua no router.
         server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao, consultaLeituraHandler, cancelamentoHandler));
+        server.createContext("/fila-espera", Rotas.filaEspera(cors, autorizacao, filaEsperaHandler));
 
         server.start();
 
