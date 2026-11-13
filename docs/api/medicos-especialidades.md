@@ -1,10 +1,7 @@
 # API de médicos e especialidades
 
-Implementação da Parte 1 / issue #13, sobre a base `f62d37d`. Mantém os schemas
-`database/init/06-esquema-especialidades.js` e `07-esquema-medicos.js`.
-Não implementa disponibilidade, agendamento nem a tela completa da #15.
-Compatibilidade revalidada após os merges até `ee210a7`; consulte a
-[revisão da integração](../revisoes/integracao-ee210a7.md).
+> Issue #13 (cadastro de médicos e especialidades). Modelagem: [medicos-agenda.md](../modelagem/medicos-agenda.md)
+> (validadores em `database/init/06-esquema-especialidades.js` e `07-esquema-medicos.js`).
 
 ## Rotas e permissões
 
@@ -22,8 +19,8 @@ Todas as chamadas exigem `Authorization: Bearer <token>` da sessão existente.
 | PUT | `/especialidades/{id}` | 200, especialidade atualizada | SECRETARIA_ADMIN |
 
 Listas incluem ativos e inativos, ordenados por nome e ID, sem paginação/filtros.
-Lista vazia retorna `[]`. A leitura pelo paciente permite o futuro consumidor de
-busca da #24; o catálogo não representa vagas disponíveis. `usuarioId` não é
+Lista vazia retorna `[]`. A leitura pelo paciente é usada na busca de vagas
+e na fila de espera; o catálogo não representa vagas disponíveis. `usuarioId` não é
 exposto nem editável por estes endpoints. IDs são strings hexadecimais de 24
 caracteres na API e ObjectId no banco, inclusive em `especialidadeIds`.
 
@@ -123,7 +120,7 @@ silenciosamente descartado.
 Na pasta `backend`, com Java 21 ou compilação `--release 21`:
 
 ```sh
-mvn -Dtest=CadastroServiceTest,CadastroHandlerTest,RotasAutorizacaoTest test
+./mvnw test -Dtest=CadastroServiceTest,CadastroHandlerTest,RotasAutorizacaoTest
 ```
 
 `CadastroServiceTest` cobre regras sem banco. `CadastroHandlerTest` usa servidor
@@ -132,7 +129,7 @@ HTTP, sessão e autorização reais com repositórios de teste em memória.
 Com MongoDB local e schemas/índices já instalados **somente em consultafacil_test**:
 
 ```sh
-mvn -DmongoTests=true -Dtest=CadastroMongoIntegrationTest test
+./mvnw test -DmongoTests=true -Dtest=CadastroMongoIntegrationTest
 ```
 
 O teste Mongo é opt-in, verifica schemas/índices antes de gravar e limpa somente
@@ -140,9 +137,7 @@ os IDs criados por ele. Verifica persistência, preservação de `usuarioId`,
 desativação, duplicidades na edição e duas criações concorrentes do mesmo CRM.
 Não executa drop, recriação de banco, remoção de volumes nem limpeza global.
 
-Na pasta `frontend`: `npm test`, `npm run lint` e `npm run build`. O formulário
-existente é reaproveitado; não há mudanças de navegação/perfis da #11 (Gabriel)
-nem implementação da tela completa da #15.
+Na pasta `frontend`: `npm test`, `npm run lint` e `npm run build`.
 
 ## Arquivos da entrega
 
@@ -162,39 +157,3 @@ nem implementação da tela completa da #15.
 | Frontend: `src/data/registrationSchemas.js`, `src/pages/RegistrationPage.jsx` | Retirar descricao; buscar/exibir código conforme o schema atual |
 | `src/__tests__/Registration.test.jsx` | Garantir envio apenas dos campos aceitos da especialidade |
 | `docs/api/medicos-especialidades.md` | Contrato, decisões, comandos e resultados desta entrega |
-
-## Resultado local em 11/11/2026
-
-Implementação da Parte 1 entregue; verificação integrada com MongoDB pendente.
-Nenhuma dependência de outra issue impede a implementação da #13. As demais
-partes do PDF não foram implementadas. Não houve push, merge, PR, comentário ou
-alteração de issue.
-
-| Verificação executada | Resultado |
-|---|---|
-| Maven `-DskipTests compile` | Aprovada: JDK 26.0.1 com `release 21` do pom.xml |
-| Maven `-Dtest=CadastroServiceTest,CadastroHandlerTest,RotasAutorizacaoTest test` | 44 testes aprovados, sem falhas/erros/ignorados |
-| Maven `-DmongoTests=true -Dtest=CadastroMongoIntegrationTest test` | 2 erros de conexão recusada em localhost:27017, antes de gravar; persistência/índices ainda não validados |
-| `npm test` | 44 aprovados, 1 falha no teste existente de retorno após login em Auth.test.jsx |
-| `npm test -- src/__tests__/Registration.test.jsx src/__tests__/Auth.test.jsx` | 12 testes de cadastro aprovados; Auth teve 3 aprovados e repetiu a mesma falha |
-| Teste de Auth na cópia limpa do HEAD f62d37d | Mesma falha, confirmando que também ocorre sem as mudanças da Parte 1 |
-| `npm run lint` | Aprovada |
-| `npm run build` | Aprovada |
-| `git diff --check` | Aprovada |
-
-O teste de Auth falha ao procurar o botão "Conta de Sofia Secretaria" após a
-mudança da rota, enquanto o DOM ainda mostra "Entrando…". Foi reproduzido numa
-cópia temporária de `git archive HEAD frontend`, com as mesmas dependências.
-Autenticação e esse teste foram preservados, pois estão fora da Parte 1.
-
-O Maven Wrapper apresentou erro de matriz nula no PowerShell antes de iniciar.
-Foi utilizado diretamente o Maven 3.10.0 já presente no cache local (mesma versão
-de `maven-wrapper.properties`), com `-Dmaven.repo.local=../../.tmp/maven-repository`.
-O Wrapper e as versões das dependências não foram alterados. Não havia JDK 21
-instalado: a compilação usa o alvo 21, mas a execução dos testes ocorreu no JDK 26.
-
-Pendências de verificação: executar os dois testes Mongo com a modelagem no banco
-exclusivo de testes, validar o fluxo visual com API real e executar no JDK 21.
-O Docker estava parado e o driver confirmou conexão recusada; nenhuma
-infraestrutura ou banco foi recriado. A suíte completa de integração preexistente
-com banco não foi executada.

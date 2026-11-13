@@ -11,7 +11,7 @@ A nova porta de escrita é RegistroConsultaService. Ela grava a consulta e um ev
 no mesmo documento, tenta transferir o evento para historico e tenta recuperar um lote de
 outras consultas. HistoricoProcessor também pode ser chamado explicitamente para recuperação.
 
-Exemplo de composição no futuro módulo de consultas (não executado automaticamente):
+Composição usada no `App.java` e pelos serviços de agendamento (#21), cancelamento (#27) e fila (#32):
 
 ~~~java
 var consultas = new ConsultaRepository(db);
@@ -19,7 +19,7 @@ var historico = new HistoricoRepository.Mongo(db);
 var processor = new HistoricoProcessor(consultas, historico);
 var registro = new RegistroConsultaService(consultas, processor, Clock.systemUTC());
 
-// No futuro handler protegido por Autorizacao:
+// Num handler protegido por Autorizacao (ex.: AgendamentoService, CancelamentoService):
 var ator = Autorizacao.usuario(exchange);
 // Validar referências, disponibilidade e acesso ao paciente/médico antes desta chamada.
 var consulta = registro.criar(dadosValidados, ator);
@@ -31,13 +31,15 @@ O usuário deve vir da sessão, nunca do corpo JSON. RegistroConsultaService val
 não nula, perfil, transições, tipos, intervalo e campos permitidos. Não consulta a coleção
 usuarios para substituir a autenticação e não implementa regras de disponibilidade,
 sobreposição, existência de referências ou propriedade do cadastro: são responsabilidades
-dos futuros serviços/handlers. Ele não é um endpoint pronto para exposição.
+dos serviços que o chamam (AgendamentoService, CancelamentoService). Ele não é exposto como endpoint.
 
-O método legado ConsultaRepository.inserir(Document) foi preservado para os testes e
-consumidores existentes. Ele NÃO gera histórico porque não recebe um responsável. Os
-futuros fluxos de aplicação devem usar a nova porta; gravações diretas no banco ou nesse
-método não são capturadas. Não há promessa de auditoria completa da aplicação antes dessa
-integração. Não se cria usuário fictício nem se atribui uma operação humana a SISTEMA.
+Ações posteriores à gravação: o construtor aceita uma ação após o cancelamento (sinalização da
+fila, #32) e outra após a criação (atualização da fila quando a vaga sinalizada é ocupada).
+Elas rodam depois da confirmação; uma falha nelas vai para o log e não desfaz a gravação.
+
+O método legado ConsultaRepository.inserir(Document) foi preservado para os testes.
+Ele NÃO gera histórico porque não recebe um responsável. Os fluxos da aplicação (agendamento,
+cancelamento) usam a porta auditada; gravações diretas no banco ou nesse método não são capturadas. Não se cria usuário fictício nem se atribui uma operação humana a SISTEMA.
 
 ## Documento e atomicidade
 
@@ -142,8 +144,8 @@ O histórico fornece eventos por ocorridoEm e consultas por dataHoraConsulta, co
 e especialidade preservados. Não confundir quantidade de eventos de confirmação com quantidade
 de consultas atualmente confirmadas. Ocupação depende também de jornadas e bloqueios;
 ocupação histórica exata exige preservar a capacidade da agenda de cada período.
-Fila ativa e vagas preenchidas dependem de filaEspera e seu futuro serviço. Não foram criados
-endpoints, painel, fórmulas de taxas ou dados de fila artificiais nesta implementação.
+Fila ativa e vagas preenchidas vêm de filaEspera (status AGUARDANDO/SINALIZADA e ATENDIDA com
+atendidaEm, índice idx_fila_atendidas). O painel de indicadores e as fórmulas de taxas não foram criados.
 
 ## Testes
 

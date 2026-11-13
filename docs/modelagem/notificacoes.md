@@ -5,12 +5,15 @@
 | Data | Autor | Versão | Comentários |
 |------|-------|--------|-------------|
 | 2026-11-07 | Davi Vitoreti | v1.0.0 | Versão inicial da coleção `notificacoes`: campos, referências, status, regras por status da consulta e índices. |
+| 2026-11-13 | Gabriel Martins | v1.1.0 | Situação da implementação: `VAGA_LIBERADA` gerada pela sinalização da fila (#32). |
 
 ## Entidades
 
 A seguir é documentada a entidade (coleção MongoDB) e seus dados (atributos) necessários para suportar confirmações, lembretes e avisos de vaga liberada (itens I9 e I7 da ideação). No MVP todas as notificações são **simuladas**: apresentadas no sistema ou enviadas como e-mail de teste. A integração com WhatsApp e SMS reais (I10) é evolução futura.
 
-> Observação: a coleção `notificacoes` não consta na lista de coleções da seção 3.2.3 do relatório de ideação (pacientes, medicos, especialidades, agendas, consultas, filaEspera e historico). Ela deve ser acrescentada à lista e ao script de inicialização do banco.
+> Observação: a coleção `notificacoes` não consta na lista de coleções da seção 3.2.3 do relatório de ideação (pacientes, medicos, especialidades, agendas, consultas, filaEspera e historico). Ela foi acrescentada ao banco pelo script `database/init/09-esquema-notificacoes.js`.
+
+> **Situação da implementação:** a API gera hoje apenas `VAGA_LIBERADA`, criada com `status = AGENDADA` quando um interessado da fila é sinalizado (#32, ver [filaEspera.md](filaEspera.md#implementação-da-sinalização-32)). Se a vaga é ocupada por outra pessoa antes do envio, o aviso passa a `CANCELADA`. Confirmação de agendamento, lembretes e aviso de cancelamento ainda não são gerados.
 
 ### 1. Notificacao (coleção `notificacoes`)
 
