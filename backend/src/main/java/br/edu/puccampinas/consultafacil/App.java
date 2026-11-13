@@ -79,7 +79,9 @@ public class App {
         // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
         var sinalizacaoFila = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
             consultaRepo, new NomesRepository.Mongo(db), historico, Clock.systemUTC());
-        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC(), sinalizacaoFila::sinalizar);
+        // e, quando uma vaga sinalizada é agendada, atualiza a fila (ATENDIDA / volta a AGUARDANDO)
+        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC(),
+            sinalizacaoFila::sinalizar, sinalizacaoFila::consultaAgendada);
         var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, Clock.systemUTC());
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);

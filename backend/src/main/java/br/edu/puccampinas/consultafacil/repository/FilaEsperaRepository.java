@@ -101,4 +101,55 @@ public class FilaEsperaRepository {
                         Updates.set("atualizadoEm", agora)))
                 .getModifiedCount();
     }
+
+    // ------------------------------------------------------------------ vaga ocupada / vencida
+
+    /** Inscrições SINALIZADA para a vaga (médico + início) informada. */
+    public List<Document> sinalizadasParaVaga(ObjectId medicoId, Date inicioVaga) {
+        return col.find(Filters.and(
+                        Filters.eq("status", "SINALIZADA"),
+                        Filters.eq("ultimaSinalizacao.medicoId", medicoId),
+                        Filters.eq("ultimaSinalizacao.dataHora", inicioVaga)))
+                .sort(Sorts.ascending("criadoEm", "_id"))
+                .into(new ArrayList<>());
+    }
+
+    /** SINALIZADA -> ATENDIDA: o próprio interessado agendou a vaga. */
+    public boolean marcarAtendida(ObjectId id, ObjectId consultaId, Date agora) {
+        return col.updateOne(
+                Filters.and(Filters.eq("_id", id), Filters.eq("status", "SINALIZADA")),
+                Updates.combine(
+                        Updates.set("status", "ATENDIDA"),
+                        Updates.set("ultimaSinalizacao", null),
+                        Updates.set("consultaAgendadaId", consultaId),
+                        Updates.set("atendidaEm", agora),
+                        Updates.set("atualizadoEm", agora)))
+                .getModifiedCount() == 1;
+    }
+
+    /** SINALIZADA -> AGUARDANDO: a vaga não está mais disponível. criadoEm (posição na fila) não muda. */
+    public boolean voltarParaAguardando(ObjectId id, Date agora) {
+        return col.updateOne(
+                Filters.and(Filters.eq("_id", id), Filters.eq("status", "SINALIZADA")),
+                paraAguardando(agora))
+                .getModifiedCount() == 1;
+    }
+
+    /**
+     * Manutenção feita antes de ler a fila (não há rotina agendada no MVP):
+     * sinalizações de vagas que já passaram voltam a AGUARDANDO e inscrições vencidas passam a EXPIRADA.
+     */
+    public void revisar(Date agora) {
+        col.updateMany(
+                Filters.and(Filters.eq("status", "SINALIZADA"), Filters.lte("ultimaSinalizacao.dataHora", agora)),
+                paraAguardando(agora));
+        expirarVencidas(agora);
+    }
+
+    private static Bson paraAguardando(Date agora) {
+        return Updates.combine(
+                Updates.set("status", "AGUARDANDO"),
+                Updates.set("ultimaSinalizacao", null),
+                Updates.set("atualizadoEm", agora));
+    }
 }

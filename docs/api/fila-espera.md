@@ -93,7 +93,9 @@ Lista em ordem de chegada (`criadoEm`).
 | `pacienteId` | secretaria | Só as inscrições desse paciente. |
 | `especialidadeId` | secretaria | Só as inscrições dessa especialidade. |
 
-Antes de responder, inscrições ativas vencidas passam a `EXPIRADA`.
+Antes de responder, a fila é revisada: inscrições ativas vencidas passam a `EXPIRADA`, e sinalizações de vagas que já passaram voltam a `AGUARDANDO`.
+
+Uma inscrição `SINALIZADA` muda sozinha quando a vaga é ocupada: vira `ATENDIDA` se o próprio paciente agendou aquele horário (`POST /consultas` com o médico e o início da `ultimaSinalizacao`), ou volta a `AGUARDANDO` se outra pessoa agendou primeiro.
 
 ## 5. DELETE /fila-espera/{id}
 
