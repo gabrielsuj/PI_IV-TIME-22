@@ -7,6 +7,7 @@ import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
+import br.edu.puccampinas.consultafacil.api.handler.CancelamentoHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
@@ -78,6 +79,11 @@ public class App {
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);
 
+        // Cancelamento (#27). A fila de espera (#32) troca o AposCancelamento.NENHUM pela implementação dela.
+        var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
+            new PacienteDoUsuarioRepository(db)::buscar, new MedicoDoUsuarioRepository(db)::buscar,
+            registroConsultas, AposCancelamento.NENHUM, Clock.systemUTC()));
+
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
             consultaRepo, agendaRepo, medicos, new NomesRepository.Mongo(db)));
@@ -107,6 +113,8 @@ public class App {
         server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
         server.createContext("/medicos", Rotas.catalogo(cors, autorizacao, medicoHandler));
         server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
+        // /consultas/{id}/... (#27); "/consultas" sem barra continua no router.
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao, cancelamentoHandler));
 
         server.start();
 

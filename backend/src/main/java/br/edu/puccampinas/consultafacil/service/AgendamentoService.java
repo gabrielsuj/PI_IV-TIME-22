@@ -110,7 +110,7 @@ public class AgendamentoService {
                 .append("especialidadeId", especialidadeId)
                 .append("inicio", Date.from(inicio))
                 .append("fim", Date.from(fim));
-        return paraResposta(registro.criar(dados, ator));
+        return ConsultaResponse.de(registro.criar(dados, ator));
     }
 
     /** Paciente agenda para si mesmo; a secretaria informa para quem é a consulta. */
@@ -164,16 +164,5 @@ public class AgendamentoService {
         } catch (DateTimeParseException e) {
             throw ApiException.badRequest(campo + " deve ser data e hora com fuso, ex.: 2026-11-16T11:00:00Z");
         }
-    }
-
-    private static ConsultaResponse paraResposta(Document d) {
-        return new ConsultaResponse(
-                d.getObjectId("_id").toHexString(),
-                d.getObjectId("pacienteId").toHexString(),
-                d.getObjectId("medicoId").toHexString(),
-                d.getObjectId("especialidadeId").toHexString(),
-                d.getDate("inicio").toInstant().toString(),
-                d.getDate("fim").toInstant().toString(),
-                d.getString("status"));
     }
 }

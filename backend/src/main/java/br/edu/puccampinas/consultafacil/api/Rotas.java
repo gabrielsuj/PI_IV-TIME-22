@@ -4,6 +4,8 @@ import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.security.Autorizacao;
 import com.sun.net.httpserver.HttpHandler;
 
+import java.util.regex.Pattern;
+
 import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
 
 /**
@@ -22,6 +24,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  POST/PUT desses cadastros    |    -     |   -    |   ✓
  *  GET  /vagas (#21)            |    ✓     |   ✓    |   ✓
  *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
+ *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
  */
 public final class Rotas {
     private Rotas() {}
@@ -63,6 +66,40 @@ public final class Rotas {
                 ("GET".equals(ex.getRequestMethod()) ? leitura : escrita).handle(ex);
             } catch (ApiException e) {
                 Http.sendError(ex, e.status(), e.getMessage());
+            } finally {
+                ex.close();
+            }
+        };
+    }
+
+    /** /consultas/{id}/cancelamento: o {id} vem no caminho. Só o que vem depois da barra fica aqui. */
+    private static final Pattern CANCELAMENTO = Pattern.compile("^/consultas/[^/]+/cancelamento$");
+
+    /**
+     * Caminhos com id de consulta (contexto "/consultas/"). O GET/POST de "/consultas" sem barra
+     * continua no Router, porque o servidor escolhe o contexto de prefixo mais longo.
+     * A #30 acrescenta aqui o GET /consultas/{id} (detalhe).
+     */
+    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler cancelamento) {
+        HttpHandler cancelar = autz.exigir(cancelamento, PACIENTE, MEDICO, SECRETARIA_ADMIN);
+        return ex -> {
+            try {
+                cors.addHeaders(ex);
+                if ("OPTIONS".equals(ex.getRequestMethod())) {
+                    ex.sendResponseHeaders(204, -1);
+                    return;
+                }
+                String caminho = ex.getRequestURI().getPath();
+                if ("POST".equals(ex.getRequestMethod()) && CANCELAMENTO.matcher(caminho).matches()) {
+                    cancelar.handle(ex);
+                    return;
+                }
+                throw ApiException.notFound("Rota não encontrada");
+            } catch (ApiException e) {
+                Http.sendError(ex, e.status(), e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                Http.sendError(ex, 500, "Erro interno do servidor");
             } finally {
                 ex.close();
             }
