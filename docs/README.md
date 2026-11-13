@@ -21,7 +21,7 @@ Os validadores (`$jsonSchema`) e índices ficam em [`database/init/`](../databas
 | [consultas.md](modelagem/consultas.md) | `consultas`, status e índices únicos parciais que protegem as reservas |
 | [historico.md](modelagem/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
 | [historico-implementacao.md](modelagem/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
-| [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera; sinalização após cancelamento implementada na #32, cadastro pela API na #31) |
+| [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
 | [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (lembretes simulados, ainda não implementados na API) |
 | [carga-demonstracao.md](modelagem/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
 
@@ -35,6 +35,7 @@ Todas as rotas, com os perfis autorizados, estão resumidas em `backend/.../api/
 | [agendamento.md](api/agendamento.md) | `GET /vagas` (disponibilidade) e `POST /consultas` (agendamento) |
 | [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as telas `/consultas` |
 | [cancelamento.md](api/cancelamento.md) | `POST /consultas/{id}/cancelamento` (cancelamento por paciente, médico ou secretaria) |
+| [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` (inscrição na fila de espera) |
 | [alteracoes-agenda.md](api/alteracoes-agenda.md) | `PUT /agendas` e `POST /bloqueios` quando atingem consultas marcadas (409 + `?confirmar=true`) |
 
 Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/me`, `/pacientes`, `GET /agendas`, `GET/DELETE /bloqueios` e `GET /consultas` (calendário). O formato de cada uma está nos testes de integração correspondentes ([testes](testes/estrategia-de-testes.md)).

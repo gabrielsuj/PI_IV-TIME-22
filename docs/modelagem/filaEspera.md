@@ -106,7 +106,7 @@ Regra de compatibilidade entre um interessado e a vaga liberada (todas devem ser
 - Todos os compatíveis são avisados; a vaga não fica reservada e quem agendar primeiro fica com ela (índices únicos de `consultas`).
 - A notificação `VAGA_LIBERADA` é criada com `status = AGENDADA`; exibir ou enviar o aviso fica para quem consome `notificacoes` (#57). Ela é gravada antes de o interesse passar a `SINALIZADA`, de modo que `ultimaSinalizacao.notificacaoId` sempre aponta para uma notificação existente.
 - O histórico da consulta recebe `SINALIZACAO_FILA` com `totalSinalizados`, inclusive quando é `0`.
-- O cadastro dos interesses pela API e as transições `ATENDIDA`/volta a `AGUARDANDO` não fazem parte da #32.
+- O cadastro dos interesses pela API é da #31 ([docs/api/fila-espera.md](../api/fila-espera.md)). As transições `ATENDIDA` e a volta a `AGUARDANDO` ainda não estão implementadas.
 
 ## Índices
 

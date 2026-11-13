@@ -26,6 +26,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
  *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
  *  GET  /consultas/lista, /consultas/{id} (#30) | ✓ | ✓ | ✓   (paciente e médico só as próprias)
+ *  POST/GET /fila-espera, DELETE /fila-espera/{id} (#31) | ✓ | - | ✓ (paciente só as próprias)
  */
 public final class Rotas {
     private Rotas() {}
@@ -106,6 +107,32 @@ public final class Rotas {
                     return;
                 }
                 throw ApiException.notFound("Rota não encontrada");
+            } catch (ApiException e) {
+                Http.sendError(ex, e.status(), e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                Http.sendError(ex, 500, "Erro interno do servidor");
+            } finally {
+                ex.close();
+            }
+        };
+    }
+
+    /** /fila-espera e /fila-espera/{id} (#31). Contexto de prefixo: o padrão evita aceitar /fila-esperaX. */
+    private static final Pattern FILA = Pattern.compile("^/fila-espera(/[^/]+)?$");
+
+    /** Fila de espera (#31): paciente e secretaria em todos os métodos; o médico não usa a fila. */
+    public static HttpHandler filaEspera(Cors cors, Autorizacao autz, HttpHandler fila) {
+        HttpHandler autorizado = autz.exigir(fila, PACIENTE, SECRETARIA_ADMIN);
+        return ex -> {
+            try {
+                cors.addHeaders(ex);
+                if ("OPTIONS".equals(ex.getRequestMethod())) {
+                    ex.sendResponseHeaders(204, -1);
+                    return;
+                }
+                if (!FILA.matcher(ex.getRequestURI().getPath()).matches()) throw ApiException.notFound("Rota não encontrada");
+                autorizado.handle(ex);
             } catch (ApiException e) {
                 Http.sendError(ex, e.status(), e.getMessage());
             } catch (Exception e) {

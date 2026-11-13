@@ -69,9 +69,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Calendário operacional por médico (semana e dia) | ✅ |
 | Busca de vagas e agendamento (secretaria e paciente) | ✅ |
 | Registro de histórico das consultas | ✅ |
-| Cancelamento e alteração de status pela interface | 🚧 #27, #28 |
+| Listagem, detalhe e cancelamento de consultas | ✅ |
+| Fila de espera: inscrição (API) e sinalização da vaga após cancelamento | ✅ #31, #32 (tela em andamento) |
+| Alteração de status (conclusão, falta) pela interface | 🚧 #28 |
 | Sobreposição do mesmo paciente em horários diferentes | 🚧 #25 |
-| Fila de espera, lembretes simulados e painel de indicadores | 🚧 #31 a #37 |
+| Lembretes simulados, avisos de vaga e painel de indicadores | 🚧 #33 a #37, #57 |
 
 ---
 

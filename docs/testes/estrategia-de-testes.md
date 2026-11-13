@@ -4,8 +4,8 @@ Resultado em 13/11/2026: **181 testes Vitest** no front-end e, no back-end:
 
 | Comando | Resultado esperado |
 |---|---|
-| `./mvnw test` | **221 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
-| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **226 rodados, 0 falhas, 1 pulado** (só o da #25) |
+| `./mvnw test` | **285 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
+| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **290 rodados, 0 falhas, 1 pulado** (só o da #25) |
 
 ## Como os testes são organizados
 
@@ -63,6 +63,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `ConsultaCalendarioIntegrationTest` | Leitura das consultas do calendário: período, fuso, nomes, validações |
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
 | `SinalizacaoFilaIntegrationTest` | Cancelamento com o banco real: vaga liberada, histórico `CANCELAMENTO` + `SINALIZACAO_FILA`, só interessados compatíveis sinalizados (turno, especialidade, médico, validade, janela, sobreposição), um aviso por paciente, vaga no passado sem aviso |
+| `FilaEsperaIntegrationTest` | Fila pela API (#31): inscrição do paciente e pela secretaria, validações, inscrição duplicada (409), saída da fila, expiração e a vaga sinalizada vista pelo paciente |
 | `TurnoFilaTest` | Regra de turno da fila no fuso de São Paulo |
 | `ReservasConcorrenciaIntegrationTest` | Pedidos simultâneos pela API (servidor com 16 threads): vaga única, mesmo paciente, vagas diferentes, sobreposição e cancelamento. Ver [garantias de reserva](garantias-de-reserva.md) |
 | `HistoricoPersistenceIntegrationTest` | Gravação do histórico com o validador real (opcional) |
