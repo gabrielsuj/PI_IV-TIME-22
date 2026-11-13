@@ -97,6 +97,17 @@ Regra de compatibilidade entre um interessado e a vaga liberada (todas devem ser
 4. Data da vaga dentro de `dataInicio` e `dataFim` (quando informados) e no `turnoPreferido`.
 5. O paciente não possui outra consulta ativa sobreposta ao horário da vaga.
 
+### Implementação da sinalização (#32)
+
+`SinalizacaoFilaService`, acionado pelo `RegistroConsultaService` sempre que uma consulta passa a `CANCELADA`:
+
+- Só sinaliza se o horário liberado ainda está no futuro. O turno é avaliado pela hora de início da vaga em São Paulo (`MANHA` antes das 12:00, `TARDE` a partir das 12:00).
+- Quem cancelou não é avisado da própria vaga, e cada paciente recebe no máximo um aviso por vaga (o interesse mais antigo dele é o sinalizado).
+- Todos os compatíveis são avisados; a vaga não fica reservada e quem agendar primeiro fica com ela (índices únicos de `consultas`).
+- A notificação `VAGA_LIBERADA` é criada com `status = AGENDADA`; exibir ou enviar o aviso fica para quem consome `notificacoes` (#57). Ela é gravada antes de o interesse passar a `SINALIZADA`, de modo que `ultimaSinalizacao.notificacaoId` sempre aponta para uma notificação existente.
+- O histórico da consulta recebe `SINALIZACAO_FILA` com `totalSinalizados`, inclusive quando é `0`.
+- O cadastro dos interesses pela API e as transições `ATENDIDA`/volta a `AGUARDANDO` não fazem parte da #32.
+
 ## Índices
 
 | Nome | Chaves | Opções | Finalidade |

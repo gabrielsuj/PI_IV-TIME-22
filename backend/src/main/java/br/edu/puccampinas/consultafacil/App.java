@@ -73,7 +73,10 @@ public class App {
 
         // Disponibilidade (#20) e busca de vagas + agendamento (#21)
         var historico = new HistoricoProcessor(consultaRepo, new HistoricoRepository.Mongo(db));
-        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC());
+        // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
+        var sinalizacaoFila = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
+            consultaRepo, new NomesRepository.Mongo(db), historico, Clock.systemUTC());
+        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC(), sinalizacaoFila::sinalizar);
         var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, Clock.systemUTC());
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);

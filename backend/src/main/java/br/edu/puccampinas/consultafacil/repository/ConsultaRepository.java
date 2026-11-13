@@ -45,6 +45,16 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
+    /** true se o paciente já tem consulta ativa que se sobrepõe à janela, com qualquer médico (#32). */
+    public boolean pacienteTemAtivaSobreposta(ObjectId pacienteId, Date inicio, Date fim) {
+        return col.find(Filters.and(
+                        Filters.eq("pacienteId", pacienteId),
+                        Filters.in("status", StatusConsulta.ATIVOS),
+                        Filters.lt("inicio", fim),
+                        Filters.gt("fim", inicio)))
+                .limit(1).first() != null;
+    }
+
     /** Todas as consultas do médico (qualquer status) que tocam a janela, em ordem de início. Usada pelo calendário (#23). */
     public List<Document> doMedicoNoPeriodo(ObjectId medicoId, Date inicio, Date fim) {
         return col.find(Filters.and(
