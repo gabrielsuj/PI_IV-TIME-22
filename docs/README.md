@@ -38,6 +38,12 @@ Todas as rotas, com os perfis autorizados, estão resumidas em `backend/.../api/
 
 Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/me`, `/pacientes`, `GET /agendas`, `GET/DELETE /bloqueios` e `GET /consultas` (calendário). O formato de cada uma está nos testes de integração correspondentes ([testes](testes/estrategia-de-testes.md)).
 
+## Operação
+
+| Documento | Conteúdo |
+|---|---|
+| [backup-recuperacao.md](operacao/backup-recuperacao.md) | Backup, restauração e teste de recuperação dos bancos, com um comando cada |
+
 ## Testes
 
 | Documento | Conteúdo |

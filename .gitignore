@@ -41,3 +41,6 @@ Desktop.ini
 *.pem
 *.key
 secrets.json   
+
+# Backups locais do MongoDB (scripts/backup-banco.sh)
+backups/

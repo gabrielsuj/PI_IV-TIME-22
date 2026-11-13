@@ -254,6 +254,16 @@ cd frontend && npm test                            # Vitest + Testing Library
 
 A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md).
 
+### 7. Backup e recuperação
+
+```bash
+bash scripts/backup-banco.sh consultafacil_demo        # gera backups/<banco>-<data>.archive.gz
+bash scripts/testar-recuperacao.sh consultafacil_demo  # confere que o backup restaura tudo, sem alterar o banco
+bash scripts/restaurar-banco.sh backups/<arquivo>      # restaura (pede confirmação)
+```
+
+Detalhes em [`docs/operacao/backup-recuperacao.md`](docs/operacao/backup-recuperacao.md).
+
 ### Variáveis de ambiente
 
 | Variável | Descrição | Exemplo |
@@ -276,7 +286,8 @@ O índice completo está em [`docs/README.md`](docs/README.md):
 - **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite).
 - **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
 - **API:** médicos e especialidades, agendamento e alterações de agenda.
-- **Testes:** estratégia, cobertura do Quadro 4 e comandos.
+- **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva e comandos.
+- **Operação:** backup e recuperação.
 
 ---
 
@@ -306,10 +317,11 @@ consultafacil/
 ├── database/
 │   ├── init/                # Coleções, validadores ($jsonSchema) e índices
 │   └── seed/                # Dados fictícios de demonstração
-├── scripts/                 # recriar-banco.sh/.ps1, verificar-modelagem.js, verificar-carga.js
+├── scripts/                 # recriar-banco, backup/restauração/teste de recuperação e verificadores
 ├── docs/                    # Documentação (índice em docs/README.md)
 │   ├── modelagem/           # Uma coleção por documento
 │   ├── api/                 # Contratos das rotas
+│   ├── operacao/            # Backup e recuperação
 │   └── testes/              # Estratégia de testes
 ├── docker-compose.yml       # MongoDB para desenvolvimento local
 ├── .env.example             # Modelo das variáveis de ambiente
