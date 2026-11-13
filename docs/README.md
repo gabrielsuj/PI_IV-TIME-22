@@ -42,3 +42,4 @@ Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/m
 | Documento | Conteúdo |
 |---|---|
 | [estrategia-de-testes.md](testes/estrategia-de-testes.md) | Como os testes foram feitos, cobertura dos cenários de aceite (Quadro 4), bancos usados e comandos |
+| [garantias-de-reserva.md](testes/garantias-de-reserva.md) | Como as reservas são protegidas (API + índices únicos parciais) e os testes de concorrência pela API |

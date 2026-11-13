@@ -1,6 +1,6 @@
 # Estratégia de testes
 
-Resultado em 12/11/2026: **211 testes JUnit** no back-end e **181 testes Vitest** no front-end, todos passando.
+Resultado em 13/11/2026: **217 testes JUnit** no back-end (216 passando e 1 desativado de propósito, pendente da #25) e **181 testes Vitest** no front-end, todos passando.
 
 ## Como os testes são organizados
 
@@ -23,10 +23,10 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 
 | Cenário | Teste | Situação |
 |---|---|---|
-| Dois usuários escolhem a mesma vaga: só um agendamento é confirmado | `ConsultaReservaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` (gravações simultâneas no banco) | ✅ |
-| Paciente ou médico já ocupado: a sobreposição é recusada | `ConsultaReservaIntegrationTest.deveRecusarMesmoPacienteNoMesmoHorario`; `AgendamentoIntegrationTest` (horário já reservado sai da busca) | ✅ parcial. Mesmo paciente em horários **sobrepostos com início diferente** em outro médico ainda não é recusado (#25) |
+| Dois usuários escolhem a mesma vaga: só um agendamento é confirmado | `ReservasConcorrenciaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` (10 pedidos simultâneos pela API) e `ConsultaReservaIntegrationTest` (gravações simultâneas no banco) | ✅ |
+| Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest.deveRecusarSobreposicaoDeHorario` e `mesmoPacienteNaoReservaDoisMedicosNoMesmoHorarioAoMesmoTempo`; `ConsultaReservaIntegrationTest.deveRecusarMesmoPacienteNoMesmoHorario` | ✅ parcial. Mesmo paciente em horários **sobrepostos com início diferente** em outro médico ainda não é recusado: o teste já existe, desativado até a #25 |
 | Horário bloqueado ou fora da agenda não aparece nem pode ser reservado | `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado`, `deveRecusarHorarioForaDaJornada`, `deveRecusarHorarioQueJaPassou`; `CalculadoraDisponibilidadeTest` | ✅ |
-| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `ConsultaReservaIntegrationTest.devePermitirReservarVagaDeConsultaCancelada`; `HistoricoTest` | ⏳ parcial. A rota de cancelamento (#27) e a fila (#31/#32) ainda não existem |
+| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `ConsultaReservaIntegrationTest.devePermitirReservarVagaDeConsultaCancelada`; `HistoricoTest` | ⏳ parcial. Vaga e histórico estão cobertos; faltam a rota de cancelamento (#27) e a fila (#31/#32) |
 | Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado` e a matriz de permissões | ✅ |
 | Formulário inválido ou API indisponível: a interface informa sem perder o contexto | `UxPacientes.test.jsx`, `Registration.test.jsx`, `App.test.jsx` (API fora do ar), `AgendaConflitos.test.jsx` | ✅ |
 
@@ -57,6 +57,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `AgendamentoIntegrationTest` | Busca de vagas e agendamento: bloqueio, fora da jornada, passado, perfis |
 | `ConsultaCalendarioIntegrationTest` | Leitura das consultas do calendário: período, fuso, nomes, validações |
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
+| `ReservasConcorrenciaIntegrationTest` | Pedidos simultâneos pela API (servidor com 16 threads): vaga única, mesmo paciente, vagas diferentes, sobreposição e cancelamento. Ver [garantias de reserva](garantias-de-reserva.md) |
 | `HistoricoPersistenceIntegrationTest` | Gravação do histórico com o validador real (opcional) |
 
 ### Front-end (`frontend/src/__tests__`)
@@ -101,7 +102,6 @@ docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/
 
 ## Pendências conhecidas
 
-- **#25**: recusar sobreposição do mesmo paciente em horários com início diferente (hoje só o mesmo início é barrado pelo índice).
+- **#25**: recusar sobreposição do mesmo paciente em horários com início diferente (hoje só o mesmo início é barrado pelo índice). O teste `pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes` já está pronto e desativado; ligado, ele falha com 201 no lugar de 409.
 - **#27**: rota de cancelamento. O cancelamento já é coberto no serviço de histórico, mas ainda não pela API.
-- **#55**: testes de concorrência pela API (`POST /consultas` simultâneos) e documento de garantias de reserva.
 - **#42**: o médico ainda pode consultar e alterar a agenda de outros médicos (o perfil é verificado, o dono do registro não).
