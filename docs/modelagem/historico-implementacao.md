@@ -58,8 +58,10 @@ pelo serviço. Alterações de dados e de status devem ser operações separadas
 
 Eventos: CRIACAO, CONFIRMACAO, ALTERACAO, CANCELAMENTO, CONCLUSAO, FALTA.
 Estados finais não são reabertos. Sem mudança efetiva não há evento novo.
-SINALIZACAO_FILA continua no schema existente, mas não é produzida por este módulo:
-somente o futuro fluxo real de fila poderá informar quem foi sinalizado.
+SINALIZACAO_FILA não é produzida por este módulo, e sim pelo SinalizacaoFilaService (#32),
+chamado pelo RegistroConsultaService logo após gravar um CANCELAMENTO. O evento usa a mesma
+caixa de pendências (sequência seguinte à do cancelamento), com ator SISTEMA (id null) e
+totalSinalizados. Uma falha nessa etapa fica em log e não desfaz o cancelamento.
 
 ## Recuperação e prevenção de duplicações
 

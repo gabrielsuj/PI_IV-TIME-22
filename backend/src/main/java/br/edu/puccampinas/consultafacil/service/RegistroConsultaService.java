@@ -11,8 +11,11 @@ import org.bson.Document;
 import org.bson.RawBsonDocument;
 import org.bson.codecs.DocumentCodec;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Porta de gravação auditada para os futuros serviços de consultas.
@@ -20,17 +23,26 @@ import java.util.*;
  * Não substitui as regras de agendamento e não deve ser exposto diretamente como endpoint.
  */
 public final class RegistroConsultaService {
+    private static final Logger LOG = LoggerFactory.getLogger(RegistroConsultaService.class);
     public static final int LIMITE_BYTES_EVENTO = 16 * 1024;
     private static final Set<String> DADOS = Set.of("pacienteId", "medicoId", "especialidadeId", "inicio", "fim");
     private static final Set<String> EDITAVEIS = Set.of("pacienteId", "medicoId", "especialidadeId", "inicio", "fim", "status", "motivoCancelamento");
     private final PendenciasConsultaRepository consultas;
     private final HistoricoProcessor processor;
     private final Clock relogio;
+    private final Consumer<ObjectId> aposCancelar;
 
     public RegistroConsultaService(PendenciasConsultaRepository consultas, HistoricoProcessor processor, Clock relogio) {
+        this(consultas, processor, relogio, id -> {});
+    }
+
+    /** aposCancelar roda depois que um CANCELAMENTO foi gravado (ex.: sinalização da fila, #32). */
+    public RegistroConsultaService(PendenciasConsultaRepository consultas, HistoricoProcessor processor, Clock relogio,
+                                   Consumer<ObjectId> aposCancelar) {
         this.consultas = consultas;
         this.processor = processor;
         this.relogio = relogio;
+        this.aposCancelar = aposCancelar;
     }
 
     public Document criar(Document dados, UsuarioLogado ator) {
@@ -97,6 +109,7 @@ public final class RegistroConsultaService {
         if (!consultas.atualizarComEvento(id, versao, modificados, evento))
             throw ApiException.conflict("Consulta alterada simultaneamente ou limite de pendências atingido; recarregue os dados");
         aposGravar(id);
+        if (tipo == EventoHistorico.CANCELAMENTO) executarAposCancelar(id);
         return resposta(depois);
     }
 
@@ -104,6 +117,14 @@ public final class RegistroConsultaService {
         // Falha de projeção não transforma uma gravação já confirmada em erro ao chamador.
         processor.processarConsulta(id);
         processor.tentarRecuperarLote();
+    }
+
+    private void executarAposCancelar(ObjectId id) {
+        // O cancelamento já foi confirmado: uma falha aqui é registrada em log e não vira erro para quem cancelou.
+        try { aposCancelar.accept(id); }
+        catch (RuntimeException e) {
+            LOG.warn("Ação pós-cancelamento falhou para a consulta {} ({})", id, e.getClass().getSimpleName());
+        }
     }
 
     private Document evento(Document antes, Document depois, UsuarioLogado ator, EventoHistorico tipo, int sequencia, List<Document> alteracoes) {

@@ -14,6 +14,7 @@ import java.util.Map;
 public interface NomesRepository {
     Map<ObjectId, String> pacientes(Collection<ObjectId> ids);
     Map<ObjectId, String> especialidades(Collection<ObjectId> ids);
+    Map<ObjectId, String> medicos(Collection<ObjectId> ids);
 
     final class Mongo implements NomesRepository {
         private final MongoDatabase db;
@@ -22,6 +23,7 @@ public interface NomesRepository {
 
         @Override public Map<ObjectId, String> pacientes(Collection<ObjectId> ids) { return nomes("pacientes", ids); }
         @Override public Map<ObjectId, String> especialidades(Collection<ObjectId> ids) { return nomes("especialidades", ids); }
+        @Override public Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return nomes("medicos", ids); }
 
         private Map<ObjectId, String> nomes(String colecao, Collection<ObjectId> ids) {
             Map<ObjectId, String> mapa = new HashMap<>();

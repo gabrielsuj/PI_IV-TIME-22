@@ -22,7 +22,7 @@ const validator = {
           properties: {
             _id: { bsonType: "objectId" }, consultaId: { bsonType: "objectId" },
             sequencia: { bsonType: "int", minimum: 1 },
-            evento: { enum: ["CRIACAO", "CONFIRMACAO", "ALTERACAO", "CANCELAMENTO", "CONCLUSAO", "FALTA"] },
+            evento: { enum: ["CRIACAO", "CONFIRMACAO", "ALTERACAO", "CANCELAMENTO", "CONCLUSAO", "FALTA", "SINALIZACAO_FILA"] },
             statusAnterior: { enum: [null, "AGENDADA", "CONFIRMADA", "CANCELADA", "CONCLUIDA", "FALTA"] },
             statusNovo: { enum: ["AGENDADA", "CONFIRMADA", "CANCELADA", "CONCLUIDA", "FALTA"] },
             pacienteId: { bsonType: "objectId" }, medicoId: { bsonType: "objectId" },
@@ -30,7 +30,8 @@ const validator = {
             dataHoraConsulta: { bsonType: "date" }, fimConsulta: { bsonType: "date" },
             ocorridoEm: { bsonType: "date" },
             ator: { bsonType: "object", required: ["perfil", "id"], properties: {
-              perfil: { enum: ["PACIENTE", "MEDICO", "SECRETARIA_ADMIN"] }, id: { bsonType: "objectId" }
+              // SISTEMA (id null) grava a SINALIZACAO_FILA após um cancelamento (#32)
+              perfil: { enum: ["PACIENTE", "MEDICO", "SECRETARIA_ADMIN", "SISTEMA"] }, id: { bsonType: ["objectId", "null"] }
             }}
           }
         }

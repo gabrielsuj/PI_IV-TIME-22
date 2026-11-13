@@ -4,8 +4,8 @@ Resultado em 13/11/2026: **181 testes Vitest** no front-end e, no back-end:
 
 | Comando | Resultado esperado |
 |---|---|
-| `./mvnw test` | **212 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
-| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **217 rodados, 0 falhas, 1 pulado** (só o da #25) |
+| `./mvnw test` | **221 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
+| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **226 rodados, 0 falhas, 1 pulado** (só o da #25) |
 
 ## Como os testes são organizados
 
@@ -31,7 +31,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | Dois usuários escolhem a mesma vaga: só um agendamento é confirmado | `ReservasConcorrenciaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` (10 pedidos simultâneos pela API) e `ConsultaReservaIntegrationTest` (gravações simultâneas no banco) | ✅ |
 | Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest.deveRecusarSobreposicaoDeHorario` e `mesmoPacienteNaoReservaDoisMedicosNoMesmoHorarioAoMesmoTempo`; `ConsultaReservaIntegrationTest.deveRecusarMesmoPacienteNoMesmoHorario` | ✅ parcial. Mesmo paciente em horários **sobrepostos com início diferente** em outro médico ainda não é recusado: o teste já existe, desativado até a #25 |
 | Horário bloqueado ou fora da agenda não aparece nem pode ser reservado | `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado`, `deveRecusarHorarioForaDaJornada`, `deveRecusarHorarioQueJaPassou`; `CalculadoraDisponibilidadeTest` | ✅ |
-| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `ConsultaReservaIntegrationTest.devePermitirReservarVagaDeConsultaCancelada`; `HistoricoTest` | ⏳ parcial. Vaga e histórico estão cobertos; faltam a rota de cancelamento (#27) e a fila (#31/#32) |
+| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `SinalizacaoFilaIntegrationTest.deveLiberarVagaRegistrarHistoricoESinalizarFila`; `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `ConsultaReservaIntegrationTest.devePermitirReservarVagaDeConsultaCancelada`; `HistoricoTest` | ✅ no serviço (#32). Falta a rota de cancelamento (#27), que deve passar pelo `RegistroConsultaService` |
 | Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado` e a matriz de permissões | ✅ |
 | Formulário inválido ou API indisponível: a interface informa sem perder o contexto | `UxPacientes.test.jsx`, `Registration.test.jsx`, `App.test.jsx` (API fora do ar), `AgendaConflitos.test.jsx` | ✅ |
 
@@ -62,6 +62,8 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `AgendamentoIntegrationTest` | Busca de vagas e agendamento: bloqueio, fora da jornada, passado, perfis |
 | `ConsultaCalendarioIntegrationTest` | Leitura das consultas do calendário: período, fuso, nomes, validações |
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
+| `SinalizacaoFilaIntegrationTest` | Cancelamento com o banco real: vaga liberada, histórico `CANCELAMENTO` + `SINALIZACAO_FILA`, só interessados compatíveis sinalizados (turno, especialidade, médico, validade, janela, sobreposição), um aviso por paciente, vaga no passado sem aviso |
+| `TurnoFilaTest` | Regra de turno da fila no fuso de São Paulo |
 | `ReservasConcorrenciaIntegrationTest` | Pedidos simultâneos pela API (servidor com 16 threads): vaga única, mesmo paciente, vagas diferentes, sobreposição e cancelamento. Ver [garantias de reserva](garantias-de-reserva.md) |
 | `HistoricoPersistenceIntegrationTest` | Gravação do histórico com o validador real (opcional) |
 
