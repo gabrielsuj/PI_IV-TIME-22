@@ -16,6 +16,9 @@ public interface NomesRepository {
     Map<ObjectId, String> especialidades(Collection<ObjectId> ids);
     Map<ObjectId, String> medicos(Collection<ObjectId> ids);
 
+    /** Usado pela listagem e pelo detalhe de consultas (#30). Implementações antigas devolvem vazio. */
+    default Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return Map.of(); }
+
     final class Mongo implements NomesRepository {
         private final MongoDatabase db;
 

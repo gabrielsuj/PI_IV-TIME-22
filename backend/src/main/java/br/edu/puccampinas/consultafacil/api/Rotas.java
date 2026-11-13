@@ -4,6 +4,8 @@ import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.security.Autorizacao;
 import com.sun.net.httpserver.HttpHandler;
 
+import java.util.regex.Pattern;
+
 import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
 
 /**
@@ -22,6 +24,8 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  POST/PUT desses cadastros    |    -     |   -    |   ✓
  *  GET  /vagas (#21)            |    ✓     |   ✓    |   ✓
  *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
+ *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
+ *  GET  /consultas/lista, /consultas/{id} (#30) | ✓ | ✓ | ✓   (paciente e médico só as próprias)
  */
 public final class Rotas {
     private Rotas() {}
@@ -63,6 +67,50 @@ public final class Rotas {
                 ("GET".equals(ex.getRequestMethod()) ? leitura : escrita).handle(ex);
             } catch (ApiException e) {
                 Http.sendError(ex, e.status(), e.getMessage());
+            } finally {
+                ex.close();
+            }
+        };
+    }
+
+    /** /consultas/{id}/cancelamento: o {id} vem no caminho. Só o que vem depois da barra fica aqui. */
+    private static final Pattern CANCELAMENTO = Pattern.compile("^/consultas/[^/]+/cancelamento$");
+    /** /consultas/lista (#30) ou /consultas/{id} (#30): um segmento só depois de /consultas/. */
+    private static final Pattern UM_SEGMENTO = Pattern.compile("^/consultas/[^/]+$");
+
+    /**
+     * Caminhos abaixo de "/consultas/" (contexto próprio). O GET/POST de "/consultas" sem barra
+     * continua no Router, porque o servidor escolhe o contexto de prefixo mais longo.
+     *  GET  /consultas/lista               → leitura (listagem, #30)
+     *  GET  /consultas/{id}                → leitura (detalhe, #30)
+     *  POST /consultas/{id}/cancelamento   → cancelamento (#27)
+     */
+    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler leitura, HttpHandler cancelamento) {
+        HttpHandler ler = autz.exigir(leitura, PACIENTE, MEDICO, SECRETARIA_ADMIN);
+        HttpHandler cancelar = autz.exigir(cancelamento, PACIENTE, MEDICO, SECRETARIA_ADMIN);
+        return ex -> {
+            try {
+                cors.addHeaders(ex);
+                if ("OPTIONS".equals(ex.getRequestMethod())) {
+                    ex.sendResponseHeaders(204, -1);
+                    return;
+                }
+                String metodo = ex.getRequestMethod();
+                String caminho = ex.getRequestURI().getPath();
+                if ("GET".equals(metodo) && UM_SEGMENTO.matcher(caminho).matches()) {
+                    ler.handle(ex);
+                    return;
+                }
+                if ("POST".equals(metodo) && CANCELAMENTO.matcher(caminho).matches()) {
+                    cancelar.handle(ex);
+                    return;
+                }
+                throw ApiException.notFound("Rota não encontrada");
+            } catch (ApiException e) {
+                Http.sendError(ex, e.status(), e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                Http.sendError(ex, 500, "Erro interno do servidor");
             } finally {
                 ex.close();
             }

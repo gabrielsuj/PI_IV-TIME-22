@@ -301,3 +301,6 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .conflito-consultas__titulo { margin: 0; color: var(--color-warning-text); font-weight: 600; }
 .conflito-consultas__lista { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding-left: var(--space-5); font-size: 0.875rem; }
 .conflito-consultas .form-actions { margin: 0; }
+
+/* Consultas (#30): o resumo e as ações ocupam a largura do card (o .card__content alinha os filhos ao início) */
+.consulta-resumo .card__content > * { align-self: stretch; }

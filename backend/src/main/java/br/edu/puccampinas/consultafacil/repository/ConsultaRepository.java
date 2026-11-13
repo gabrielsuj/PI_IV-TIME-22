@@ -65,6 +65,14 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
+    /** Listagem de consultas (#30): filtro montado pelo serviço, ordenada por início e limitada. */
+    public List<Document> listar(org.bson.conversions.Bson filtro, boolean crescente, int limite) {
+        return col.find(filtro)
+                .sort(crescente ? Sorts.ascending("inicio", "_id") : Sorts.descending("inicio", "_id"))
+                .limit(limite)
+                .into(new ArrayList<>());
+    }
+
     @Override public java.util.Optional<Document> buscar(ObjectId id) {
         return java.util.Optional.ofNullable(col.find(Filters.eq("_id", id)).first());
     }

@@ -7,8 +7,10 @@ import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
+import br.edu.puccampinas.consultafacil.api.handler.CancelamentoHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaLeituraHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
@@ -81,6 +83,16 @@ public class App {
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);
 
+        // Cancelamento (#27). A fila de espera (#32) troca o AposCancelamento.NENHUM pela implementação dela.
+        // Quem vê/mexe em qual consulta: paciente as próprias, médico as dele, secretaria todas (#27, #30)
+        var acessoConsulta = new AcessoConsulta(
+            new PacienteDoUsuarioRepository(db)::buscar, new MedicoDoUsuarioRepository(db)::buscar);
+        var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
+            acessoConsulta, registroConsultas, AposCancelamento.NENHUM, Clock.systemUTC()));
+        // Listagem e detalhe de consultas (#30)
+        var consultaLeituraHandler = new ConsultaLeituraHandler(new ConsultaLeituraService(
+            consultaRepo, new NomesRepository.Mongo(db), acessoConsulta, Clock.systemUTC()));
+
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
             consultaRepo, agendaRepo, medicos, new NomesRepository.Mongo(db)));
@@ -110,6 +122,8 @@ public class App {
         server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
         server.createContext("/medicos", Rotas.catalogo(cors, autorizacao, medicoHandler));
         server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
+        // /consultas/lista, /consultas/{id} e /consultas/{id}/cancelamento (#27, #30); "/consultas" sem barra continua no router.
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao, consultaLeituraHandler, cancelamentoHandler));
 
         server.start();
 

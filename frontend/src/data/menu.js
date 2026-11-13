@@ -15,8 +15,8 @@ const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
  *
  * Regra: cadastros-base (médicos, especialidades) e a área técnica (status)
  * ficam só com a secretaria. Médico usa pacientes (consulta) e agenda.
- * Secretaria e paciente podem iniciar agendamento; a tela com as próprias
- * consultas do paciente entra com a #30.
+ * Secretaria e paciente podem iniciar agendamento. "Consultas" (#30) abre para
+ * todos: o paciente vê as próprias, o médico as que atende e a secretaria todas.
  *
  * O servidor continua sendo quem bloqueia o acesso aos dados (403, ver
  * api/Rotas.java); aqui decidimos o que aparece no menu e quais telas abrem.
@@ -24,6 +24,7 @@ const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
 export const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true, perfis: TODOS },
   { to: '/nova-consulta', label: 'Nova consulta', perfis: AGENDAMENTO },
+  { to: '/consultas', label: 'Consultas', perfis: TODOS },
   { to: '/pacientes', label: 'Pacientes', perfis: EQUIPE },
   { to: '/medicos', label: 'Médicos', perfis: SECRETARIA },
   { to: '/especialidades', label: 'Especialidades', perfis: SECRETARIA },

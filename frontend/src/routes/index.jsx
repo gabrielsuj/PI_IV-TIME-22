@@ -4,6 +4,8 @@ import RequireAuth from '../components/RequireAuth';
 import AuthProvider from '../contexts/AuthProvider';
 import AgendaPage from '../pages/AgendaPage';
 import CalendarioPage from '../pages/CalendarioPage';
+import ConsultaDetalhePage from '../pages/ConsultaDetalhePage';
+import ConsultasPage from '../pages/ConsultasPage';
 import ErrorPage from '../pages/ErrorPage';
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -46,6 +48,8 @@ export const routes = [
               { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
               { path: 'agenda', element: <AgendaPage /> },
               { path: 'calendario', element: <CalendarioPage /> },
+              { path: 'consultas', element: <ConsultasPage /> },
+              { path: 'consultas/:id', element: <ConsultaDetalhePage /> },
               {
                 path: 'nova-consulta',
                 element: <NovaConsultaPage buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />,
