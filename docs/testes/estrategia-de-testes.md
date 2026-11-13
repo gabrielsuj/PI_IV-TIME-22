@@ -1,6 +1,6 @@
 # Estratégia de testes
 
-Resultado em 13/11/2026: **181 testes Vitest** no front-end e, no back-end:
+Resultado em 13/11/2026: **198 testes Vitest** no front-end e, no back-end:
 
 | Comando | Resultado esperado |
 |---|---|
@@ -31,7 +31,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | Dois usuários escolhem a mesma vaga: só um agendamento é confirmado | `ReservasConcorrenciaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` (10 pedidos simultâneos pela API) e `ConsultaReservaIntegrationTest` (gravações simultâneas no banco) | ✅ |
 | Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest.deveRecusarSobreposicaoDeHorario` e `mesmoPacienteNaoReservaDoisMedicosNoMesmoHorarioAoMesmoTempo`; `ConsultaReservaIntegrationTest.deveRecusarMesmoPacienteNoMesmoHorario` | ✅ parcial. Mesmo paciente em horários **sobrepostos com início diferente** em outro médico ainda não é recusado: o teste já existe, desativado até a #25 |
 | Horário bloqueado ou fora da agenda não aparece nem pode ser reservado | `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado`, `deveRecusarHorarioForaDaJornada`, `deveRecusarHorarioQueJaPassou`; `CalculadoraDisponibilidadeTest` | ✅ |
-| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `SinalizacaoFilaIntegrationTest.deveLiberarVagaRegistrarHistoricoESinalizarFila`; `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `ConsultaReservaIntegrationTest.devePermitirReservarVagaDeConsultaCancelada`; `HistoricoTest` | ✅ no serviço (#32). Falta a rota de cancelamento (#27), que deve passar pelo `RegistroConsultaService` |
+| Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `SinalizacaoFilaIntegrationTest.deveLiberarVagaRegistrarHistoricoESinalizarFila`; `CancelamentoIntegrationTest.deveLiberarAVagaParaABuscaEParaNovaReserva`; `FilaEsperaIntegrationTest.inscricaoSinalizadaMostraAVagaLiberada`; `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `HistoricoTest` | ✅ |
 | Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado` e a matriz de permissões | ✅ |
 | Formulário inválido ou API indisponível: a interface informa sem perder o contexto | `UxPacientes.test.jsx`, `Registration.test.jsx`, `App.test.jsx` (API fora do ar), `AgendaConflitos.test.jsx` | ✅ |
 
@@ -47,6 +47,8 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `ValidadorAgendaTest` | Jornada semanal: faixas sobrepostas, dias repetidos, duração e fuso |
 | `CalculadoraDisponibilidadeTest` | Vagas a partir da jornada, descontando bloqueios, consultas e horários passados |
 | `HistoricoTest` | Transições de status e eventos de histórico por perfil |
+| `CancelamentoServiceTest` | Regras do cancelamento: quem pode cancelar o quê, status final, consulta que já começou, motivo e falha na fila sem desfazer o cancelamento |
+| `TurnoFilaTest` | Regra de turno da fila no fuso de São Paulo |
 
 ### Back-end: integração (`integration/`, requer MongoDB)
 
@@ -64,7 +66,8 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
 | `SinalizacaoFilaIntegrationTest` | Cancelamento com o banco real: vaga liberada, histórico `CANCELAMENTO` + `SINALIZACAO_FILA`, só interessados compatíveis sinalizados (turno, especialidade, médico, validade, janela, sobreposição), um aviso por paciente, vaga no passado sem aviso; vaga sinalizada ocupada (`ATENDIDA` para quem agendou, `AGUARDANDO` para os demais) e sinalização vencida voltando a concorrer |
 | `FilaEsperaIntegrationTest` | Fila pela API (#31): inscrição do paciente e pela secretaria, validações, inscrição duplicada (409), saída da fila, expiração e a vaga sinalizada vista pelo paciente |
-| `TurnoFilaTest` | Regra de turno da fila no fuso de São Paulo |
+| `CancelamentoIntegrationTest` | Cancelamento com o banco real: vaga liberada para a busca e para nova reserva, histórico com motivo e ator, consulta que já começou |
+| `ConsultaLeituraIntegrationTest` | Listagem e detalhe de consultas por perfil (#30): filtros, nomes e `podeCancelar` |
 | `ReservasConcorrenciaIntegrationTest` | Pedidos simultâneos pela API (servidor com 16 threads): vaga única, mesmo paciente, vagas diferentes, sobreposição e cancelamento. Ver [garantias de reserva](garantias-de-reserva.md) |
 | `HistoricoPersistenceIntegrationTest` | Gravação do histórico com o validador real (opcional) |
 
@@ -77,6 +80,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `Registration.test.jsx`, `UxPacientes.test.jsx`, `rascunhoPacientes.test.js` | Cadastros, validação por campo, rascunho preservado após erro |
 | `Agenda.test.jsx`, `AgendaConflitos.test.jsx` | Jornada semanal, bloqueios e aviso de consultas afetadas |
 | `Calendario.test.jsx` | Regras de exibição (livre, ocupado, remarcar, bloqueado, indisponível), navegação e visão do dia |
+| `Consultas.test.jsx` | Listagem, detalhe e cancelamento de consultas por perfil |
 | `NovaConsulta.test.jsx`, `FluxoAgendamento.test.jsx`, `FiltrosAgendamento.test.jsx`, `HorariosDisponiveis.test.jsx`, `ResumoAgendamento.test.jsx` e serviços de agendamento | Fluxo de agendamento: filtros, paciente, horários, resumo, confirmação e resultado incerto |
 
 ## Como executar
@@ -111,5 +115,4 @@ docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/
 ## Pendências conhecidas
 
 - **#25**: recusar sobreposição do mesmo paciente em horários com início diferente (hoje só o mesmo início é barrado pelo índice). O teste `pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes` já está pronto e desativado; ligado, ele falha com 201 no lugar de 409.
-- **#27**: rota de cancelamento. O cancelamento já é coberto no serviço de histórico, mas ainda não pela API.
 - **#42**: o médico ainda pode consultar e alterar a agenda de outros médicos (o perfil é verificado, o dono do registro não).

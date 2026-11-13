@@ -22,7 +22,7 @@ Os validadores (`$jsonSchema`) e índices ficam em [`database/init/`](../databas
 | [historico.md](modelagem/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
 | [historico-implementacao.md](modelagem/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
 | [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
-| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (lembretes simulados, ainda não implementados na API) |
+| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos simulados; hoje a API gera o aviso de vaga liberada da fila) |
 | [carga-demonstracao.md](modelagem/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
 
 ## API REST

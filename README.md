@@ -59,7 +59,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 
 **Fora do MVP:** WhatsApp e SMS reais, teleconsulta, prontuário eletrônico, pagamentos e convênios, relatórios avançados, previsão de faltas por inteligência artificial e aplicativo móvel.
 
-### Situação atual (12/11/2026)
+### Situação atual (13/11/2026)
 
 | Funcionalidade | Situação |
 |---|---|
@@ -70,10 +70,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Busca de vagas e agendamento (secretaria e paciente) | ✅ |
 | Registro de histórico das consultas | ✅ |
 | Listagem, detalhe e cancelamento de consultas | ✅ |
-| Fila de espera: inscrição (API) e sinalização da vaga após cancelamento | ✅ #31, #32 (tela em andamento) |
+| Fila de espera na API: inscrição, sinalização da vaga após cancelamento e atualização quando a vaga é ocupada | ✅ #31, #32 |
+| Tela da fila de espera e avisos de vaga para o paciente | 🚧 #57 |
 | Alteração de status (conclusão, falta) pela interface | 🚧 #28 |
 | Sobreposição do mesmo paciente em horários diferentes | 🚧 #25 |
-| Lembretes simulados, avisos de vaga e painel de indicadores | 🚧 #33 a #37, #57 |
+| Lembretes simulados e painel de indicadores | 🚧 #33 a #37 |
 
 ---
 
@@ -86,7 +87,8 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Backend | **Java 21** (sem frameworks) | API REST e regras de negócio, sobre o servidor HTTP nativo do JDK (`com.sun.net.httpserver`) |
 | Backend | Maven | Build e gerenciamento de dependências |
 | Banco de dados | **MongoDB** (via MongoDB Java Driver) | Persistência em coleções de documentos |
-| Testes | **JUnit 5** | Testes de unidade e de integração da API |
+| Testes | **JUnit 5** | Testes de unidade e de integração da API, com MongoDB real |
+| Testes | **Vitest** + Testing Library | Testes das telas e dos serviços do frontend |
 | Design | Figma | Protótipo navegável |
 | Infraestrutura | Docker Compose | Execução local do MongoDB |
 
@@ -201,11 +203,15 @@ A carga de demonstração simula uma clínica em funcionamento: 9 especialidades
 
 As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `SenhaHasher`. O login da médica está vinculado ao cadastro de Ana; Paulo aparece tanto como usuário quanto como paciente, com o mesmo CPF e e-mail.
 
-Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. Use a conta da secretaria para cadastrar e editar pacientes; médicos têm acesso de leitura aos pacientes e acesso às agendas e bloqueios. O perfil paciente pode autenticar, mas não tem acesso a essas rotas administrativas.
+Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. O menu mostra só as telas de cada perfil, e o servidor recusa (403) o acesso a dados de outro perfil.
 
-A agenda carrega os médicos de `GET /medicos`, disponível para médico e secretaria autenticados. Selecione Ana em `/agenda` ou abra diretamente `/agenda?medicoId=100000000000000000000001`. O bloqueio existente é de **26/10/2026, das 09h às 10h**, no fuso de São Paulo; sua data foi preservada. O contrato do cadastro está em [docs/api/medicos-especialidades.md](docs/api/medicos-especialidades.md).
+| Perfil | O que mostrar |
+|---|---|
+| Secretaria | Cadastros de pacientes, médicos e especialidades; **Agenda** (jornada semanal e bloqueios, com aviso quando a mudança atinge consultas marcadas); **Calendário** por médico; **Nova consulta** para qualquer paciente; **Consultas** (todas, com detalhe e cancelamento) |
+| Médico (Ana) | **Agenda** e **Calendário** (selecione Ana ou abra `/agenda?medicoId=100000000000000000000001`); **Consultas** que atende; leitura de pacientes |
+| Paciente (Paulo) | **Nova consulta** para si mesmo; **Consultas** próprias, com cancelamento |
 
-Em **Nova consulta** (`/nova-consulta`), a secretaria escolhe o paciente, a especialidade, o médico e a data, e confirma um dos horários livres. O paciente Paulo também pode agendar para si mesmo. Os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. O contrato está em [docs/api/agendamento.md](docs/api/agendamento.md).
+Em **Nova consulta** (`/nova-consulta`), os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
 
 Para verificar a modelagem:
 
@@ -287,7 +293,7 @@ O índice completo está em [`docs/README.md`](docs/README.md):
 
 - **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite).
 - **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
-- **API:** médicos e especialidades, agendamento e alterações de agenda.
+- **API:** médicos e especialidades, agendamento, consultas, cancelamento, fila de espera e alterações de agenda.
 - **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva e comandos.
 - **Operação:** backup e recuperação.
 
