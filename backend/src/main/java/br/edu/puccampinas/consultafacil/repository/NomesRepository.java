@@ -14,7 +14,6 @@ import java.util.Map;
 public interface NomesRepository {
     Map<ObjectId, String> pacientes(Collection<ObjectId> ids);
     Map<ObjectId, String> especialidades(Collection<ObjectId> ids);
-    Map<ObjectId, String> medicos(Collection<ObjectId> ids);
 
     /** Usado pela listagem e pelo detalhe de consultas (#30). Implementações antigas devolvem vazio. */
     default Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return Map.of(); }
