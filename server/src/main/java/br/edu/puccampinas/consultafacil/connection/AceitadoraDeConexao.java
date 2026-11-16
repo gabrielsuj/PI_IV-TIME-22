@@ -25,7 +25,7 @@ public class AceitadoraDeConexao extends Thread {
 
     public void run() {
         for(;;) {
-            Socket conexao=null;
+            Socket conexao;
             try {
                 conexao = this.pedido.accept();
             } catch(Exception erro) {
@@ -34,8 +34,7 @@ public class AceitadoraDeConexao extends Thread {
 
             SupervisoraDeConexao supervisoraDeConexao=null;
             try {
-                supervisoraDeConexao =
-                new SupervisoraDeConexao (conexao, usuarios);
+                supervisoraDeConexao = new SupervisoraDeConexao(conexao, usuarios);
             } catch(Exception ignored) {} // sei que passei parametros corretos para o construtor
             supervisoraDeConexao.start();
         }

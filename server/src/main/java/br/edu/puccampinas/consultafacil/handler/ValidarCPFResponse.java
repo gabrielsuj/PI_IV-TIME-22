@@ -7,7 +7,9 @@ public class ValidarCPFResponse extends Comunicado {
     private final boolean valido;
     private final String mensagem;
 
-    public ValidarCPFResponse(String cpf, boolean valido, String mensagem) {
+    public ValidarCPFResponse(String cpf, boolean valido, String mensagem) throws Exception {
+        if(mensagem == null) throw new Exception("Mensagem não pode ser nula");
+
         this.cpf = cpf;
         this.valido = valido;
         this.mensagem = mensagem;

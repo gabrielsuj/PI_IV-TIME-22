@@ -2,6 +2,9 @@ package br.edu.puccampinas.consultafacil.client;
 
 import br.edu.puccampinas.consultafacil.connection.TratadoraDeComunicadoDeDesligamento;
 import br.edu.puccampinas.consultafacil.core.Teclado;
+import br.edu.puccampinas.consultafacil.handler.ValidarCPFRequest;
+import br.edu.puccampinas.consultafacil.handler.ValidarCPFResponse;
+import br.edu.puccampinas.consultafacil.protocol.Comunicado;
 import br.edu.puccampinas.consultafacil.protocol.Parceiro;
 import br.edu.puccampinas.consultafacil.protocol.PedidoParaSair;
 
@@ -63,20 +66,33 @@ public class Cliente {
 
         tratadoraDeComunicadoDeDesligamento.start();
 
-        char opcao=' ';
+        Object ret;
         do {
-			try {
-				System.out.println("temp");
-			} catch(Exception erro) {
-				System.err.println ("Erro de comunicacao com o servidor;");
-				System.err.println ("Tente novamente!");
-				System.err.println ("Caso o erro persista, termine o programa");
-				System.err.println ("e volte a tentar mais tarde!\n");
-			}
-        } while(opcao != 'T');
+            // Fazer que ret receba do Backend
+            // ret = servidor.envie();
+            try {
+                if (ret instanceof ValidarCPFRequest) {
+                    ValidarCPFRequest cpf = null;
+                    try {
+                        cpf = (ValidarCPFRequest)(ret);
+                        servidor.receba(new ValidarCPFRequest(cpf.getCPF()));
+                    } catch (Exception e) {
+                        System.err.println("Não foi recebido o CPF corretamente.");
+                    }
+
+                    Comunicado comunicado;
+                    do {
+                        comunicado = (Comunicado)(servidor.espie());
+                    } while (!(comunicado instanceof ValidarCPFResponse));
+
+                    // Mandar resposta para o backend
+                    // ValidarCPFResponse resposta = (ValidarCPFResponse)(servidor.envie());
+                }
+            } catch (Exception ignored) {}
+        } while(!(ret instanceof PedidoParaSair));
 
 		try {
-			servidor.receba (new PedidoParaSair());
+			servidor.receba(new PedidoParaSair());
 		} catch(Exception ignored) {}
 		
 		System.out.println ("Obrigado por usar este programa!");

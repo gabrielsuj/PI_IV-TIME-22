@@ -7,6 +7,7 @@ public class ValidarCPFRequest extends Comunicado {
 
     public ValidarCPFRequest(String cpf) throws Exception {
         if(cpf == null) throw new Exception("CPF não pode ser nulo.");
+        if(cpf.length() != 11) throw new Exception("CPF não pode ter mais ou menos que 11 digitos.");
 
         this.cpf = cpf;
     }

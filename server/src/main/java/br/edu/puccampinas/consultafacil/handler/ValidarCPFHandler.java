@@ -3,7 +3,7 @@ package br.edu.puccampinas.consultafacil.handler;
 import br.edu.puccampinas.consultafacil.protocol.Comunicado;
 
 public class ValidarCPFHandler extends Comunicado {
-    public static ValidarCPFResponse ValidateCPF(ValidarCPFRequest request) {
+    public static ValidarCPFResponse ValidateCPF(ValidarCPFRequest request) throws Exception {
         String cpf = request.getCPF();
 
         if(cpf == null) return new ValidarCPFResponse(null, false, "CPF não fornecido");
