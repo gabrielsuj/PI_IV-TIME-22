@@ -15,6 +15,7 @@ import LoginPage from '../pages/LoginPage';
 import ProfilesPage from '../pages/ProfilesPage';
 import RegistrationPage from '../pages/RegistrationPage';
 import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
+import FilaEsperaPage from '../pages/FilaEsperaPage';
 
 /**
  * Tabela de rotas da aplicação.
@@ -54,6 +55,7 @@ export const routes = [
                 path: 'nova-consulta',
                 element: <NovaConsultaPage buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />,
               },
+              { path: 'fila-espera', element: <FilaEsperaPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],
           },
