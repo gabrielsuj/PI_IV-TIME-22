@@ -11,7 +11,6 @@ function dataValida(data) {
   const instante = Date.parse(`${data}T00:00:00Z`);
   return Number.isFinite(instante) && new Date(instante).toISOString().slice(0, 10) === data;
 }
-
 function validarVagas(resultado, data) {
   if (!resultado || !Array.isArray(resultado.horarios)) throw new Error('Não foi possível ler os horários recebidos.');
   if ((resultado.semAgenda !== undefined && typeof resultado.semAgenda !== 'boolean')
@@ -26,11 +25,11 @@ function validarVagas(resultado, data) {
   }
   return resultado;
 }
-
 const mesmoHorario = (a, b) => a?.inicio === b?.inicio && a?.fim === b?.fim;
+const mesmaHoraInicial = (a, iso) => Boolean(iso) && Date.parse(a?.inicio) === Date.parse(iso);
 
-// Contrato da API em docs/api/agendamento.md (GET /vagas e POST /consultas, #21).
-export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta }) {
+// Mantém o fluxo de agendamento padrão; vagaInicial só ativa a pré-seleção pela fila.
+export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta, vagaInicial }) {
   const [vagas, setVagas] = useState({ status: 'aguardando', horarios: [], fusoHorario: null, error: null });
   const [horario, setHorario] = useState(null);
   const [revisando, setRevisando] = useState(false);
@@ -38,16 +37,17 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
   const [erroConfirmacao, setErroConfirmacao] = useState(null);
   const [confirmacao, setConfirmacao] = useState(null);
   const [resultadoIncerto, setResultadoIncerto] = useState(false);
+  const [vagaSinalizadaOcupada, setVagaSinalizadaOcupada] = useState(false);
   const emConfirmacao = useRef(false);
   const montado = useRef(false);
   const buscaAtual = useRef(null);
   const sequencia = useRef(0);
   const painel = useRef(null);
+  const autoBuscaFeita = useRef(false);
 
   useEffect(() => {
     if (revisando || confirmacao || resultadoIncerto) painel.current?.focus();
   }, [revisando, confirmacao, resultadoIncerto]);
-
   useEffect(() => {
     montado.current = true;
     return () => {
@@ -56,7 +56,6 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       if (emConfirmacao.current) onConfirmandoChange?.(false);
     };
   }, [onConfirmandoChange]);
-
   const pessoal = usuario?.perfil === 'PACIENTE';
   const permitido = pessoal || usuario?.perfil === 'SECRETARIA_ADMIN';
   const pronto = permitido && (pessoal || Boolean(paciente?.id)) && especialidade?.ativa === true
@@ -77,13 +76,23 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       if (!montado.current || controller.signal.aborted || numero !== sequencia.current) return;
       const resultado = validarVagas(resposta, data);
       setVagas({ status: resultado.semAgenda ? 'sem-agenda' : 'sucesso', horarios: resultado.horarios, fusoHorario: resultado.fusoHorario, error: null });
-      setHorario((current) => resultado.horarios.find((opcao) => mesmoHorario(opcao, current)) || null);
+      const oferta = vagaInicial ? resultado.horarios.find((opcao) => mesmaHoraInicial(opcao, vagaInicial)) : null;
+      if (vagaInicial) setVagaSinalizadaOcupada(!oferta);
+      setHorario((current) => oferta || resultado.horarios.find((opcao) => mesmoHorario(opcao, current)) || null);
     } catch (error) {
       if (montado.current && !controller.signal.aborted && numero === sequencia.current) {
         setVagas((current) => ({ ...current, status: 'erro', error }));
       }
     }
   }
+
+  // Ao entrar pela fila, verifica uma única vez se a vaga ainda existe.
+  // Não reserva nem altera o estado de uma inscrição no servidor.
+  useEffect(() => {
+    if (!vagaInicial || !pronto || autoBuscaFeita.current) return;
+    autoBuscaFeita.current = true;
+    buscar();
+  }, [vagaInicial, pronto]);
 
   async function confirmar() {
     if (!pronto || !selecionado || !revisando || emConfirmacao.current || resultadoIncerto || typeof confirmarAgendamento !== 'function') return;
@@ -104,7 +113,7 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       setConfirmacao(resultado);
     } catch (error) {
       if (!montado.current) return;
-      // Sem resposta HTTP completa, a consulta pode ter sido gravada.
+      // Se a conexão cair, a consulta pode ter sido gravada; não repetir automaticamente.
       if (error?.status === 0 || !Number.isInteger(error?.status)) {
         setResultadoIncerto(true);
         return;
@@ -113,6 +122,7 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       if (error?.status === 409) {
         setHorario(null);
         setRevisando(false);
+        if (vagaInicial) setVagaSinalizadaOcupada(true);
         atualizarVagas = true;
       }
     } finally {
@@ -124,36 +134,34 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       }
     }
   }
-
   if (confirmacao) return (
     <Card title="Agendamento realizado" ref={painel} tabIndex={-1}>
       <Alert tone="success">Consulta agendada. Código da consulta: {confirmacao.id}.</Alert>
-      <div className="form-actions"><Button onClick={onNovaConsulta}>Nova consulta</Button></div>
+      <div className="form-actions"><Button onClick={onNovaConsulta}>Nova consulta</Button><Button variant="outline" to="/fila-espera">Voltar à fila</Button></div>
     </Card>
   );
-
   if (resultadoIncerto) return (
     <Card title="Verifique o agendamento" ref={painel} tabIndex={-1}>
       <Alert>Não foi possível verificar o resultado da confirmação. Confira o agendamento antes de tentar novamente.</Alert>
       <div className="form-actions"><Button to="/" variant="outline">Voltar ao início</Button></div>
     </Card>
   );
-
   if (revisando) return <div ref={painel} tabIndex={-1}>
     <ResumoAgendamento usuario={usuario} paciente={paciente} especialidade={especialidade} medico={medico}
       horario={horario} fusoHorario={vagas.fusoHorario} confirmando={confirmando} error={erroConfirmacao}
       onVoltar={() => { if (!emConfirmacao.current) { setRevisando(false); setErroConfirmacao(null); } }}
       onConfirmar={typeof confirmarAgendamento === 'function' ? confirmar : undefined} />
   </div>;
-
   return (
     <>
+      {vagaSinalizadaOcupada && <Alert tone="warning">A vaga sinalizada já foi ocupada ou não está mais disponível. Escolha outro horário ou volte à fila. O status da inscrição é atualizado pelo servidor.</Alert>}
       {erroConfirmacao?.status === 409 && <Alert>Este horário não está mais disponível. Escolha outro horário na lista atualizada.</Alert>}
       <HorariosDisponiveis {...vagas} value={horario} disabled={confirmando || !pronto} onRetry={() => buscar()}
         onChange={(opcao) => {
           if (!emConfirmacao.current && vagas.status === 'sucesso' && vagas.horarios.some((item) => mesmoHorario(item, opcao))) {
             setHorario(opcao);
             setErroConfirmacao(null);
+            setVagaSinalizadaOcupada(false);
           }
         }} />
       <div className="form-actions">

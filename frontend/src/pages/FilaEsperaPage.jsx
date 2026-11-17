@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -78,6 +79,7 @@ function usePacientesSecretaria(ativo) {
 
 export default function FilaEsperaPage() {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const perfil = usuario?.perfil;
   const secretaria = perfil === 'SECRETARIA_ADMIN';
   const permitido = secretaria || perfil === 'PACIENTE';
@@ -93,6 +95,8 @@ export default function FilaEsperaPage() {
   const [revisao, setRevisao] = useState(0);
   const [estado, setEstado] = useState({ revisao: -1, ativos: [], atendidos: [], erro: null });
   const [operandoId, setOperandoId] = useState(null);
+  const sinalizacoesAnteriores = useRef(new Map());
+  const [avisosDeVaga, setAvisosDeVaga] = useState([]);
 
   const recarregar = useCallback(() => setRevisao((valor) => valor + 1), []);
   useEffect(() => {
@@ -103,6 +107,25 @@ export default function FilaEsperaPage() {
       listarFilaEspera({ status: 'ATENDIDA' }, { signal: ctrl.signal }),
     ]).then(([ativos, atendidos]) => {
       if (!Array.isArray(ativos) || !Array.isArray(atendidos)) throw new Error('A API retornou uma lista inválida.');
+      // Apenas aviso visual: o servidor permanece a fonte de verdade do status.
+      // Não marca inscrições como EXPIRADA: conforme a API, vaga ocupada por
+      // terceiro volta a AGUARDANDO; EXPIRADA significa inscrição vencida.
+      const anterior = sinalizacoesAnteriores.current;
+      const atual = new Map();
+      for (const item of ativos) {
+        if (item.status === 'SINALIZADA' && item.ultimaSinalizacao?.dataHora) {
+          atual.set(item.id, { dataHora: item.ultimaSinalizacao.dataHora, pacienteNome: item.pacienteNome });
+        }
+      }
+      const perdidas = [];
+      for (const item of ativos) {
+        const previa = anterior.get(item.id);
+        if (previa && item.status === 'AGUARDANDO') {
+          perdidas.push({ id: item.id, texto: `A vaga anteriormente sinalizada para ${item.pacienteNome || 'o paciente'} não está mais disponível. A inscrição continua aguardando outra oportunidade.` });
+        }
+      }
+      sinalizacoesAnteriores.current = atual;
+      if (perdidas.length) setAvisosDeVaga((prev) => [...perdidas, ...prev].slice(0, 5));
       setEstado({ revisao, ativos, atendidos, erro: null });
     }).catch((erro) => {
       if (!ctrl.signal.aborted) setEstado({ revisao, ativos: [], atendidos: [], erro });
@@ -179,6 +202,32 @@ export default function FilaEsperaPage() {
     }
   }
 
+  function agendarSinalizacao(item) {
+    const sinal = item.ultimaSinalizacao;
+    if (item.status !== 'SINALIZADA' || !sinal?.dataHora || !sinal?.medicoId || !item.especialidadeId) {
+      setAviso('A sinalização não contém todos os dados para iniciar o agendamento. Atualize a fila.');
+      return;
+    }
+    // A rota de agendamento efetua a verificação de disponibilidade antes de confirmar.
+    navigate('/nova-consulta', { state: {
+      origemFila: {
+        inscricaoId: item.id,
+        pacienteId: item.pacienteId,
+        pacienteNome: item.pacienteNome,
+        especialidadeId: item.especialidadeId,
+        medicoId: sinal.medicoId,
+        inicio: sinal.dataHora,
+      },
+    } });
+  }
+
+  // Reconsulta periódica enquanto a página estiver aberta; não abre conexão persistente.
+  useEffect(() => {
+    if (!permitido) return undefined;
+    const timer = setInterval(() => recarregar(), 30000);
+    return () => clearInterval(timer);
+  }, [permitido, recarregar]);
+
   const colunas = [
     { key: 'pacienteNome', label: 'Paciente', render: (p) => p.pacienteNome || '—' },
     { key: 'especialidadeNome', label: 'Especialidade', render: (p) => p.especialidadeNome || '—' },
@@ -192,6 +241,11 @@ export default function FilaEsperaPage() {
           <span className="fila-espera__sinal" title={`Vaga: ${dataBR(p.ultimaSinalizacao.dataHora)} — ${p.ultimaSinalizacao.medicoNome || 'médico'}`}>
             <Icon name="bell" /> <span className="sr-only">Vaga sinalizada</span>
           </span>
+        )}
+        {p.status === 'SINALIZADA' && p.ultimaSinalizacao && (
+          <Button size="sm" onClick={() => agendarSinalizacao(p)} disabled={!!operandoId}>
+            Agendar vaga
+          </Button>
         )}
         {(p.status === 'AGUARDANDO' || p.status === 'SINALIZADA') && (
           <button className="fila-espera__acao fila-espera__acao--remover" type="button" disabled={!!operandoId}
@@ -218,6 +272,12 @@ export default function FilaEsperaPage() {
       </section>
 
       {aviso && <Alert tone={aviso.startsWith('Não foi possível') ? 'danger' : 'info'}>{aviso}</Alert>}
+      {avisosDeVaga.map((item) => (
+        <div className="fila-v4__aviso" key={`${item.id}-${item.texto}`} role="status">
+          <Alert tone="warning">{item.texto}</Alert>
+          <Button variant="ghost" size="sm" onClick={() => setAvisosDeVaga((prev) => prev.filter((a) => a !== item))}>Dispensar aviso</Button>
+        </div>
+      ))}
       <div className="fila-espera__controles">
         <Field label="Visualizar inscrições" as="select" value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
           <option value="ATIVAS">Ativas (aguardando e sinalizadas)</option>

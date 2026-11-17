@@ -352,3 +352,25 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .fila-espera__sem-acao { color: var(--color-text-muted); }
 .fila-espera__modal { max-height: 90vh; overflow-y: auto; }
 
+/* Botão Agendar vaga e outros controles na coluna de ações.
+   Evita quebra de linhas dentro dos botões compactos. */
+.fila-espera__acoes .button--sm {
+  white-space: nowrap;
+}
+
+/* Aviso visual quando uma sinalização anteriormente exibida some.
+   A inscrição continua obedecendo ao status real do servidor. */
+.fila-v4__aviso {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.fila-v4__aviso > :first-child {
+  flex: 1 1 280px;
+}
+
+@media (max-width: 720px) {
+  .fila-espera__acoes { flex-wrap: wrap; }
+}
+
