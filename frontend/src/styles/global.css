@@ -304,3 +304,51 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 /* Consultas (#30): o resumo e as ações ocupam a largura do card (o .card__content alinha os filhos ao início) */
 .consulta-resumo .card__content > * { align-self: stretch; }
+
+
+
+
+/* ===================================
+   FILA DE ESPERA
+   =================================== */
+
+
+.fila-espera__indicadores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.fila-espera__indicador .card__content { width: 100%; }
+.fila-espera__indicador-corpo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 66px;
+}
+.fila-espera__indicador-titulo { display: block; color: var(--color-text-muted); font-size: 0.95rem; }
+.fila-espera__indicador-total { display: block; color: var(--color-heading); font-size: 1.7rem; font-weight: 500; line-height: 1.25; margin-top: 2px; }
+.fila-espera__indicador-icone { display: grid; place-items: center; width: 52px; height: 52px; border-radius: var(--radius); flex-shrink: 0; }
+.fila-espera__indicador-icone--teal { color: var(--color-teal-text); background: var(--color-teal-bg); }
+.fila-espera__indicador-icone--azul { color: #1d62db; background: #dceafe; }
+.fila-espera__indicador-icone--verde { color: var(--color-success-text); background: var(--color-success-bg); }
+.fila-espera__tabela .data-table { min-width: 1060px; }
+.fila-espera__tabela .data-table th, .fila-espera__tabela .data-table td { padding-block: var(--space-3); }
+.fila-espera__tabela .badge { border-radius: 999px; }
+.fila-espera__acoes { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-3); }
+.fila-espera__acao { display: inline-grid; place-items: center; padding: 4px; border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer; }
+.fila-espera__acao--notificar { color: #2563eb; }
+.fila-espera__acao--remover { color: var(--color-danger-text); }
+.fila-espera__acao:disabled { opacity: .45; cursor: not-allowed; }
+.fila-espera__acao:not(:disabled):hover { background: var(--color-input-bg); }
+.fila-espera__nota { color: var(--color-text-muted); font-size: 0.75rem; }
+.fila-espera__modal { position: fixed; inset: 0; }
+@media (max-width: 1050px) { .fila-espera__indicadores { gap: var(--space-3); } }
+@media (max-width: 700px) { .fila-espera__indicadores { grid-template-columns: 1fr; } }
+.fila-espera__controles { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+.fila-espera__controles .field { min-width: min(100%, 300px); }
+.fila-espera__sinal { color: #2563eb; display: inline-flex; align-items: center; }
+.fila-espera__sem-acao { color: var(--color-text-muted); }
+.fila-espera__modal { max-height: 90vh; overflow-y: auto; }
+
