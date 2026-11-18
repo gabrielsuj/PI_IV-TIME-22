@@ -68,10 +68,17 @@ public final class RegistroConsultaService {
     }
 
     public Document alterar(ObjectId id, Document campos, UsuarioLogado ator) {
+        return alterar(id, campos, ator, null);
+    }
+
+    /** Recusa se a consulta mudou desde o snapshot usado para validar acesso e regras da operação. */
+    public Document alterar(ObjectId id, Document campos, UsuarioLogado ator, Integer versaoEsperada) {
         validarAtor(ator);
         if (id == null || campos == null || !EDITAVEIS.containsAll(campos.keySet()))
             throw ApiException.badRequest("Campos de alteração inválidos");
         Document antes = consultas.buscar(id).orElseThrow(() -> ApiException.notFound("Consulta não encontrada"));
+        if (versaoEsperada != null && !Objects.equals(antes.getInteger("versao", 0), versaoEsperada))
+            throw ApiException.conflict("Consulta alterada simultaneamente; recarregue os dados");
         StatusConsulta anterior = StatusConsulta.valueOf(antes.getString("status"));
         if (!StatusConsulta.ATIVOS.contains(anterior.name())) throw ApiException.conflict("Consulta em status final não pode ser alterada");
         Document depois = new Document(antes);

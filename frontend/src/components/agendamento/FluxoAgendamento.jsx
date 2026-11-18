@@ -28,8 +28,8 @@ function validarVagas(resultado, data) {
 const mesmoHorario = (a, b) => a?.inicio === b?.inicio && a?.fim === b?.fim;
 const mesmaHoraInicial = (a, iso) => Boolean(iso) && Date.parse(a?.inicio) === Date.parse(iso);
 
-// Mantém o fluxo de agendamento padrão; vagaInicial só ativa a pré-seleção pela fila.
-export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta, vagaInicial }) {
+// Contrato da API em docs/api/agendamento.md (GET /vagas e POST /consultas, #21).
+export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta,onConfirmado, vagaInicial }) {
   const [vagas, setVagas] = useState({ status: 'aguardando', horarios: [], fusoHorario: null, error: null });
   const [horario, setHorario] = useState(null);
   const [revisando, setRevisando] = useState(false);
@@ -111,6 +111,7 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
         return;
       }
       setConfirmacao(resultado);
+      onConfirmado?.();
     } catch (error) {
       if (!montado.current) return;
       // Se a conexão cair, a consulta pode ter sido gravada; não repetir automaticamente.
