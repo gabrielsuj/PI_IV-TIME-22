@@ -25,6 +25,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET  /vagas (#21)            |    ✓     |   ✓    |   ✓
  *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
  *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
+ *  POST /consultas/{id}/status (#28) | ✓ | ✓ | ✓ (serviço valida ação e propriedade)
  *  GET  /consultas/lista, /consultas/{id} (#30) | ✓ | ✓ | ✓   (paciente e médico só as próprias)
  *  POST/GET /fila-espera, DELETE /fila-espera/{id} (#31) | ✓ | - | ✓ (paciente só as próprias)
  */
@@ -76,6 +77,7 @@ public final class Rotas {
 
     /** /consultas/{id}/cancelamento: o {id} vem no caminho. Só o que vem depois da barra fica aqui. */
     private static final Pattern CANCELAMENTO = Pattern.compile("^/consultas/[^/]+/cancelamento$");
+    private static final Pattern STATUS = Pattern.compile("^/consultas/[^/]+/status$");
     /** /consultas/lista (#30) ou /consultas/{id} (#30): um segmento só depois de /consultas/. */
     private static final Pattern UM_SEGMENTO = Pattern.compile("^/consultas/[^/]+$");
 
@@ -85,10 +87,13 @@ public final class Rotas {
      *  GET  /consultas/lista               → leitura (listagem, #30)
      *  GET  /consultas/{id}                → leitura (detalhe, #30)
      *  POST /consultas/{id}/cancelamento   → cancelamento (#27)
+     *  POST /consultas/{id}/status         → transições autorizadas (#28)
      */
-    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler leitura, HttpHandler cancelamento) {
+    public static HttpHandler consultaPorId(Cors cors, Autorizacao autz, HttpHandler leitura,
+                                            HttpHandler cancelamento, HttpHandler status) {
         HttpHandler ler = autz.exigir(leitura, PACIENTE, MEDICO, SECRETARIA_ADMIN);
         HttpHandler cancelar = autz.exigir(cancelamento, PACIENTE, MEDICO, SECRETARIA_ADMIN);
+        HttpHandler alterarStatus = autz.exigir(status, PACIENTE, MEDICO, SECRETARIA_ADMIN);
         return ex -> {
             try {
                 cors.addHeaders(ex);
@@ -104,6 +109,10 @@ public final class Rotas {
                 }
                 if ("POST".equals(metodo) && CANCELAMENTO.matcher(caminho).matches()) {
                     cancelar.handle(ex);
+                    return;
+                }
+                if ("POST".equals(metodo) && STATUS.matcher(caminho).matches()) {
+                    alterarStatus.handle(ex);
                     return;
                 }
                 throw ApiException.notFound("Rota não encontrada");
