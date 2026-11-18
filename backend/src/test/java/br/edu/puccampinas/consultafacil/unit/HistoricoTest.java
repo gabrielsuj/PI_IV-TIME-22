@@ -252,6 +252,7 @@ class HistoricoTest {
         var leitor = leitor(propria, leituras);
         var ator = perfil == Perfil.PACIENTE ? paciente : medico;
         assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(outra, ator)).status());
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(outra, 5, 1, ator)).status());
         var semVinculo = new UsuarioLogado(new ObjectId().toHexString(), "Sem vínculo", perfil);
         assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(propria, semVinculo)).status());
         assertEquals(0, leituras.get());
@@ -303,6 +304,93 @@ class HistoricoTest {
         var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
         assertEquals(100, resposta.eventos().size());
         assertTrue(resposta.limiteAtingido());
+        assertFalse(resposta.temMais());
+        assertNull(resposta.proximaSequencia());
+    }
+
+    @Test void leituraPaginaPorSequenciaSemRepetirEventosEReconheceUltimaPaginaCheia() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        service.alterar(id, new Document("medicoId", new ObjectId()), secretaria);
+        service.alterar(id, new Document("status", "CONCLUIDA"), secretaria);
+        var leitor = leitor(id, new AtomicInteger());
+
+        var primeira = leitor.listar(id, 0, 2, secretaria);
+        assertEquals(List.of(1, 2), primeira.eventos().stream().map(e -> e.sequencia()).toList());
+        assertEquals(0, primeira.aposSequencia());
+        assertEquals(2, primeira.limite());
+        assertTrue(primeira.temMais());
+        assertEquals(2, primeira.proximaSequencia());
+        var segunda = leitor.listar(id, primeira.proximaSequencia(), 2, secretaria);
+        assertEquals(List.of(3, 4), segunda.eventos().stream().map(e -> e.sequencia()).toList());
+        assertTrue(segunda.limiteAtingido());
+        assertFalse(segunda.temMais());
+        assertNull(segunda.proximaSequencia());
+        var vazia = leitor.listar(id, 4, 2, secretaria);
+        assertTrue(vazia.eventos().isEmpty());
+        assertFalse(vazia.temMais());
+        assertNull(vazia.proximaSequencia());
+    }
+
+    @Test void cursorToleraLacunasEOrdenaPorSequenciaEmVezDaDataDoEvento() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        service.alterar(id, new Document("status", "CANCELADA"), secretaria);
+        eventos.values().removeIf(e -> e.getInteger("sequencia") == 2);
+        for (Document evento : eventos.values())
+            evento.put("ocorridoEm", Date.from(Instant.parse(evento.getInteger("sequencia") == 1
+                    ? "2026-12-02T12:00:00Z" : "2026-11-01T12:00:00Z")));
+        var leitor = leitor(id, new AtomicInteger());
+        var primeira = leitor.listar(id, 0, 1, secretaria);
+        assertEquals(1, primeira.eventos().getFirst().sequencia());
+        assertEquals("2026-12-02T12:00:00Z", primeira.eventos().getFirst().ocorridoEm());
+        assertEquals("2026-12-01T12:00:00Z", primeira.eventos().getFirst().dataHoraConsulta());
+        var segunda = leitor.listar(id, primeira.proximaSequencia(), 1, secretaria);
+        assertEquals(3, segunda.eventos().getFirst().sequencia());
+        assertEquals("2026-11-01T12:00:00Z", segunda.eventos().getFirst().ocorridoEm());
+        assertFalse(segunda.temMais());
+    }
+
+    @Test void proximaPaginaIncluiNovosEventosProjetadosComSequenciaMaior() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        var leitor = leitor(id, new AtomicInteger());
+        var primeira = leitor.listar(id, 0, 1, secretaria);
+        service.alterar(id, new Document("status", "CONCLUIDA"), secretaria);
+        var seguinte = leitor.listar(id, primeira.proximaSequencia(), 2, secretaria);
+        assertEquals(List.of(2, 3), seguinte.eventos().stream().map(e -> e.sequencia()).toList());
+        assertFalse(seguinte.temMais());
+    }
+
+    @Test void parametrosInvalidosNaoChegamAoRepositorioDoHistorico() {
+        ObjectId id = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(id, leituras);
+        for (int limite : List.of(-1, 0, 101, Integer.MAX_VALUE))
+            assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(id, 0, limite, secretaria)).status());
+        assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(id, -1, 10, secretaria)).status());
+        assertEquals(0, leituras.get());
+        assertTrue(leitor.listar(id, Integer.MAX_VALUE, 1, secretaria).eventos().isEmpty());
+    }
+
+    @Test void ultimaSequenciaInt32NaoProvocaOverflowNoCursor() {
+        ObjectId id = criar();
+        Document ultimo = copia(eventos.values().iterator().next()).append("_id", new ObjectId()).append("sequencia", Integer.MAX_VALUE);
+        eventos.put(ultimo.getObjectId("_id"), ultimo);
+        var pagina = leitor(id, new AtomicInteger()).listar(id, Integer.MAX_VALUE - 1, 1, secretaria);
+        assertEquals(Integer.MAX_VALUE, pagina.eventos().getFirst().sequencia());
+        assertFalse(pagina.temMais());
+        assertNull(pagina.proximaSequencia());
+    }
+
+    @Test void falhaAoConferirProximaPaginaNaoAnunciaFimDoHistorico() {
+        ObjectId id = criar();
+        Document evento = eventos.values().iterator().next();
+        var leitor = new HistoricoConsultaService(consultas, (consulta, apos, limite) -> {
+            if (apos == 0) return List.of(evento);
+            throw new IllegalStateException("Falha na continuação");
+        }, new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty()));
+        assertThrows(IllegalStateException.class, () -> leitor.listar(id, 0, 1, secretaria));
     }
 
     @Test void falhaDeLeituraNaoViraHistoricoVazio() {

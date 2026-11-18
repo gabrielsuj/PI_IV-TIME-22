@@ -10,6 +10,7 @@ import org.bson.types.ObjectId;
 
 /** Leitura autorizada da #46; não processa pendências nem gera eventos como efeito colateral. */
 public final class HistoricoConsultaService {
+    public static final int LIMITE_PADRAO = HistoricoLeituraRepository.LIMITE_MAXIMO;
     private final PendenciasConsultaRepository consultas;
     private final HistoricoLeituraRepository historico;
     private final AcessoConsulta acesso;
@@ -22,13 +23,24 @@ public final class HistoricoConsultaService {
     }
 
     public HistoricoConsultaResponse listar(ObjectId consultaId, UsuarioLogado ator) {
+        return listar(consultaId, 0, LIMITE_PADRAO, ator);
+    }
+
+    public HistoricoConsultaResponse listar(ObjectId consultaId, int aposSequencia, int limite, UsuarioLogado ator) {
         if (ator == null || ator.perfil() == null || ator.id() == null || !ObjectId.isValid(ator.id()))
             throw ApiException.unauthorized("Faça login para consultar o histórico");
         if (consultaId == null) throw ApiException.badRequest("ID da consulta é obrigatório");
+        if (aposSequencia < 0) throw ApiException.badRequest("aposSequencia deve ser um inteiro de 0 a 2147483647");
+        if (limite < 1 || limite > HistoricoLeituraRepository.LIMITE_MAXIMO)
+            throw ApiException.badRequest("limite deve ser um inteiro de 1 a " + HistoricoLeituraRepository.LIMITE_MAXIMO);
         var consulta = consultas.buscar(consultaId).orElseThrow(() -> ApiException.notFound("Consulta não encontrada"));
         acesso.verificar(consulta, ator);
-        int limite = HistoricoLeituraRepository.LIMITE_MAXIMO;
-        var eventos = historico.listarPorConsulta(consultaId, 0, limite).stream().map(HistoricoEventoResponse::de).toList();
-        return new HistoricoConsultaResponse(consultaId.toHexString(), eventos, limite, eventos.size() == limite);
+        var eventos = historico.listarPorConsulta(consultaId, aposSequencia, limite).stream().map(HistoricoEventoResponse::de).toList();
+        boolean limiteAtingido = eventos.size() == limite;
+        Integer ultima = eventos.isEmpty() ? null : eventos.getLast().sequencia();
+        // Uma leitura adicional de no máximo um evento evita anunciar uma página extra inexistente.
+        boolean temMais = limiteAtingido && !historico.listarPorConsulta(consultaId, ultima, 1).isEmpty();
+        return new HistoricoConsultaResponse(consultaId.toHexString(), eventos, aposSequencia, limite, limiteAtingido,
+                temMais, temMais ? ultima : null);
     }
 }

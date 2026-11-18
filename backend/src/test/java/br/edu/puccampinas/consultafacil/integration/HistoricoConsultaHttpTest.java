@@ -16,6 +16,7 @@ import org.bson.types.ObjectId;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -40,9 +41,10 @@ class HistoricoConsultaHttpTest {
     private String base;
     private ObjectId id;
     private int leituras;
+    private RegistroConsultaService registro;
 
     @BeforeEach void iniciar() throws Exception {
-        var registro = new RegistroConsultaService(consultas, new HistoricoProcessor(consultas, eventos::add),
+        registro = new RegistroConsultaService(consultas, new HistoricoProcessor(consultas, eventos::add),
                 Clock.fixed(Instant.parse("2026-11-18T12:30:00Z"), ZoneOffset.UTC));
         id = registro.criar(new Document("pacienteId", PACIENTE).append("medicoId", MEDICO)
                 .append("especialidadeId", new ObjectId()).append("inicio", Date.from(Instant.parse("2026-12-01T12:00:00Z")))
@@ -53,7 +55,8 @@ class HistoricoConsultaHttpTest {
         var handler = new HistoricoConsultaHandler(new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
             leituras++;
             return eventos.stream().filter(e -> consultaId.equals(e.getObjectId("consultaId")))
-                    .filter(e -> e.getInteger("sequencia") > apos).limit(limite).toList();
+                    .filter(e -> e.getInteger("sequencia") > apos)
+                    .sorted(Comparator.comparingInt(e -> e.getInteger("sequencia"))).limit(limite).toList();
         }, acesso));
         var cors = new Cors(List.of("http://localhost:5173"));
         var autz = new Autorizacao(new Autenticador(sessoes));
@@ -79,7 +82,10 @@ class HistoricoConsultaHttpTest {
         var corpo = json.readTree(resposta.body());
         assertEquals(id.toHexString(), corpo.get("consultaId").asText());
         assertEquals(100, corpo.get("limite").asInt());
+        assertEquals(0, corpo.get("aposSequencia").asInt());
         assertFalse(corpo.get("limiteAtingido").asBoolean());
+        assertFalse(corpo.get("temMais").asBoolean());
+        assertFalse(corpo.has("proximaSequencia"));
         assertEquals(1, corpo.get("eventos").size());
         var evento = corpo.get("eventos").get(0);
         assertTrue(evento.get("id").isTextual());
@@ -100,6 +106,7 @@ class HistoricoConsultaHttpTest {
         conferirErro(enviar("GET", caminho(), token(usuario(perfil))), 403);
         consultas.docs.get(id).put(perfil == Perfil.PACIENTE ? "pacienteId" : "medicoId", new ObjectId());
         conferirErro(enviar("GET", caminho(), token(ator)), 403);
+        conferirErro(enviar("GET", caminho() + "?aposSequencia=1&limite=1", token(ator)), 403);
         assertEquals(0, leituras);
     }
 
@@ -136,6 +143,75 @@ class HistoricoConsultaHttpTest {
         assertEquals(204, preflight.statusCode());
         assertEquals("http://localhost:5173", preflight.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
         assertEquals(0, leituras);
+    }
+
+    @Test void paginaPeloCursorSemRepetirEInformaFimMesmoComPaginaCheia() throws Exception {
+        acrescentarEventos(3);
+        String token = token(SECRETARIA);
+        var primeira = json.readTree(enviar("GET", caminho() + "?limite=2", token).body());
+        assertEquals(1, primeira.get("eventos").get(0).get("sequencia").asInt());
+        assertEquals(2, primeira.get("eventos").get(1).get("sequencia").asInt());
+        assertEquals(2, primeira.get("limite").asInt());
+        assertTrue(primeira.get("temMais").asBoolean());
+        int cursor = primeira.get("proximaSequencia").asInt();
+        assertEquals(2, cursor);
+        var segunda = json.readTree(enviar("GET", caminho() + "?aposSequencia=" + cursor + "&limite=2", token).body());
+        assertEquals(2, segunda.get("aposSequencia").asInt());
+        assertEquals(3, segunda.get("eventos").get(0).get("sequencia").asInt());
+        assertEquals(4, segunda.get("eventos").get(1).get("sequencia").asInt());
+        assertTrue(segunda.get("limiteAtingido").asBoolean());
+        assertFalse(segunda.get("temMais").asBoolean());
+        assertFalse(segunda.has("proximaSequencia"));
+        var vazia = json.readTree(enviar("GET", caminho() + "?aposSequencia=4&limite=2", token).body());
+        assertTrue(vazia.get("eventos").isEmpty());
+        assertFalse(vazia.get("temMais").asBoolean());
+        assertFalse(vazia.has("proximaSequencia"));
+    }
+
+    @Test void paginaPadraoDeCemDistingueTetoDeMaisEventos() throws Exception {
+        acrescentarEventos(99);
+        String token = token(SECRETARIA);
+        var ultimaCheia = json.readTree(enviar("GET", caminho(), token).body());
+        assertEquals(100, ultimaCheia.get("eventos").size());
+        assertTrue(ultimaCheia.get("limiteAtingido").asBoolean());
+        assertFalse(ultimaCheia.get("temMais").asBoolean());
+        acrescentarEventos(1);
+        var primeira = json.readTree(enviar("GET", caminho(), token).body());
+        assertEquals(100, primeira.get("eventos").size());
+        assertTrue(primeira.get("temMais").asBoolean());
+        assertEquals(100, primeira.get("proximaSequencia").asInt());
+        var ultima = json.readTree(enviar("GET", caminho() + "?aposSequencia=100", token).body());
+        assertEquals(1, ultima.get("eventos").size());
+        assertEquals(101, ultima.get("eventos").get(0).get("sequencia").asInt());
+        assertFalse(ultima.get("temMais").asBoolean());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"limite=0", "limite=-1", "limite=101", "limite=2147483648", "limite=1.5", "limite=true",
+            "limite=", "limite", "limite=%2B1", "limite=%201", "limite=1%20", "limite=%EF%BC%91",
+            "aposSequencia=-1", "aposSequencia=2147483648", "aposSequencia=1.5", "aposSequencia=", "aposSequencia=null",
+            "aposSequencia=%2B1", "pagina=1", "pacienteId=outro", "limite=2&limite=3", "aposSequencia=0&aposSequencia=1",
+            "%6Cimite=1&limite=2", "limite=1&", "&limite=1", "limite=1&&aposSequencia=0"})
+    void recusaParametrosInvalidosRepetidosOuDesconhecidos(String query) throws Exception {
+        conferirErro(enviar("GET", caminho() + "?" + query, token(SECRETARIA)), 400);
+        assertEquals(0, leituras);
+    }
+
+    @Test void aceitaLimitesDoCursorENormalizaInteirosValidos() throws Exception {
+        String token = token(SECRETARIA);
+        var primeira = json.readTree(enviar("GET", caminho() + "?limite=01&aposSequencia=0000", token).body());
+        assertEquals(1, primeira.get("limite").asInt());
+        assertEquals(0, primeira.get("aposSequencia").asInt());
+        assertFalse(primeira.get("temMais").asBoolean());
+        var resposta = enviar("GET", caminho() + "?%6Cimite=1&aposSequencia=2147483647", token);
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var ultima = json.readTree(resposta.body());
+        assertEquals(Integer.MAX_VALUE, ultima.get("aposSequencia").asInt());
+        assertTrue(ultima.get("eventos").isEmpty());
+    }
+
+    private void acrescentarEventos(int quantidade) {
+        for (int i = 0; i < quantidade; i++) registro.alterar(id, new Document("medicoId", new ObjectId()), SECRETARIA);
     }
 
     private static UsuarioLogado usuario(Perfil perfil) { return new UsuarioLogado(new ObjectId().toHexString(), "Teste", perfil); }

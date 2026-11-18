@@ -2,9 +2,14 @@ package br.edu.puccampinas.consultafacil.api.dto;
 
 import java.util.List;
 
-/** limiteAtingido informa somente que a leitura alcançou o teto, sem afirmar que existem mais eventos. */
+/**
+ * Página em sequência crescente, após aposSequencia (exclusivo).
+ * limiteAtingido mantém a indicação de página cheia; temMais exige encontrar outro evento projetado.
+ * proximaSequencia vem somente quando temMais é verdadeiro. Não representa pendências ainda não projetadas.
+ */
 public record HistoricoConsultaResponse(String consultaId, List<HistoricoEventoResponse> eventos,
-                                       int limite, boolean limiteAtingido) {
+                                       int aposSequencia, int limite, boolean limiteAtingido,
+                                       boolean temMais, Integer proximaSequencia) {
     public HistoricoConsultaResponse {
         eventos = List.copyOf(eventos);
     }
