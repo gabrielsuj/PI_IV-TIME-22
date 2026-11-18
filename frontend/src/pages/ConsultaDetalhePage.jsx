@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
@@ -8,12 +8,18 @@ import Field from '../components/ui/Field';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
-import { buscarConsulta, cancelarConsulta } from '../services/consultasService';
-import { dataHoraDaConsulta, STATUS_ATIVOS, STATUS_CONSULTA } from '../utils/consulta';
+import { usePrazoConsulta } from '../hooks/usePrazoConsulta';
+import { alterarStatusConsulta, buscarConsulta, cancelarConsulta } from '../services/consultasService';
+import { acoesStatusDaConsulta, dataHoraDaConsulta, STATUS_ATIVOS, STATUS_CONSULTA } from '../utils/consulta';
 
 const LIMITE_MOTIVO = 255;
+const ACOES_STATUS = {
+  CONFIRMADA: { rotulo: 'Confirmar consulta', enviando: 'Confirmando…', sucesso: 'Consulta confirmada.' },
+  CONCLUIDA: { rotulo: 'Concluir consulta', enviando: 'Concluindo…', sucesso: 'Consulta concluída.' },
+  FALTA: { rotulo: 'Registrar falta', enviando: 'Registrando falta…', sucesso: 'Falta registrada.' },
+};
 
-/** Detalhe da consulta, recarregável depois de uma ação (cancelar, e futuramente as da #28). */
+/** Detalhe recarregável depois de cancelar ou alterar status. */
 function useConsulta(id) {
   const [revisao, setRevisao] = useState(0);
   const chave = `${id}|${revisao}`;
@@ -22,8 +28,10 @@ function useConsulta(id) {
   useEffect(() => {
     const controller = new AbortController();
     buscarConsulta(id, { signal: controller.signal })
-      .then((consulta) => setEstado({ chave, consulta, erro: null }))
-      .catch((erro) => { if (!controller.signal.aborted) setEstado({ chave, consulta: null, erro }); });
+      .then((consulta) => { if (!controller.signal.aborted) setEstado({ chave, consulta, erro: null }); })
+      .catch((erro) => {
+        if (!controller.signal.aborted) setEstado((anterior) => ({ chave, consulta: anterior.consulta, erro }));
+      });
     return () => controller.abort();
   }, [id, chave]);
 
@@ -79,12 +87,73 @@ function CancelarConsultaModal({ consulta, onFechar, onCancelada, onRecusada }) 
 
 export default function ConsultaDetalhePage() {
   const { id } = useParams();
+  return <DetalheConsulta key={id} id={id} />;
+}
+
+function DetalheConsulta({ id }) {
   const { usuario } = useAuth();
-  const { consulta, erro, carregando, recarregar } = useConsulta(id);
+  const { consulta, erro, carregando, recarregar, chave } = useConsulta(id);
   const [cancelando, setCancelando] = useState(false);
   const [aviso, setAviso] = useState(null);
+  const [enviandoStatus, setEnviandoStatus] = useState(null);
+  const [leituraPendente, setLeituraPendente] = useState(null);
+  const emEnvio = useRef(false);
+  const montado = useRef(false);
+  const avisoRef = useRef(null);
+  const agora = usePrazoConsulta(consulta?.fim);
+  const acoes = consulta ? acoesStatusDaConsulta(consulta, usuario?.perfil, agora) : [];
+  const conferir = leituraPendente !== null && (carregando || Boolean(erro) || leituraPendente === chave);
+  const acessoRecusado = erro && [400, 403, 404].includes(erro.status);
+  const bloqueado = carregando || Boolean(erro) || Boolean(enviandoStatus) || conferir;
 
-  const voltar = <Button to="/consultas" variant="outline">‹ Voltar para consultas</Button>;
+  useEffect(() => {
+    montado.current = true;
+    return () => { montado.current = false; };
+  }, []);
+
+  useEffect(() => { if (aviso) avisoRef.current?.focus(); }, [aviso]);
+
+  function sinalizarConferencia(texto) {
+    setLeituraPendente(chave);
+    setAviso({ tom: 'danger', texto, conferir: true });
+  }
+
+  async function alterarStatus(destino) {
+    if (emEnvio.current || bloqueado || cancelando || !acoes.includes(destino)) return;
+    emEnvio.current = true;
+    setEnviandoStatus(destino);
+    setAviso(null);
+    setLeituraPendente(null);
+    try {
+      const resultado = await alterarStatusConsulta(consulta.id, destino);
+      if (!montado.current) return;
+      if (resultado?.id !== consulta.id || resultado?.status !== destino) {
+        sinalizarConferencia('Não foi possível verificar o resultado da alteração. Confira o status atual antes de tentar novamente.');
+        return;
+      }
+      setAviso({ tom: 'success', texto: ACOES_STATUS[destino].sucesso });
+      recarregar();
+    } catch (falha) {
+      if (!montado.current) return;
+      if (!Number.isInteger(falha?.status) || falha.status === 0 || (falha.status >= 500 && falha.status !== 503)) {
+        sinalizarConferencia('Não foi possível verificar o resultado da alteração. Confira o status atual antes de tentar novamente.');
+      } else if ([403, 404].includes(falha.status)) {
+        sinalizarConferencia(falha.message || 'Não foi possível alterar esta consulta. Atualize os dados para conferir seu acesso.');
+      } else {
+        setAviso({ tom: 'danger', texto: falha.message || 'Não foi possível alterar o status da consulta.' });
+        if (falha.status === 409) recarregar();
+      }
+    } finally {
+      emEnvio.current = false;
+      if (montado.current) setEnviandoStatus(null);
+    }
+  }
+
+  const voltar = <Button to="/consultas" variant="outline" disabled={Boolean(enviandoStatus)}>‹ Voltar para consultas</Button>;
+  const feedback = aviso && <Alert ref={avisoRef} tabIndex={-1} tone={aviso.conferir && !conferir ? 'info' : aviso.tom}
+    action={conferir && !acessoRecusado && <Button variant="outline" size="sm" disabled={carregando} onClick={recarregar}>Conferir status da consulta</Button>}>
+    {aviso.conferir && !conferir ? 'Status atualizado. Confira o resumo antes de decidir sobre outra alteração.' : aviso.texto}
+  </Alert>;
 
   if (carregando && !consulta) {
     return (
@@ -95,11 +164,12 @@ export default function ConsultaDetalhePage() {
     );
   }
 
-  if (erro) {
+  if (erro && (!consulta || acessoRecusado)) {
     const recuperavel = ![400, 403, 404].includes(erro.status);
     return (
       <div className="page">
         <PageHeader title="Detalhes da consulta" action={voltar} />
+        {feedback}
         <Alert action={recuperavel && <Button variant="outline" size="sm" onClick={recarregar}>Tentar novamente</Button>}>
           {mensagemDeErro(erro)}
         </Alert>
@@ -116,9 +186,13 @@ export default function ConsultaDetalhePage() {
     <div className="page">
       <PageHeader title="Detalhes da consulta" description={`${data}, ${periodo}`} action={voltar} />
 
-      {aviso && <Alert tone={aviso.tom}>{aviso.texto}</Alert>}
+      {feedback}
+      {erro && <Alert action={<Button variant="outline" size="sm" onClick={recarregar}>Tentar novamente</Button>}>
+        Não foi possível atualizar a consulta. O resumo abaixo pode estar desatualizado. {erro.message}
+      </Alert>}
+      {carregando && <p role="status">Atualizando consulta…</p>}
 
-      <Card title="Resumo da reserva" className="consulta-resumo" aria-busy={carregando || undefined}
+      <Card title="Resumo da reserva" className="consulta-resumo" aria-busy={carregando || Boolean(enviandoStatus) || undefined}
         action={<Badge tone={status?.tom}>{status?.rotulo ?? consulta.status}</Badge>}>
         <dl className="resumo-agendamento">
           <div><dt>Data</dt><dd>{data}</dd></div>
@@ -135,16 +209,21 @@ export default function ConsultaDetalhePage() {
           <Alert tone="info">Esta consulta já começou e não pode mais ser cancelada.</Alert>
         )}
 
-        {/* #28 (Vinicius): botões de confirmar, concluir e registrar falta entram aqui, ao lado do cancelar,
-            usando consulta.status e usuario.perfil. Depois da ação, chamar recarregar(). */}
-        {consulta.podeCancelar && (
+        {['MEDICO', 'SECRETARIA_ADMIN'].includes(usuario?.perfil) && STATUS_ATIVOS.includes(consulta.status)
+          && Date.parse(consulta.fim) > agora && <p>Conclusão e falta ficam disponíveis após o fim previsto da consulta.</p>}
+        {(acoes.length > 0 || consulta.podeCancelar) && (
           <div className="form-actions">
-            <Button variant="danger" onClick={() => { setAviso(null); setCancelando(true); }}>Cancelar consulta</Button>
+            {acoes.map((destino) => <Button key={destino} variant={destino === 'FALTA' ? 'outline' : 'primary'}
+              disabled={bloqueado || cancelando} loading={enviandoStatus === destino} onClick={() => alterarStatus(destino)}>
+              {enviandoStatus === destino ? ACOES_STATUS[destino].enviando : ACOES_STATUS[destino].rotulo}
+            </Button>)}
+            {consulta.podeCancelar && <Button variant="danger" disabled={bloqueado || cancelando}
+              onClick={() => { if (!emEnvio.current) { setAviso(null); setCancelando(true); } }}>Cancelar consulta</Button>}
           </div>
         )}
       </Card>
 
-      {/* #46 (Vinicius): linha do tempo do histórico da consulta entra aqui, como um <Card title="Histórico">. */}
+      {/* Necessita issue #46 para exibir o histórico. */}
 
       {cancelando && (
         <CancelarConsultaModal
