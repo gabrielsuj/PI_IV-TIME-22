@@ -13,6 +13,7 @@ import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.ConsultaLeituraHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
+import br.edu.puccampinas.consultafacil.api.handler.HistoricoConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.handler.StatusConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
@@ -76,7 +77,8 @@ public class App {
         );
 
         // Disponibilidade (#20) e busca de vagas + agendamento (#21)
-        var historico = new HistoricoProcessor(consultaRepo, new HistoricoRepository.Mongo(db));
+        var historicoRepo = new HistoricoRepository.Mongo(db);
+        var historico = new HistoricoProcessor(consultaRepo, historicoRepo);
         // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
         var sinalizacaoFila = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
             consultaRepo, new NomesRepository.Mongo(db), historico, Clock.systemUTC());
@@ -101,6 +103,8 @@ public class App {
         // Listagem e detalhe de consultas (#30)
         var consultaLeituraHandler = new ConsultaLeituraHandler(new ConsultaLeituraService(
             consultaRepo, new NomesRepository.Mongo(db), acessoConsulta, Clock.systemUTC()));
+        var historicoConsultaHandler = new HistoricoConsultaHandler(new HistoricoConsultaService(
+            consultaRepo, historicoRepo, acessoConsulta));
 
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
@@ -131,9 +135,9 @@ public class App {
         server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
         server.createContext("/medicos", Rotas.catalogo(cors, autorizacao, medicoHandler));
         server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
-        // Listagem, detalhe, cancelamento e status (#27, #28, #30); "/consultas" sem barra continua no router.
+        // Listagem, detalhe, cancelamento, status e histórico; "/consultas" sem barra continua no router.
         server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao,
-            consultaLeituraHandler, cancelamentoHandler, statusConsultaHandler));
+            consultaLeituraHandler, cancelamentoHandler, statusConsultaHandler, historicoConsultaHandler));
         server.createContext("/fila-espera", Rotas.filaEspera(cors, autorizacao, filaEsperaHandler));
 
         server.start();

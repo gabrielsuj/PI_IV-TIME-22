@@ -1,6 +1,7 @@
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.Json;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.*;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
@@ -8,8 +9,11 @@ import br.edu.puccampinas.consultafacil.service.*;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HistoricoTest {
@@ -25,6 +29,8 @@ class HistoricoTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-11T12:00:00Z"), ZoneOffset.UTC);
     private final RegistroConsultaService service = new RegistroConsultaService(consultas, processor, clock);
     private final UsuarioLogado secretaria = new UsuarioLogado(new ObjectId().toHexString(), "Teste", Perfil.SECRETARIA_ADMIN);
+    private final UsuarioLogado paciente = new UsuarioLogado(new ObjectId().toHexString(), "Paciente", Perfil.PACIENTE);
+    private final UsuarioLogado medico = new UsuarioLogado(new ObjectId().toHexString(), "Médico", Perfil.MEDICO);
 
     private static Document dados() {
         return new Document("pacienteId", new ObjectId()).append("medicoId", new ObjectId())
@@ -201,6 +207,110 @@ class HistoricoTest {
         assertEquals(1, resultado.eventosProcessados());
         assertEquals(1, resultado.falhas());
         assertEquals(2, consultas.docs.get(id).getList("eventosPendentes", Document.class).getFirst().getInteger("sequencia"));
+    }
+
+    private HistoricoConsultaService leitor(ObjectId referencia, AtomicInteger leituras) {
+        Document consulta = consultas.docs.get(referencia);
+        var acesso = new AcessoConsulta(
+                login -> Optional.ofNullable(paciente.id().equals(login) ? consulta.getObjectId("pacienteId") : null),
+                login -> Optional.ofNullable(medico.id().equals(login) ? consulta.getObjectId("medicoId") : null));
+        return new HistoricoConsultaService(consultas, (id, apos, limite) -> {
+            leituras.incrementAndGet();
+            return eventos.values().stream().filter(e -> id.equals(e.getObjectId("consultaId")))
+                    .filter(e -> e.getInteger("sequencia") > apos)
+                    .sorted(Comparator.comparingInt(e -> e.getInteger("sequencia"))).limit(limite).toList();
+        }, acesso);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Perfil.class)
+    void leituraAutorizadaUsaVinculoEConverteEventosReaisEmDtos(Perfil perfil) {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        ObjectId outra = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var ator = switch (perfil) { case PACIENTE -> paciente; case MEDICO -> medico; case SECRETARIA_ADMIN -> secretaria; };
+        var resposta = leitor(id, leituras).listar(id, ator);
+        assertEquals(id.toHexString(), resposta.consultaId());
+        assertEquals(List.of("CRIACAO", "CONFIRMACAO"), resposta.eventos().stream().map(e -> e.evento()).toList());
+        assertEquals(List.of(1, 2), resposta.eventos().stream().map(e -> e.sequencia()).toList());
+        assertEquals(clock.instant().toString(), resposta.eventos().getFirst().ocorridoEm());
+        assertEquals("2026-12-01T12:00:00Z", resposta.eventos().getFirst().dataHoraConsulta());
+        assertEquals(secretaria.id(), resposta.eventos().getFirst().ator().id());
+        assertEquals(100, resposta.limite());
+        assertFalse(resposta.limiteAtingido());
+        assertEquals(1, leituras.get());
+        assertNotEquals(outra.toHexString(), resposta.consultaId());
+        assertThrows(UnsupportedOperationException.class, () -> resposta.eventos().clear());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Perfil.class, names = {"PACIENTE", "MEDICO"})
+    void leituraNaoConsultaHistoricoDeOutroCadastroOuLoginSemVinculo(Perfil perfil) {
+        ObjectId propria = criar(), outra = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(propria, leituras);
+        var ator = perfil == Perfil.PACIENTE ? paciente : medico;
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(outra, ator)).status());
+        var semVinculo = new UsuarioLogado(new ObjectId().toHexString(), "Sem vínculo", perfil);
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(propria, semVinculo)).status());
+        assertEquals(0, leituras.get());
+    }
+
+    @Test void leituraDistingueAtorInvalidoIdAusenteEConsultaInexistenteAntesDeBuscarEventos() {
+        ObjectId id = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(id, leituras);
+        for (UsuarioLogado ator : Arrays.asList(null, new UsuarioLogado("inválido", "Teste", Perfil.SECRETARIA_ADMIN),
+                new UsuarioLogado(secretaria.id(), "Teste", null)))
+            assertEquals(401, assertThrows(ApiException.class, () -> leitor.listar(id, ator)).status());
+        assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(null, secretaria)).status());
+        assertEquals(404, assertThrows(ApiException.class, () -> leitor.listar(new ObjectId(), secretaria)).status());
+        assertEquals(0, leituras.get());
+    }
+
+    @Test void leituraVaziaNaoProcessaNemDescartaPendencias() {
+        indisponivel = true;
+        ObjectId id = criar();
+        Document antes = copia(consultas.docs.get(id));
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertTrue(resposta.eventos().isEmpty());
+        assertFalse(resposta.limiteAtingido());
+        assertEquals(antes, consultas.docs.get(id));
+        assertEquals(1, consultas.docs.get(id).getList("eventosPendentes", Document.class).size());
+    }
+
+    @Test void leituraNuncaSerializaDocumentoBrutoOuCredenciais() {
+        ObjectId id = criar();
+        Document evento = eventos.values().iterator().next();
+        evento.append("versao", 99).append("eventosPendentes", List.of(new Document("senha", "segredo")));
+        evento.get("ator", Document.class).append("token", "segredo");
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        String serializado = Json.toJson(resposta);
+        for (String proibido : List.of("versao", "eventosPendentes", "senha", "token", "segredo", "$oid", "$date"))
+            assertFalse(serializado.contains(proibido), serializado);
+        assertEquals(evento.getObjectId("_id").toHexString(), resposta.eventos().getFirst().id());
+        assertNull(resposta.eventos().getFirst().statusAnterior());
+    }
+
+    @Test void leituraIndicaTetoSemAfirmarQueExistemMaisEventos() {
+        ObjectId id = criar();
+        Document modelo = eventos.values().iterator().next();
+        for (int sequencia = 2; sequencia <= 100; sequencia++) {
+            ObjectId eventoId = new ObjectId();
+            eventos.put(eventoId, copia(modelo).append("_id", eventoId).append("sequencia", sequencia));
+        }
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(100, resposta.eventos().size());
+        assertTrue(resposta.limiteAtingido());
+    }
+
+    @Test void falhaDeLeituraNaoViraHistoricoVazio() {
+        ObjectId id = criar();
+        var leitor = new HistoricoConsultaService(consultas, (consulta, apos, limite) -> {
+            throw new IllegalStateException("Falha de leitura");
+        }, new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty()));
+        assertThrows(IllegalStateException.class, () -> leitor.listar(id, secretaria));
     }
 
     private static final class Memoria implements PendenciasConsultaRepository {
