@@ -2,15 +2,21 @@ package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.api.Json;
+import br.edu.puccampinas.consultafacil.api.dto.HistoricoAlteracaoResponse;
+import br.edu.puccampinas.consultafacil.domain.enums.EventoHistorico;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.*;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
 import br.edu.puccampinas.consultafacil.service.*;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.bson.types.Decimal128;
+import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -399,6 +405,142 @@ class HistoricoTest {
             throw new IllegalStateException("Falha de leitura");
         }, new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty()));
         assertThrows(IllegalStateException.class, () -> leitor.listar(id, secretaria));
+    }
+
+    private ObjectId criarEvento(EventoHistorico tipo) {
+        ObjectId id = criar();
+        switch (tipo) {
+            case CRIACAO -> { }
+            case CONFIRMACAO -> service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+            case ALTERACAO -> service.alterar(id, new Document("medicoId", new ObjectId()), secretaria);
+            case CANCELAMENTO, SINALIZACAO_FILA -> {
+                service.alterar(id, new Document("status", "CANCELADA").append("motivoCancelamento", "Viagem"), secretaria);
+                if (tipo == EventoHistorico.SINALIZACAO_FILA) projetarSinalizacao(id, 7);
+            }
+            case CONCLUSAO, FALTA -> {
+                service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+                service.alterar(id, new Document("status", tipo == EventoHistorico.CONCLUSAO ? "CONCLUIDA" : "FALTA"), secretaria);
+            }
+        }
+        return id;
+    }
+
+    /** Payload da #32, transferido pelo mesmo processador real, sem executar o fluxo de notificações/fila. */
+    private void projetarSinalizacao(ObjectId id, int total) {
+        Document cancelamento = eventos.values().stream().filter(e -> id.equals(e.getObjectId("consultaId")))
+                .max(Comparator.comparingInt(e -> e.getInteger("sequencia"))).orElseThrow();
+        int versao = consultas.docs.get(id).getInteger("versao");
+        Document evento = copia(cancelamento).append("_id", new ObjectId()).append("sequencia", versao + 1)
+                .append("evento", "SINALIZACAO_FILA").append("statusAnterior", "CANCELADA").append("statusNovo", "CANCELADA")
+                .append("ator", new Document("perfil", "SISTEMA").append("id", null)).append("totalSinalizados", total);
+        evento.remove("motivo");
+        assertTrue(consultas.atualizarComEvento(id, versao, new Document(), evento));
+        processor.processarConsulta(id);
+    }
+
+    @ParameterizedTest
+    @EnumSource(EventoHistorico.class)
+    void leituraRetornaOsSeteTiposComDetalhesCondicionais(EventoHistorico tipo) {
+        ObjectId id = criarEvento(tipo);
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        var ultimo = resposta.eventos().getLast();
+        assertEquals(tipo.name(), ultimo.evento());
+        assertEquals(switch (tipo) {
+            case CRIACAO -> null;
+            case CONCLUSAO, FALTA -> "CONFIRMADA";
+            case SINALIZACAO_FILA -> "CANCELADA";
+            default -> "AGENDADA";
+        }, ultimo.statusAnterior());
+        assertEquals(switch (tipo) {
+            case CRIACAO, ALTERACAO -> "AGENDADA";
+            case CONFIRMACAO -> "CONFIRMADA";
+            case CANCELAMENTO, SINALIZACAO_FILA -> "CANCELADA";
+            case CONCLUSAO -> "CONCLUIDA";
+            case FALTA -> "FALTA";
+        }, ultimo.statusNovo());
+        JsonObject corpo = Json.fromJson(Json.toJson(resposta), JsonObject.class);
+        var eventosJson = corpo.getAsJsonArray("eventos");
+        JsonObject eventoJson = eventosJson.get(eventosJson.size() - 1).getAsJsonObject();
+        assertEquals(tipo == EventoHistorico.ALTERACAO, eventoJson.has("alteracoes"));
+        assertEquals(tipo == EventoHistorico.CANCELAMENTO, eventoJson.has("motivo"));
+        assertEquals(tipo == EventoHistorico.SINALIZACAO_FILA, eventoJson.has("totalSinalizados"));
+        if (tipo == EventoHistorico.ALTERACAO) assertEquals(1, ultimo.alteracoes().size());
+        if (tipo == EventoHistorico.CANCELAMENTO) assertEquals("Viagem", ultimo.motivo());
+        if (tipo == EventoHistorico.SINALIZACAO_FILA) {
+            assertEquals(7, ultimo.totalSinalizados());
+            assertEquals("SISTEMA", ultimo.ator().perfil());
+            assertNull(ultimo.ator().id());
+            assertTrue(eventoJson.getAsJsonObject("ator").get("id").isJsonNull());
+        }
+        assertFalse(corpo.has("proximaSequencia"), "A preservação de nulos é restrita aos DTOs anotados");
+    }
+
+    @Test void alteracoesConvertemIdsDatasENulosSemModificarOEventoPersistido() {
+        ObjectId id = new ObjectId(), especialidade = new ObjectId(), novoMedico = new ObjectId();
+        Document legado = dados().append("_id", id).append("status", "AGENDADA");
+        ObjectId medicoAnterior = legado.getObjectId("medicoId");
+        legado.remove("especialidadeId");
+        consultas.docs.put(id, legado);
+        service.alterar(id, new Document("especialidadeId", especialidade).append("medicoId", novoMedico)
+                .append("inicio", Date.from(Instant.parse("2026-12-02T13:00:00Z")))
+                .append("fim", Date.from(Instant.parse("2026-12-02T13:30:00Z"))), secretaria);
+        Document antes = copia(eventos.values().iterator().next());
+        var ultimo = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        Map<String, HistoricoAlteracaoResponse> mudancas = new HashMap<>();
+        ultimo.alteracoes().forEach(a -> mudancas.put(a.campo(), a));
+        assertEquals(medicoAnterior.toHexString(), mudancas.get("medicoId").valorAnterior());
+        assertEquals(novoMedico.toHexString(), mudancas.get("medicoId").valorNovo());
+        assertNull(mudancas.get("especialidadeId").valorAnterior());
+        assertEquals(especialidade.toHexString(), mudancas.get("especialidadeId").valorNovo());
+        assertEquals("2026-12-01T12:00:00Z", mudancas.get("inicio").valorAnterior());
+        assertEquals("2026-12-02T13:00:00Z", mudancas.get("inicio").valorNovo());
+        JsonObject json = Json.fromJson(Json.toJson(mudancas.get("especialidadeId")), JsonObject.class);
+        assertTrue(json.get("valorAnterior").isJsonNull());
+        assertEquals(especialidade.toHexString(), json.get("valorNovo").getAsString());
+        assertEquals(antes, eventos.values().iterator().next());
+        assertThrows(UnsupportedOperationException.class, () -> ultimo.alteracoes().clear());
+    }
+
+    @Test void alteracoesPublicamApenasCamposConhecidosEValoresEscalaresFinitos() {
+        ObjectId id = criarEvento(EventoHistorico.ALTERACAO);
+        Document evento = eventos.values().stream().filter(e -> "ALTERACAO".equals(e.getString("evento"))).findFirst().orElseThrow();
+        evento.put("alteracoes", List.of(
+                new Document("campo", "inicio").append("valorAnterior", 10L).append("valorNovo", new Decimal128(new BigDecimal("12.50"))),
+                new Document("campo", "status").append("valorAnterior", null).append("valorNovo", "AGENDADA"),
+                new Document("campo", "senha").append("valorAnterior", "segredo").append("valorNovo", "segredo"),
+                new Document("campo", "medicoId").append("valorAnterior", new Document("senha", "segredo")).append("valorNovo", new ObjectId()),
+                new Document("campo", "fim").append("valorAnterior", Double.NaN).append("valorNovo", 1),
+                new Document("campo", "fim").append("valorAnterior", Decimal128.NaN).append("valorNovo", 1),
+                new Document("campo", "inicio").append("valorAnterior", List.of("segredo")).append("valorNovo", 1)));
+        var ultimo = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        assertEquals(2, ultimo.alteracoes().size());
+        String serializado = Json.toJson(ultimo);
+        for (String proibido : List.of("senha", "segredo", "$oid", "$date", "$numberDecimal", "NaN"))
+            assertFalse(serializado.contains(proibido), serializado);
+        JsonObject json = Json.fromJson(serializado, JsonObject.class);
+        assertEquals(10L, json.getAsJsonArray("alteracoes").get(0).getAsJsonObject().get("valorAnterior").getAsLong());
+        assertEquals(new BigDecimal("12.50"), json.getAsJsonArray("alteracoes").get(0).getAsJsonObject().get("valorNovo").getAsBigDecimal());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 4})
+    void sinalizacaoPreservaTotalInclusiveZeroEAtorSistemaSemId(int total) {
+        ObjectId id = criarEvento(EventoHistorico.CANCELAMENTO);
+        projetarSinalizacao(id, total);
+        var sinalizacao = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        assertEquals(total, sinalizacao.totalSinalizados());
+        assertNull(sinalizacao.ator().id());
+        assertEquals("SISTEMA", sinalizacao.ator().perfil());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SECRETARIA", "ADMINISTRADOR"})
+    void leituraPreservaPerfilLegadoDoAtorSemConverterParaPerfilDeLogin(String perfil) {
+        ObjectId id = criar();
+        eventos.values().iterator().next().get("ator", Document.class).put("perfil", perfil);
+        var ator = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+        assertEquals(perfil, ator.perfil());
+        assertEquals(secretaria.id(), ator.id());
     }
 
     private static final class Memoria implements PendenciasConsultaRepository {

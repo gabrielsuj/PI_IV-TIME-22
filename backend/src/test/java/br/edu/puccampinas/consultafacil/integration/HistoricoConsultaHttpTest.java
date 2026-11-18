@@ -214,6 +214,74 @@ class HistoricoConsultaHttpTest {
         for (int i = 0; i < quantidade; i++) registro.alterar(id, new Document("medicoId", new ObjectId()), SECRETARIA);
     }
 
+    @Test void alteracaoExibeReferenciasDatasENulosSemBsonBruto() throws Exception {
+        ObjectId especialidade = new ObjectId(), medicoNovo = new ObjectId();
+        consultas.docs.get(id).remove("especialidadeId"); // Registro legado completado pela alteração auditada.
+        registro.alterar(id, new Document("especialidadeId", especialidade).append("medicoId", medicoNovo)
+                .append("inicio", Date.from(Instant.parse("2026-12-02T13:00:00Z")))
+                .append("fim", Date.from(Instant.parse("2026-12-02T13:30:00Z"))), SECRETARIA);
+        var resposta = enviar("GET", caminho() + "?aposSequencia=1", token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var corpo = json.readTree(resposta.body());
+        var evento = corpo.get("eventos").get(0);
+        assertEquals("ALTERACAO", evento.get("evento").asText());
+        assertEquals(4, evento.get("alteracoes").size());
+        for (var mudanca : evento.get("alteracoes")) {
+            switch (mudanca.get("campo").asText()) {
+                case "especialidadeId" -> {
+                    assertTrue(mudanca.get("valorAnterior").isNull());
+                    assertEquals(especialidade.toHexString(), mudanca.get("valorNovo").asText());
+                }
+                case "medicoId" -> assertEquals(medicoNovo.toHexString(), mudanca.get("valorNovo").asText());
+                case "inicio" -> assertEquals("2026-12-02T13:00:00Z", mudanca.get("valorNovo").asText());
+                case "fim" -> assertEquals("2026-12-02T13:30:00Z", mudanca.get("valorNovo").asText());
+                default -> fail("Campo inesperado no DTO");
+            }
+        }
+        assertFalse(resposta.body().contains("$oid"));
+        assertFalse(resposta.body().contains("$date"));
+        assertFalse(corpo.has("proximaSequencia"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void cancelamentoExibeMotivoSomenteQuandoRegistrado(boolean comMotivo) throws Exception {
+        Document campos = new Document("status", "CANCELADA");
+        if (comMotivo) campos.append("motivoCancelamento", "Viagem");
+        registro.alterar(id, campos, SECRETARIA);
+        var resposta = enviar("GET", caminho() + "?aposSequencia=1", token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var evento = json.readTree(resposta.body()).get("eventos").get(0);
+        assertEquals("CANCELAMENTO", evento.get("evento").asText());
+        assertEquals(comMotivo, evento.has("motivo"));
+        if (comMotivo) assertEquals("Viagem", evento.get("motivo").asText());
+        assertFalse(evento.has("alteracoes"));
+        assertFalse(evento.has("totalSinalizados"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 5})
+    void sinalizacaoExibeTotalEIdNuloDoSistema(int total) throws Exception {
+        registro.alterar(id, new Document("status", "CANCELADA"), SECRETARIA);
+        int versao = consultas.docs.get(id).getInteger("versao");
+        Document cancelamento = eventos.getLast();
+        // Payload produzido pela #32; a transferência usa a infraestrutura real do histórico.
+        Document sinalizacao = new Document(cancelamento).append("_id", new ObjectId()).append("sequencia", versao + 1)
+                .append("evento", "SINALIZACAO_FILA").append("statusAnterior", "CANCELADA")
+                .append("ator", new Document("perfil", "SISTEMA").append("id", null)).append("totalSinalizados", total);
+        assertTrue(consultas.atualizarComEvento(id, versao, new Document(), sinalizacao));
+        new HistoricoProcessor(consultas, eventos::add).processarConsulta(id);
+        var resposta = enviar("GET", caminho() + "?aposSequencia=2", token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var evento = json.readTree(resposta.body()).get("eventos").get(0);
+        assertEquals("SINALIZACAO_FILA", evento.get("evento").asText());
+        assertEquals(total, evento.get("totalSinalizados").asInt());
+        assertEquals("SISTEMA", evento.get("ator").get("perfil").asText());
+        assertTrue(evento.get("ator").get("id").isNull());
+        assertFalse(evento.has("motivo"));
+        assertFalse(evento.has("alteracoes"));
+    }
+
     private static UsuarioLogado usuario(Perfil perfil) { return new UsuarioLogado(new ObjectId().toHexString(), "Teste", perfil); }
     private String token(UsuarioLogado ator) { return sessoes.criar(ator).token(); }
     private String caminho() { return "/consultas/" + id + "/historico"; }
