@@ -30,7 +30,7 @@ function validarVagas(resultado, data) {
 const mesmoHorario = (a, b) => a?.inicio === b?.inicio && a?.fim === b?.fim;
 
 // Contrato da API em docs/api/agendamento.md (GET /vagas e POST /consultas, #21).
-export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta }) {
+export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onConfirmado, onNovaConsulta }) {
   const [vagas, setVagas] = useState({ status: 'aguardando', horarios: [], fusoHorario: null, error: null });
   const [horario, setHorario] = useState(null);
   const [revisando, setRevisando] = useState(false);
@@ -102,6 +102,7 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
         return;
       }
       setConfirmacao(resultado);
+      onConfirmado?.();
     } catch (error) {
       if (!montado.current) return;
       // Sem resposta HTTP completa, a consulta pode ter sido gravada.

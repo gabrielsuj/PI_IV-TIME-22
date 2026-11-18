@@ -3,18 +3,23 @@ import { api } from '../services/api';
 import { lerUsuario, limparSessao, salvarSessao, SESSAO_EXPIRADA } from '../services/sessao';
 import { AuthContext } from './authContext';
 import { encerrarRascunhos, iniciarRascunhos, suspenderRascunhos } from '../services/rascunhoPacientes';
+import { encerrarRascunhoAgendamento, iniciarRascunhoAgendamento, suspenderRascunhoAgendamento } from '../services/rascunhoAgendamento';
 
 export default function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(lerUsuario);
   const [sessaoExpirada, setSessaoExpirada] = useState(false);
 
   useEffect(() => {
-    if (usuario) iniciarRascunhos(usuario.id);
+    if (usuario) {
+      iniciarRascunhos(usuario.id);
+      iniciarRascunhoAgendamento(usuario);
+    }
   }, [usuario]);
 
   useEffect(() => {
     const aoExpirar = () => {
       suspenderRascunhos();
+      suspenderRascunhoAgendamento();
       setUsuario(null);
       setSessaoExpirada(true);
     };
@@ -29,6 +34,7 @@ export default function AuthProvider({ children }) {
     }
     salvarSessao(data.token, data.usuario);
     iniciarRascunhos(data.usuario.id);
+    iniciarRascunhoAgendamento(data.usuario);
     setSessaoExpirada(false);
     setUsuario(data.usuario);
     return data.usuario;
@@ -36,6 +42,7 @@ export default function AuthProvider({ children }) {
 
   const sair = useCallback(async () => {
     encerrarRascunhos();
+    encerrarRascunhoAgendamento();
     try {
       await api.post('/auth/logout');
     } catch {
@@ -43,6 +50,7 @@ export default function AuthProvider({ children }) {
     }
     limparSessao();
     encerrarRascunhos();
+    encerrarRascunhoAgendamento();
     setUsuario(null);
   }, []);
 

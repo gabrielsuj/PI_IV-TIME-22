@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NovaConsultaPage from '../pages/NovaConsultaPage';
 import { routes } from '../routes';
 import { buscarVagas as buscarVagasApi, confirmarAgendamento as confirmarAgendamentoApi } from '../services/agendamentoService';
+import { encerrarSessaoExpirada } from '../services/sessao';
 import { entrarComo } from './sessaoTeste';
 
 // Operações e respostas isoladas de teste, com casos usando o serviço HTTP real.
@@ -16,7 +17,7 @@ const pacientes = [
   { id: 'p1', nome: 'Maria Teste', cpf: '01234567890' },
   { id: 'p2', nome: 'Paulo Teste', cpf: '52998224725' },
 ];
-const json = (data) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
+const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 function deferred() {
   let resolve;
@@ -66,9 +67,152 @@ async function revisar(user) {
   expect(screen.getByRole('region', { name: 'Revise sua consulta' })).toBeInTheDocument();
 }
 
+function conectarApi(fetchMock, { perfil = 'SECRETARIA_ADMIN', expirarEm = '/consultas', outraConta = false } = {}) {
+  const catalogos = fetchMock.getMockImplementation();
+  let expirou = false;
+  fetchMock.mockImplementation(async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path === '/auth/login') return json({ token: 'novo-token', usuario: {
+      id: outraConta ? 'outra-conta' : 'usuario-logado', nome: 'Usuário Teste', perfil,
+    } });
+    if (path === '/auth/logout') return new Response(null, { status: 204 });
+    if (!expirou && path === expirarEm) {
+      expirou = true;
+      return json({ erro: 'Sessão expirada.' }, 401);
+    }
+    if (path === '/vagas') return json(vagas);
+    if (path === '/consultas') return json({ id: 'c1' }, 201);
+    return catalogos(url, init);
+  });
+}
+
+async function reautenticar(user) {
+  await user.type(await screen.findByLabelText(/E-mail/), 'conta@example.com');
+  await user.type(screen.getByLabelText(/Senha/), 'senha-de-teste');
+  await user.click(screen.getByRole('button', { name: 'Entrar' }));
+  await screen.findByRole('option', { name: 'Cardiologia' });
+}
+
 beforeEach(() => { sessionStorage.clear(); });
 
 describe('fluxo integrado do frontend de agendamento', () => {
+  it.each(['SECRETARIA_ADMIN', 'PACIENTE'])('recupera contexto após 401 para %s sem buscar vagas nem confirmar automaticamente', async (perfil) => {
+    const { fetchMock } = renderFluxo({ perfil, buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    conectarApi(fetchMock, { perfil });
+    const user = userEvent.setup();
+    await preencher(user, perfil === 'PACIENTE');
+    await revisar(user);
+    await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
+    await screen.findByRole('heading', { name: 'Acesse sua conta' });
+    expect(JSON.stringify({ ...sessionStorage, ...localStorage })).not.toMatch(/01234567890|2026-12-01/);
+    await reautenticar(user);
+    expect((await screen.findByText(/Dados do agendamento recuperados/)).closest('[role="status"]')).toBeInTheDocument();
+    if (perfil === 'SECRETARIA_ADMIN') expect(await screen.findByRole('combobox', { name: /^Paciente/ })).toHaveValue('p1');
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1');
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('m1');
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('2026-12-01');
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar agendamento' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revisar agendamento' })).toBeDisabled();
+    const confirmacoes = () => fetchMock.mock.calls.filter(([url, init]) => new URL(url).pathname === '/consultas' && init.method === 'POST');
+    expect(confirmacoes()).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/vagas')).toHaveLength(1);
+    await revisar(user);
+    await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
+    await screen.findByRole('heading', { name: 'Agendamento realizado' });
+    expect(confirmacoes()).toHaveLength(2);
+    const enviado = JSON.parse(confirmacoes()[1][1].body);
+    if (perfil === 'SECRETARIA_ADMIN') expect(enviado.pacienteId).toBe('p1');
+    else expect(enviado).not.toHaveProperty('pacienteId');
+    expect(screen.queryByText(/Dados do agendamento recuperados/)).not.toBeInTheDocument();
+  });
+
+  it('recupera os filtros quando a sessão expira na busca de vagas', async () => {
+    const { fetchMock } = renderFluxo({ buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    conectarApi(fetchMock, { expirarEm: '/vagas' });
+    const user = userEvent.setup();
+    await preencher(user);
+    await user.click(screen.getByRole('button', { name: 'Buscar horários' }));
+    await reautenticar(user);
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('2026-12-01');
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('p1');
+    expect(screen.getByRole('button', { name: 'Buscar horários' })).toBeEnabled();
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/vagas')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/consultas')).toHaveLength(0);
+  });
+
+  it('descarta o contexto da conta anterior ao entrar com outro usuário', async () => {
+    const { fetchMock } = renderFluxo({ buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    conectarApi(fetchMock, { expirarEm: '/vagas', outraConta: true });
+    const user = userEvent.setup();
+    await preencher(user);
+    await user.click(screen.getByRole('button', { name: 'Buscar horários' }));
+    await reautenticar(user);
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('');
+    expect(screen.queryByText(/Dados do agendamento recuperados/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buscar horários' })).toBeDisabled();
+  });
+
+  it('revalida o catálogo após login e descarta o médico que ficou inativo', async () => {
+    const { fetchMock } = renderFluxo({ buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    conectarApi(fetchMock, { expirarEm: '/vagas' });
+    const user = userEvent.setup();
+    await preencher(user);
+    await user.click(screen.getByRole('button', { name: 'Buscar horários' }));
+    await screen.findByRole('heading', { name: 'Acesse sua conta' });
+    const apiConectada = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, init) => new URL(url).pathname === '/medicos'
+      ? Promise.resolve(json([{ id: 'm1', nome: 'Ana Teste', especialidadeIds: ['e1'], ativo: false }])) : apiConectada(url, init));
+    await reautenticar(user);
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1');
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('2026-12-01');
+    expect(screen.getByRole('button', { name: 'Buscar horários' })).toBeDisabled();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('descarta o contexto ao sair voluntariamente da conta', async () => {
+    const { fetchMock } = renderFluxo();
+    conectarApi(fetchMock, { expirarEm: null });
+    const user = userEvent.setup();
+    await preencher(user);
+    await user.click(screen.getByRole('button', { name: 'Conta de Usuário Teste' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    await reautenticar(user);
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('');
+    expect(screen.queryByText(/Dados do agendamento recuperados/)).not.toBeInTheDocument();
+  });
+
+  it('descarta o rascunho ao sair da página sem expiração de sessão', async () => {
+    const { router } = renderFluxo();
+    const user = userEvent.setup();
+    await preencher(user);
+    await act(async () => { await router.navigate('/perfis'); });
+    await act(async () => { await router.navigate('/nova-consulta'); });
+    await screen.findByRole('option', { name: 'Cardiologia' });
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('');
+    expect(screen.queryByText(/Dados do agendamento recuperados/)).not.toBeInTheDocument();
+  });
+
+  it('não recupera um agendamento já confirmado quando outra requisição expira a sessão', async () => {
+    const { fetchMock } = renderFluxo({ buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
+    conectarApi(fetchMock, { expirarEm: null });
+    const user = userEvent.setup();
+    await preencher(user);
+    await revisar(user);
+    await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
+    await screen.findByRole('heading', { name: 'Agendamento realizado' });
+    act(() => encerrarSessaoExpirada());
+    await reautenticar(user);
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('');
+    expect(screen.queryByText(/Dados do agendamento recuperados/)).not.toBeInTheDocument();
+  });
+
   it('secretaria busca, revisa e confirma somente após ação explícita, e pode iniciar outra consulta', async () => {
     const { buscarVagas, confirmarAgendamento } = renderFluxo();
     const user = userEvent.setup();
