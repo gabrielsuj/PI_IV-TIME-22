@@ -374,3 +374,13 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
   .fila-espera__acoes { flex-wrap: wrap; }
 }
 
+/* Ícones do menu lateral */
+.app-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-nav__link svg {
+  flex-shrink: 0;
+}
