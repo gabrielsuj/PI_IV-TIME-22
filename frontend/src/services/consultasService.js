@@ -27,3 +27,8 @@ export function cancelarConsulta(id, motivo) {
   const texto = motivo?.trim();
   return api.post(`/consultas/${encodeURIComponent(id)}/cancelamento`, texto ? { motivo: texto } : {});
 }
+
+/** Transição autorizada pela API (#28); envia somente o status, sem repetir a escrita automaticamente. */
+export function alterarStatusConsulta(id, status) {
+  return api.post(`/consultas/${encodeURIComponent(id)}/status`, { status });
+}

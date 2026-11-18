@@ -14,6 +14,7 @@ import br.edu.puccampinas.consultafacil.api.handler.ConsultaLeituraHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
+import br.edu.puccampinas.consultafacil.api.handler.StatusConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 
@@ -92,6 +93,8 @@ public class App {
             new PacienteDoUsuarioRepository(db)::buscar, new MedicoDoUsuarioRepository(db)::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
             acessoConsulta, registroConsultas, AposCancelamento.NENHUM, Clock.systemUTC()));
+        var statusConsultaHandler = new StatusConsultaHandler(new StatusConsultaService(consultaRepo,
+            acessoConsulta, registroConsultas, Clock.systemUTC()));
         // Fila de espera (#31): inscrição, consulta e saída
         var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(new FilaEsperaRepository(db), especialidades,
             medicos, pacienteRepo, new PacienteDoUsuarioRepository(db), new NomesRepository.Mongo(db), Clock.systemUTC()));
@@ -128,8 +131,9 @@ public class App {
         server.createContext("/pacientes", Rotas.pacientes(cors, autorizacao, pacienteHandler));
         server.createContext("/medicos", Rotas.catalogo(cors, autorizacao, medicoHandler));
         server.createContext("/especialidades", Rotas.catalogo(cors, autorizacao, especialidadeHandler));
-        // /consultas/lista, /consultas/{id} e /consultas/{id}/cancelamento (#27, #30); "/consultas" sem barra continua no router.
-        server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao, consultaLeituraHandler, cancelamentoHandler));
+        // Listagem, detalhe, cancelamento e status (#27, #28, #30); "/consultas" sem barra continua no router.
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autorizacao,
+            consultaLeituraHandler, cancelamentoHandler, statusConsultaHandler));
         server.createContext("/fila-espera", Rotas.filaEspera(cors, autorizacao, filaEsperaHandler));
 
         server.start();
