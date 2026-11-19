@@ -881,18 +881,26 @@ describe('detalhe e cancelamento da consulta', () => {
     await waitFor(() => expect(chamadas(fetchMock, '/consultas/c1')).toHaveLength(2));
   });
 
-  it('outro erro: mantém o modal aberto com a mensagem para tentar de novo', async () => {
+  it('preserva o motivo após falha temporária e envia o mesmo texto ao tentar novamente', async () => {
     entrarComo(PAULO);
-    mockApi({ cancelar: () => erro(500, 'Erro interno do servidor') });
+    const motivo = 'Conflito de horário';
+    const cancelar = vi.fn()
+      .mockImplementationOnce(() => erro(503, 'Serviço indisponível'))
+      .mockImplementationOnce(() => json(consulta('c1', { status: 'CANCELADA' })));
+    mockApi({ cancelar });
     const user = userEvent.setup();
     renderAt('/consultas/c1');
 
     await user.click(await screen.findByRole('button', { name: 'Cancelar consulta' }));
-    const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Confirmar cancelamento' }));
+    const dialog = within(screen.getByRole('dialog'));
+    await user.type(dialog.getByLabelText('Motivo (opcional)'), motivo);
+    await user.click(dialog.getByRole('button', { name: 'Confirmar cancelamento' }));
 
-    expect(await within(dialog).findByText('Erro interno do servidor')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Confirmar cancelamento' })).toBeEnabled();
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Serviço indisponível');
+    expect(dialog.getByLabelText('Motivo (opcional)')).toHaveValue(motivo);
+    await user.click(dialog.getByRole('button', { name: 'Confirmar cancelamento' }));
+    expect(await screen.findByText('Consulta cancelada. O horário foi liberado para outros pacientes.')).toBeInTheDocument();
+    expect(cancelar.mock.calls).toEqual([['c1', { motivo }], ['c1', { motivo }]]);
   });
 
   it('consulta ativa que já começou não mostra o botão e explica o motivo', async () => {

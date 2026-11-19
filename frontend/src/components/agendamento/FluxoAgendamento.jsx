@@ -158,7 +158,10 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
     <>
       {vagaSinalizadaOcupada && <Alert tone="warning">A vaga sinalizada já foi ocupada ou não está mais disponível. Escolha outro horário ou volte à fila. O status da inscrição é atualizado pelo servidor.</Alert>}
       {erroConfirmacao?.status === 409 && (
-        <Alert>{erroConfirmacao.message || 'Este horário não está mais disponível. Escolha outro horário na lista atualizada.'}</Alert>
+        <Alert>
+          {erroConfirmacao.message || 'Este horário não está mais disponível.'}
+          {vagas.status === 'sucesso' && vagas.horarios.length > 0 && ' Escolha outro horário na lista atualizada.'}
+        </Alert>
       )}
       <HorariosDisponiveis {...vagas} value={horario} disabled={confirmando || !pronto} onRetry={() => buscar()}
         onChange={(opcao) => {
