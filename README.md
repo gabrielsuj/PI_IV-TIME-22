@@ -14,6 +14,7 @@
 - [Tecnologias utilizadas](#tecnologias-utilizadas)
 - [Arquitetura da aplicação](#arquitetura-da-aplicação)
 - [Pré-requisitos e guia inicial de execução](#pré-requisitos-e-guia-inicial-de-execução)
+- [Roteiro de entrega e demonstração](docs/operacao/entrega-mvp.md)
 - [Documentação](#documentação)
 - [Estrutura de pastas](#estrutura-de-pastas)
 - [Informações acadêmicas e autoria](#informações-acadêmicas-e-autoria)
@@ -64,10 +65,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Funcionalidade | Situação |
 |---|---|
 | Login, sessão com expiração, logout e menu por perfil | ✅ |
-| Cadastros de pacientes, médicos e especialidades | ✅ |
+| Cadastro, busca e detalhe do paciente, com edição pela secretaria e leitura pelo médico | ✅ #14 |
+| Cadastros de médicos e especialidades | ✅ |
 | Agenda: jornada semanal, duração e bloqueios, com aviso quando a mudança atinge consultas marcadas | ✅ |
 | Calendário operacional por médico (semana e dia) | ✅ |
-| Busca de vagas e agendamento (secretaria e paciente) | ✅ |
+| Busca de vagas e agendamento (secretaria e paciente), com escolha de outro horário após conflito | ✅ #54 |
 | Registro e consulta do histórico no detalhe da consulta | ✅ #29, #46 |
 | Listagem, detalhe e cancelamento de consultas | ✅ |
 | Fila de espera na API: inscrição, sinalização da vaga após cancelamento e atualização quando a vaga é ocupada | ✅ #31, #32 |
@@ -75,9 +77,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Telas da fila de espera (paciente e secretaria) | ✅ #33 |
 | Confirmação, conclusão e falta pela interface | ✅ #28 |
 | Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
-| Lembretes simulados e painel de indicadores | 🚧 #34 a #37 |
+| Central de notificações, leitura e confirmação de presença pelo lembrete | ✅ #35 |
+| Geração e envio periódico dos lembretes | 🚧 #34 |
+| Indicadores e painel operacional | 🚧 #36 e #37 |
 
-O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne o cenário de demonstração da fila e o passo a passo para publicar a versão final.
+O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne os cenários de demonstração e o passo a passo para publicar a versão final.
 
 ---
 
@@ -160,6 +164,14 @@ docker compose up -d mongo
 
 Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices. Eles só rodam com o volume vazio; para recriar o banco local, use `docker compose down -v` antes do `up`.
 
+> **Atualizar um banco que já existe.** Quando um PR muda algum arquivo de `database/init/` (validadores ou índices), o Docker **não** reaplica esses scripts num volume que já tem dados. Rode, com o container no ar, para cada banco que você usa:
+>
+> ```bash
+> for f in database/init/*.js; do docker exec -i consultafacil-mongo mongosh <banco> --quiet --file /dev/stdin < "$f"; done
+> ```
+>
+> Os scripts são idempotentes: atualizam validadores e índices e **preservam os dados**. Para começar do zero, use `bash scripts/recriar-banco.sh <banco>` (apaga e recarrega). Sem isso, a API nova pode ter gravações recusadas pelo validador antigo.
+
 #### Bancos por ambiente
 
 | Banco | Uso | Dados de exemplo |
@@ -219,13 +231,13 @@ Em **Nova consulta** (`/nova-consulta`), os horários livres consideram a jornad
 Para verificar a modelagem:
 
 ```bash
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
+docker exec -i consultafacil-mongo mongosh consultafacil --quiet --file /dev/stdin < scripts/verificar-modelagem.js
 ```
 
 Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobreposições, histórico e logins):
 
 ```bash
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/verificar-carga.js
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
 ```
 
 Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md) e [`docs/modelagem/consultas.md`](docs/modelagem/consultas.md).
@@ -259,8 +271,8 @@ Com o MongoDB no ar:
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem dados
-cd backend && ./mvnw test                          # JUnit 5: unidade e integração
-cd frontend && npm test                            # Vitest + Testing Library
+(cd backend && ./mvnw test)                       # JUnit 5: unidade e integração
+(cd frontend && npm ci && npm test && npm run lint && npm run build)
 ```
 
 A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md).
@@ -272,10 +284,10 @@ Em cada pull request, o [workflow de CI](.github/workflows/ci.yml) roda o JUnit 
 ```bash
 bash scripts/backup-banco.sh consultafacil_demo        # gera backups/<banco>-<data>.archive.gz
 bash scripts/testar-recuperacao.sh consultafacil_demo  # confere que o backup restaura tudo, sem alterar o banco
-bash scripts/restaurar-banco.sh backups/<arquivo>      # restaura (pede confirmação)
+bash scripts/testes/restaurar-banco.test.sh           # valida a recusa de backups inválidos em container descartável
 ```
 
-Detalhes em [`docs/operacao/backup-recuperacao.md`](docs/operacao/backup-recuperacao.md).
+Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bash scripts/restaurar-banco.sh`. O script pede confirmação e valida o arquivo em um banco temporário antes de substituir o destino. Consulte o [procedimento e o resultado da recuperação](docs/operacao/backup-recuperacao.md).
 
 ### Variáveis de ambiente
 
