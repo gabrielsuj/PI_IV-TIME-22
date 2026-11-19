@@ -27,6 +27,7 @@ export const NAV_ITEMS = [
   { to: '/consultas', label: 'Consultas', perfis: TODOS },
   { to: '/fila-espera', label: 'Fila de espera', perfis: AGENDAMENTO },
   { to: '/avisos-vaga', label: 'Avisos de vaga', perfis: ['PACIENTE'] },
+  { to: '/notificacoes', label: 'Notificações', perfis: ['PACIENTE', 'MEDICO'] },
   { to: '/pacientes', label: 'Pacientes', perfis: EQUIPE },
   { to: '/medicos', label: 'Médicos', perfis: SECRETARIA },
   { to: '/especialidades', label: 'Especialidades', perfis: SECRETARIA },

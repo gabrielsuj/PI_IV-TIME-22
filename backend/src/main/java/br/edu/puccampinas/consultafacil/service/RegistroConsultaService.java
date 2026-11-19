@@ -122,6 +122,7 @@ public final class RegistroConsultaService {
         modificados.put("atualizadaEm", agora());
         depois.put("atualizadaEm", modificados.get("atualizadaEm"));
         Document evento = evento(antes, depois, ator, tipo, ultimaSequencia + 1, alteracoes);
+        if (tipo == EventoHistorico.CANCELAMENTO) modificados.put("sinalizacaoFila", "PENDENTE");
         if (!consultas.atualizarComEvento(id, versao, modificados, evento))
             throw ApiException.conflict("Consulta alterada simultaneamente ou limite de pendências atingido; recarregue os dados");
         aposGravar(id);

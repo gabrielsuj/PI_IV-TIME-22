@@ -36,7 +36,7 @@ public final class Rotas {
 
     public record Handlers(HttpHandler health, HttpHandler auth, HttpHandler agendas,
                            HttpHandler bloqueios, HttpHandler pacientes,
-                           HttpHandler vagas, HttpHandler consultas, HttpHandler calendario, HttpHandler avisosVaga) {}
+                           HttpHandler vagas, HttpHandler consultas, HttpHandler calendario, HttpHandler avisosVaga, HttpHandler notificacoes) {}
 
     public static Router router(Cors cors, Autorizacao autz, Handlers h) {
         return new Router(cors)
@@ -51,6 +51,9 @@ public final class Rotas {
             .add("DELETE", "/bloqueios", autz.exigir(h.bloqueios(), MEDICO, SECRETARIA_ADMIN))
             .add("GET", "/vagas", autz.exigir(h.vagas(), PACIENTE, MEDICO, SECRETARIA_ADMIN))
             .add("POST", "/consultas", autz.exigir(h.consultas(), PACIENTE, SECRETARIA_ADMIN))
+            .add("GET", "/notificacoes", autz.exigir(h.notificacoes(), PACIENTE, MEDICO))
+            .add("POST", "/notificacoes/lida", autz.exigir(h.notificacoes(), PACIENTE, MEDICO))
+            .add("POST", "/notificacoes/confirmar", autz.exigir(h.notificacoes(), PACIENTE))
             .add("GET", "/avisos-vaga", autz.exigir(h.avisosVaga(), PACIENTE))
             .add("POST", "/avisos-vaga", autz.exigir(h.avisosVaga(), PACIENTE))
             .add("GET", "/consultas", autz.exigir(h.calendario(), MEDICO, SECRETARIA_ADMIN));

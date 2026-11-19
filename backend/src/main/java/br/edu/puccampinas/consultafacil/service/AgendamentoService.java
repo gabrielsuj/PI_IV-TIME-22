@@ -11,6 +11,7 @@ import br.edu.puccampinas.consultafacil.api.dto.VagasResponse;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.EspecialidadeRepository;
 import br.edu.puccampinas.consultafacil.repository.MedicoRepository;
+import br.edu.puccampinas.consultafacil.repository.TravaAgenda;
 import br.edu.puccampinas.consultafacil.repository.PacienteDoUsuarioRepository;
 import br.edu.puccampinas.consultafacil.repository.PacienteRepository;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
@@ -97,15 +98,17 @@ public class AgendamentoService {
         validarMedicoEEspecialidade(medicoId, especialidadeId);
         ObjectId pacienteId = pacienteDaConsulta(r.pacienteId(), ator);
 
-        // Outra pessoa pode ter reservado depois da busca, ou o horário saiu da jornada / foi bloqueado.
-        disponibilidade.exigirVagaLivre(medicoId, inicio, fim);
-        // A gravação auditada verifica também os intervalos das consultas ativas do paciente (#25).
-        Document dados = new Document("pacienteId", pacienteId)
-                .append("medicoId", medicoId)
-                .append("especialidadeId", especialidadeId)
-                .append("inicio", Date.from(inicio))
-                .append("fim", Date.from(fim));
-        return ConsultaResponse.de(registro.criar(dados, ator));
+        synchronized (TravaAgenda.porMedico(medicoId)) {
+            // Outra pessoa pode ter reservado depois da busca, ou o horário saiu da jornada / foi bloqueado.
+            disponibilidade.exigirVagaLivre(medicoId, inicio, fim);
+            // A gravação auditada verifica também os intervalos das consultas ativas do paciente (#25).
+            Document dados = new Document("pacienteId", pacienteId)
+                    .append("medicoId", medicoId)
+                    .append("especialidadeId", especialidadeId)
+                    .append("inicio", Date.from(inicio))
+                    .append("fim", Date.from(fim));
+            return ConsultaResponse.de(registro.criar(dados, ator));
+        }
     }
 
     /** Paciente agenda para si mesmo; a secretaria informa para quem é a consulta. */

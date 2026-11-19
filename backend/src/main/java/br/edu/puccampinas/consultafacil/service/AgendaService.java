@@ -8,6 +8,7 @@ import br.edu.puccampinas.consultafacil.api.dto.FaixaDto;
 import br.edu.puccampinas.consultafacil.api.dto.JornadaDto;
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
 import br.edu.puccampinas.consultafacil.repository.MedicoRepository;
+import br.edu.puccampinas.consultafacil.repository.TravaAgenda;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
@@ -50,30 +51,32 @@ public class AgendaService {
         garantirMedico(medicoId);
         ValidadorAgenda.validar(r);
         ZoneId fuso = ZoneId.of(r.fusoHorario() != null ? r.fusoHorario() : FUSO_PADRAO);
-        if (!confirmado) {
-            List<Document> fora = afetadas.futuras(medicoId, relogio.instant()).stream()
-                    .filter(c -> !cabeNaJornada(c, r, fuso)).toList();
-            if (!fora.isEmpty())
-                throw new ConflitoComConsultasException("A nova jornada deixa " + fora.size()
-                        + " consulta(s) marcada(s) fora do horário de atendimento. Confirme para salvar mesmo assim; elas precisarão ser remarcadas.",
-                        afetadas.resumir(fora, medicoId, fuso));
+        synchronized (TravaAgenda.porMedico(medicoId)) {
+            if (!confirmado) {
+                List<Document> fora = afetadas.futuras(medicoId, relogio.instant()).stream()
+                        .filter(c -> !cabeNaJornada(c, r, fuso)).toList();
+                if (!fora.isEmpty())
+                    throw new ConflitoComConsultasException("A nova jornada deixa " + fora.size()
+                            + " consulta(s) marcada(s) fora do horário de atendimento. Confirme para salvar mesmo assim; elas precisarão ser remarcadas.",
+                            afetadas.resumir(fora, medicoId, fuso));
+            }
+
+            List<Document> jornadas = r.jornadas().stream()
+                    .sorted(Comparator.comparing(JornadaDto::diaSemana))
+                    .map(j -> new Document("diaSemana", j.diaSemana())
+                            .append("faixas", j.faixas().stream()
+                                    .sorted(Comparator.comparing(FaixaDto::inicioMinuto))
+                                    .map(f -> new Document("inicioMinuto", f.inicioMinuto())
+                                            .append("fimMinuto", f.fimMinuto()))
+                                    .toList()))
+                    .toList();
+
+            Document dados = new Document("fusoHorario", r.fusoHorario() != null ? r.fusoHorario() : FUSO_PADRAO)
+                    .append("duracaoMinutos", r.duracaoMinutos())
+                    .append("jornadas", jornadas);
+
+            return paraResposta(agendas.salvar(medicoId, dados));
         }
-
-        List<Document> jornadas = r.jornadas().stream()
-                .sorted(Comparator.comparing(JornadaDto::diaSemana))
-                .map(j -> new Document("diaSemana", j.diaSemana())
-                        .append("faixas", j.faixas().stream()
-                                .sorted(Comparator.comparing(FaixaDto::inicioMinuto))
-                                .map(f -> new Document("inicioMinuto", f.inicioMinuto())
-                                        .append("fimMinuto", f.fimMinuto()))
-                                .toList()))
-                .toList();
-
-        Document dados = new Document("fusoHorario", r.fusoHorario() != null ? r.fusoHorario() : FUSO_PADRAO)
-                .append("duracaoMinutos", r.duracaoMinutos())
-                .append("jornadas", jornadas);
-
-        return paraResposta(agendas.salvar(medicoId, dados));
     }
 
     /** Se a consulta continua inteira dentro de alguma faixa do mesmo dia da semana na jornada informada. */

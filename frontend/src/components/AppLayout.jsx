@@ -27,6 +27,7 @@ export default function AppLayout() {
   '/consultas': ClipboardList,
   '/fila-espera': ListOrdered,
   '/avisos-vaga': Bell,
+  '/notificacoes': Bell,
   '/pacientes': Users,
   '/medicos': Stethoscope,
   '/agenda': CalendarCheck2,

@@ -54,7 +54,7 @@ class RotasAutorizacaoTest {
     @BeforeEach void iniciar() throws Exception {
         var cors = new Cors(List.of());
         var autz = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -148,6 +148,11 @@ class RotasAutorizacaoTest {
         "GET,    /fila-espera/abc/def,        PACIENTE,         404",
         "GET,    /fila-esperaX,               PACIENTE,         404",
         // Avisos (#57): somente o paciente
+        "GET,    /notificacoes,               PACIENTE,         200",
+        "GET,    /notificacoes,               MEDICO,           200",
+        "GET,    /notificacoes,               SECRETARIA_ADMIN, 403",
+        "POST,   /notificacoes/lida,          MEDICO,           200",
+        "POST,   /notificacoes/confirmar,     MEDICO,           403",
         "GET,    /avisos-vaga,                PACIENTE,         200",
         "POST,   /avisos-vaga,                PACIENTE,         200",
         "GET,    /avisos-vaga,                MEDICO,           403",

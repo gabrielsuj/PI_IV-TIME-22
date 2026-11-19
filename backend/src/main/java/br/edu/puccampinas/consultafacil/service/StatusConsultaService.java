@@ -33,6 +33,14 @@ public final class StatusConsultaService {
     }
 
     public ConsultaResponse alterar(ObjectId consultaId, StatusConsulta destino, UsuarioLogado ator) {
+        return alterar(consultaId, destino, ator, null);
+    }
+
+    void confirmarPeloLembrete(ObjectId id, java.util.Date horario, UsuarioLogado ator) {
+        alterar(id, StatusConsulta.CONFIRMADA, ator, horario);
+    }
+
+    private ConsultaResponse alterar(ObjectId consultaId, StatusConsulta destino, UsuarioLogado ator, java.util.Date horarioLembrete) {
         if (ator == null || ator.perfil() == null || ator.id() == null || !ObjectId.isValid(ator.id()))
             throw ApiException.unauthorized("Usuário autenticado é obrigatório para alterar o status");
         if (consultaId == null) throw ApiException.badRequest("ID da consulta é obrigatório");
@@ -46,6 +54,12 @@ public final class StatusConsultaService {
             throw ApiException.forbidden("Somente médico ou secretaria podem concluir a consulta ou registrar falta");
 
         String atual = consulta.getString("status");
+        if (horarioLembrete != null) {
+            if (!horarioLembrete.equals(consulta.getDate("inicio")) || !horarioLembrete.toInstant().isAfter(relogio.instant()))
+                throw ApiException.conflict("O horário deste lembrete não está mais disponível para confirmação");
+            // Uma repetição após a gravação pode completar a leitura sem duplicar o evento no histórico.
+            if (StatusConsulta.CONFIRMADA.name().equals(atual)) return ConsultaResponse.de(consulta);
+        }
         if (!StatusConsulta.ATIVOS.contains(atual)
                 || destino == StatusConsulta.CONFIRMADA && !StatusConsulta.AGENDADA.name().equals(atual)
                 || destino == StatusConsulta.CONCLUIDA && !StatusConsulta.CONFIRMADA.name().equals(atual))

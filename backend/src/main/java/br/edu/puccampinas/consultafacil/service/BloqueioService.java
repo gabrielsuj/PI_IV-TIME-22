@@ -8,6 +8,7 @@ import br.edu.puccampinas.consultafacil.api.dto.BloqueioResponse;
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
 import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
 import br.edu.puccampinas.consultafacil.repository.MedicoRepository;
+import br.edu.puccampinas.consultafacil.repository.TravaAgenda;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
@@ -48,27 +49,29 @@ public class BloqueioService {
     public BloqueioResponse criar(ObjectId medicoId, BloqueioRequest r, boolean confirmado) {
         if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
 
-        ZoneId fuso = fusoDo(medicoId);
-        Instant inicio = paraInstante(r.inicio(), "inicio", fuso);
-        Instant fim = paraInstante(r.fim(), "fim", fuso);
-        if (!inicio.isBefore(fim)) throw ApiException.badRequest("O início do bloqueio deve ser anterior ao fim");
-        if (r.motivo() != null && r.motivo().length() > 200) throw ApiException.badRequest("Motivo muito longo (máx. 200)");
+        synchronized (TravaAgenda.porMedico(medicoId)) {
+            ZoneId fuso = fusoDo(medicoId);
+            Instant inicio = paraInstante(r.inicio(), "inicio", fuso);
+            Instant fim = paraInstante(r.fim(), "fim", fuso);
+            if (!inicio.isBefore(fim)) throw ApiException.badRequest("O início do bloqueio deve ser anterior ao fim");
+            if (r.motivo() != null && r.motivo().length() > 200) throw ApiException.badRequest("Motivo muito longo (máx. 200)");
 
-        if (!bloqueios.sobrepostos(medicoId, Date.from(inicio), Date.from(fim)).isEmpty())
-            throw ApiException.conflict("Já existe um bloqueio nesse período");
-        if (!confirmado) {
-            var atingidas = afetadas.noPeriodo(medicoId, inicio, fim, fuso);
-            if (!atingidas.isEmpty())
-                throw new ConflitoComConsultasException("O período tem " + atingidas.size()
-                        + " consulta(s) marcada(s). Confirme para bloquear mesmo assim; elas precisarão ser remarcadas.", atingidas);
+            if (!bloqueios.sobrepostos(medicoId, Date.from(inicio), Date.from(fim)).isEmpty())
+                throw ApiException.conflict("Já existe um bloqueio nesse período");
+            if (!confirmado) {
+                var atingidas = afetadas.noPeriodo(medicoId, inicio, fim, fuso);
+                if (!atingidas.isEmpty())
+                    throw new ConflitoComConsultasException("O período tem " + atingidas.size()
+                            + " consulta(s) marcada(s). Confirme para bloquear mesmo assim; elas precisarão ser remarcadas.", atingidas);
+            }
+
+            Document d = new Document("medicoId", medicoId)
+                    .append("inicio", Date.from(inicio))
+                    .append("fim", Date.from(fim));
+            if (r.motivo() != null && !r.motivo().isBlank()) d.append("motivo", r.motivo().strip());
+
+            return paraResposta(bloqueios.inserir(d), fuso);
         }
-
-        Document d = new Document("medicoId", medicoId)
-                .append("inicio", Date.from(inicio))
-                .append("fim", Date.from(fim));
-        if (r.motivo() != null && !r.motivo().isBlank()) d.append("motivo", r.motivo().strip());
-
-        return paraResposta(bloqueios.inserir(d), fuso);
     }
 
     /** Sem de/ate lista todos; com de/ate (AAAA-MM-DD, inclusivos) lista os que tocam o período. */

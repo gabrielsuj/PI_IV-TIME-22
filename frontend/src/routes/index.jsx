@@ -3,6 +3,7 @@ import AppLayout from '../components/AppLayout';
 import RequireAuth from '../components/RequireAuth';
 import AuthProvider from '../contexts/AuthProvider';
 import AgendaPage from '../pages/AgendaPage';
+import NotificacoesPage from '../pages/NotificacoesPage';
 import AvisosVagaPage from '../pages/AvisosVagaPage';
 import CalendarioPage from '../pages/CalendarioPage';
 import ConsultaDetalhePage from '../pages/ConsultaDetalhePage';
@@ -14,6 +15,8 @@ import NovaConsultaPage from '../pages/NovaConsultaPage';
 import StatusPage from '../pages/StatusPage';
 import LoginPage from '../pages/LoginPage';
 import ProfilesPage from '../pages/ProfilesPage';
+import PacientesLayout, { ListaPacientes } from '../pages/PacientesLayout';
+import PacienteDetalhePage from '../pages/PacienteDetalhePage';
 import RegistrationPage from '../pages/RegistrationPage';
 import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
 import FilaEsperaPage from '../pages/FilaEsperaPage';
@@ -45,13 +48,21 @@ export const routes = [
               { index: true, element: <HomePage /> },
               { path: 'status', element: <StatusPage /> },
               { path: 'perfis', element: <ProfilesPage /> },
-              { path: 'pacientes', element: <RegistrationPage key="pacientes" resource="pacientes" /> },
+              {
+                path: 'pacientes',
+                element: <PacientesLayout />,
+                children: [
+                  { index: true, element: <ListaPacientes /> },
+                  { path: ':id', element: <PacienteDetalhePage /> },
+                ],
+              },
               { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
               { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
               { path: 'agenda', element: <AgendaPage /> },
               { path: 'calendario', element: <CalendarioPage /> },
               { path: 'consultas', element: <ConsultasPage /> },
               { path: 'consultas/:id', element: <ConsultaDetalhePage /> },
+              { path: 'notificacoes', element: <NotificacoesPage /> },
               { path: 'avisos-vaga', element: <AvisosVagaPage /> },
               {
                 path: 'nova-consulta',

@@ -31,6 +31,12 @@ Os índices são **parciais**: consultas canceladas, concluídas ou faltas não 
 
 Os testes de `ReservasConcorrenciaIntegrationTest` usam o MongoDB real e passam pela autenticação, por `POST /consultas` e por `GET /vagas`. O servidor de teste atende com **16 threads**. No cenário da #25, uma barreira faz com que os dois pedidos encontrem as vagas livres antes da disputa pela gravação.
 
+## Reserva durante uma alteração da agenda
+
+Na mesma instância da API, o agendamento, a criação de bloqueios e a alteração da jornada usam o mesmo monitor do médico desde a validação da disponibilidade ou das consultas afetadas até a gravação. A proteção contra sobreposição de paciente entre médicos continua adquirindo a trava do paciente depois da trava do médico.
+
+O teste `AgendamentoIntegrationTest.reservaDisputaHorarioComMudancaDaAgenda` cobre quatro combinações com MongoDB. Quando o bloqueio ou a redução da jornada entra primeiro, a reserva recebe 409. Quando a reserva entra primeiro, a secretaria recebe 409 com a consulta afetada e pode confirmar a mudança explicitamente. A consulta permanece agendada para remarcação.
+
 ## Observações
 
 - A proteção de intervalos de médico e paciente cobre requisições simultâneas atendidas pela mesma instância do backend. As gravações diretas no MongoDB têm as garantias dos índices únicos.
