@@ -17,6 +17,7 @@ import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HistoricoConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.handler.StatusConsultaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.CentralNotificacoesHandler;
 import br.edu.puccampinas.consultafacil.api.handler.VagasHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 
@@ -107,6 +108,8 @@ public class App {
             acessoConsulta, registroConsultas, AposCancelamento.NENHUM, relogio));
         var statusConsulta = new StatusConsultaService(consultaRepo, acessoConsulta, registroConsultas, relogio);
         var statusConsultaHandler = new StatusConsultaHandler(statusConsulta);
+        var central = new CentralNotificacoesHandler(new CentralNotificacoesService(notificacoes, consultaRepo,
+                pacienteDoUsuario::buscar, medicoDoUsuario::buscar, statusConsulta, relogio));
         // Fila de espera (#31): inscrição, consulta e saída
         var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(fila, especialidades,
             medicos, pacienteRepo, pacienteDoUsuario, nomes, relogio));
@@ -133,7 +136,7 @@ public class App {
         var autorizacao = new Autorizacao(autenticador);
         Router router = Rotas.router(cors, autorizacao, new Rotas.Handlers(
             new HealthHandler(), authHandler, agendaHandler, bloqueioHandler, pacienteHandler,
-            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler, avisosVaga));
+            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler, avisosVaga, central));
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0

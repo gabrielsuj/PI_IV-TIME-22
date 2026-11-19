@@ -31,6 +31,11 @@ import br.edu.puccampinas.consultafacil.service.HistoricoProcessor;
 import br.edu.puccampinas.consultafacil.service.RegistroConsultaService;
 import br.edu.puccampinas.consultafacil.service.SinalizacaoFilaService;
 import br.edu.puccampinas.consultafacil.support.RelogioAjustavel;
+import br.edu.puccampinas.consultafacil.api.handler.CentralNotificacoesHandler;
+import br.edu.puccampinas.consultafacil.service.AcessoConsulta;
+import br.edu.puccampinas.consultafacil.service.CentralNotificacoesService;
+import br.edu.puccampinas.consultafacil.service.StatusConsultaService;
+import br.edu.puccampinas.consultafacil.repository.MedicoDoUsuarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoDatabase;
@@ -166,7 +171,12 @@ class FilaEsperaIntegrationTest {
         sessoes = new Sessoes(Duration.ofMinutes(60));
         var cors = new Cors(List.of());
         var autorizacao = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos));
+        var medicosDoUsuario = new MedicoDoUsuarioRepository(db);
+        var status = new StatusConsultaService(consultas, new AcessoConsulta(pacienteDoUsuario::buscar, medicosDoUsuario::buscar),
+                registro, relogio);
+        var central = new CentralNotificacoesHandler(new CentralNotificacoesService(notificacoes, consultas,
+                pacienteDoUsuario::buscar, medicosDoUsuario::buscar, status, relogio));
+        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos, central));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsHttp = Executors.newFixedThreadPool(4);
         server.setExecutor(threadsHttp);
@@ -375,6 +385,43 @@ class FilaEsperaIntegrationTest {
     }
 
     // ---- apoio ----
+
+    @Test void lembreteReprocessadoApareceUmaVezEConfirmaPresencaUmaVez() throws Exception {
+        var sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
+        var consulta = registro.criar(new Document("pacienteId", P1).append("medicoId", MEDICO)
+                .append("especialidadeId", ESPECIALIDADE).append("inicio", Date.from(VAGA))
+                .append("fim", Date.from(VAGA.plusSeconds(1800))), sec).getObjectId("_id");
+        var id = new ObjectId();
+        var lembrete = new Document("_id", id).append("destinatarioPerfil", "PACIENTE").append("destinatarioId", P1)
+                .append("tipo", "LEMBRETE_CONSULTA").append("canal", "SISTEMA").append("simulada", true)
+                .append("consultaId", consulta).append("filaEsperaId", null).append("statusConsulta", "AGENDADA")
+                .append("antecedenciaHoras", 24).append("titulo", "Lembrete").append("mensagem", "Confirme sua presença.")
+                .append("dadosConsulta", new Document("dataHora", Date.from(VAGA)).append("medicoNome", "Dra. Paula"))
+                .append("status", "ENVIADA").append("agendadaPara", Date.from(AGORA)).append("enviadaEm", Date.from(AGORA))
+                .append("tentativas", 1).append("erro", null).append("criadoEm", Date.from(AGORA));
+        var repo = new NotificacaoRepository(db);
+        assertTrue(repo.inserirSeNova(lembrete));
+        assertFalse(repo.inserirSeNova(new Document(lembrete).append("_id", new ObjectId())));
+        var dono = paciente(U1);
+        var pedido = Map.of("notificacaoId", id.toHexString());
+        var central = json.readTree(enviar("GET", "/notificacoes", dono, null).body());
+        assertEquals(1, central.size());
+        assertFalse(central.get(0).get("lida").asBoolean());
+        assertTrue(central.get(0).get("podeConfirmar").asBoolean());
+        assertEquals(0, json.readTree(enviar("GET", "/notificacoes", paciente(U2), null).body()).size());
+        assertEquals(404, enviar("POST", "/notificacoes/confirmar", paciente(U2), pedido).statusCode());
+        assertEquals(404, enviar("POST", "/notificacoes/lida", paciente(U2), pedido).statusCode());
+        assertEquals(204, enviar("POST", "/notificacoes/lida", dono, pedido).statusCode());
+        assertEquals("AGENDADA", db.getCollection("consultas").find(Filters.eq("_id", consulta)).first().getString("status"));
+        assertEquals(204, enviar("POST", "/notificacoes/confirmar", dono, pedido).statusCode());
+        assertEquals(204, enviar("POST", "/notificacoes/confirmar", dono, pedido).statusCode());
+        central = json.readTree(enviar("GET", "/notificacoes", dono, null).body());
+        assertEquals(1, central.size());
+        assertTrue(central.get(0).get("lida").asBoolean());
+        assertTrue(central.get(0).get("presencaConfirmada").asBoolean());
+        assertEquals("CONFIRMADA", db.getCollection("consultas").find(Filters.eq("_id", consulta)).first().getString("status"));
+        assertEquals(1, db.getCollection("historico").countDocuments(new Document("consultaId", consulta).append("evento", "CONFIRMACAO")));
+    }
 
     private ObjectId liberarVaga(ObjectId pacienteId) {
         UsuarioLogado sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
