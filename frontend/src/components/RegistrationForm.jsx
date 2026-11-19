@@ -75,9 +75,10 @@ export default function RegistrationForm({ resource, schema, record, initialValu
       return [field.name, field.dataType === 'boolean' ? value === 'true' : Array.isArray(value) ? value : value.trim()];
     }));
     try {
-      if (record) await api.put(`/${resource}/${encodeURIComponent(record.id || record._id)}`, payload);
-      else await api.post(`/${resource}`, payload);
-      onSaved(record ? 'Cadastro atualizado.' : 'Cadastro realizado.');
+      const savedRecord = record
+        ? await api.put(`/${resource}/${encodeURIComponent(record.id || record._id)}`, payload)
+        : await api.post(`/${resource}`, payload);
+      onSaved(record ? 'Cadastro atualizado.' : 'Cadastro realizado.', savedRecord);
     } catch (error) {
       setFailure(error.message);
     } finally {
