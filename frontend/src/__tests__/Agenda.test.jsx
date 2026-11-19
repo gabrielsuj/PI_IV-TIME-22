@@ -65,15 +65,24 @@ describe('conversões de horário', () => {
 });
 
 describe('tela de agenda', () => {
-  it('carrega o catálogo da API para o médico mesmo sem acesso à tela de cadastro', async () => {
-    entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
-    const fetchMock = mockApi({ 'GET /medicos': () => response([ANA]) });
-    renderAt('/agenda');
-    expect(await screen.findByRole('option', { name: /Ana Martins/ })).toBeInTheDocument();
-    const nav = within(screen.getByRole('navigation', { name: 'Navegação principal' }));
-    expect(nav.queryByRole('link', { name: 'Médicos' })).not.toBeInTheDocument();
-    expect(chamadas(fetchMock, 'GET', '/medicos')).toHaveLength(1);
-  });
+  it.each([['/agenda', 'Minha agenda'], ['/calendario', 'Meu calendário']])(
+    'médico abre somente a própria agenda em %s', async (rota, titulo) => {
+      entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
+      const fetchMock = mockApi({
+        'GET /agendas': () => response(AGENDA_ANA),
+        'GET /bloqueios': () => response([]),
+        'GET /consultas': () => response([]),
+      });
+      renderAt(rota + '?medicoId=outro');
+      expect(await screen.findByRole('heading', { name: titulo })).toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: 'Médico' })).not.toBeInTheDocument();
+      expect(chamadas(fetchMock, 'GET', '/medicos')).toHaveLength(0);
+      const rotas = rota === '/agenda' ? ['/agendas', '/bloqueios'] : ['/agendas', '/bloqueios', '/consultas'];
+      for (const caminho of rotas) {
+        expect(chamadas(fetchMock, 'GET', caminho).map(c => c.url.searchParams.get('medicoId'))).toEqual(['meu']);
+      }
+    }
+  );
 
   it('pede para escolher um médico quando nenhum está selecionado', async () => {
     mockApi({ 'GET /medicos': () => response([ANA]) });

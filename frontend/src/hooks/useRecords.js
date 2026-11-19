@@ -9,6 +9,7 @@ export function useRecords(resource) {
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
+    if (!resource) return undefined;
     const controller = new AbortController();
     api.get(`/${resource}`, { signal: controller.signal })
       .then((data) => {

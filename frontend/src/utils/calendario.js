@@ -45,19 +45,22 @@ export function agoraNoFuso(fuso = 'America/Sao_Paulo') {
   return new Date().toLocaleString('sv-SE', { timeZone: fuso, hour12: false }).slice(0, 16).replace(' ', 'T');
 }
 
+const faixasDoDia = (agenda, data) =>
+  agenda?.jornadas?.find((j) => Number(j.diaSemana) === diaIso(data))?.faixas ?? [];
+
+const horarioNaData = (data, minuto) =>
+  minuto === 1440 ? `${somarDias(data, 1)}T00:00` : `${data}T${minutosParaHora(minuto)}`;
+
 /** Horários de atendimento de um dia, pela jornada e pela duração da agenda. */
 export function horariosDoDia(agenda, data) {
-  const jornada = agenda?.jornadas?.find((j) => Number(j.diaSemana) === diaIso(data));
-  if (!jornada) return [];
-  const duracao = Number(agenda.duracaoMinutos);
+  const duracao = Number(agenda?.duracaoMinutos);
   const horarios = [];
-  for (const faixa of jornada.faixas) {
+  for (const faixa of faixasDoDia(agenda, data)) {
     for (let minuto = Number(faixa.inicioMinuto); minuto + duracao <= Number(faixa.fimMinuto); minuto += duracao) {
-      const fim = minuto + duracao;
       horarios.push({
         hora: minutosParaHora(minuto),
-        inicio: `${data}T${minutosParaHora(minuto)}`,
-        fim: fim >= 1440 ? `${somarDias(data, 1)}T00:00` : `${data}T${minutosParaHora(fim)}`,
+        inicio: horarioNaData(data, minuto),
+        fim: horarioNaData(data, minuto + duracao),
       });
     }
   }
@@ -100,4 +103,29 @@ export function classificarHorario(horario, consultas, bloqueios, agora) {
   if (ativa) return { estado: 'ocupado', consulta: ativa };
   if (bloqueio) return { estado: 'bloqueado', bloqueio };
   return cancelada ? { estado: 'livre', consulta: cancelada } : { estado: 'livre' };
+}
+
+/** Inclui no horário original as consultas futuras que deixaram de caber na jornada. */
+export function horariosDoCalendario(agenda, data, consultas, bloqueios, agora) {
+  const faixas = faixasDoDia(agenda, data).map(({ inicioMinuto, fimMinuto }) => ({
+    inicio: horarioNaData(data, Number(inicioMinuto)),
+    fim: horarioNaData(data, Number(fimMinuto)),
+  }));
+  const horarios = new Map(horariosDoDia(agenda, data).map((horario) => [
+    horario.inicio, { ...horario, ...classificarHorario(horario, consultas, bloqueios, agora) },
+  ]));
+
+  for (const consulta of consultas) {
+    const { inicio, fim, status } = consulta;
+    if (!STATUS_ATIVOS.includes(status) || inicio < agora || inicio.slice(0, 10) !== data) continue;
+    // A alteração de jornada exige que a consulta inteira caiba em uma única faixa de atendimento.
+    if (faixas.some((faixa) => inicio >= faixa.inicio && fim <= faixa.fim)) continue;
+
+    horarios.set(inicio, {
+      hora: inicio.slice(11), inicio, fim, estado: 'conflito', foraDaJornada: true, consulta,
+      bloqueio: bloqueios.find((bloqueio) => sobrepoe(bloqueio, consulta)),
+    });
+  }
+
+  return [...horarios.values()].sort((a, b) => a.inicio.localeCompare(b.inicio));
 }

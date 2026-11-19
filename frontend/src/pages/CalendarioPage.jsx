@@ -6,11 +6,12 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
+import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import { buscarAgenda, listarBloqueios } from '../services/agendaService';
 import { listarConsultas } from '../services/calendarioService';
 import {
-  agoraNoFuso, classificarHorario, diasDaSemana, horariosDoDia, rotuloDia, rotuloDiaCompleto, somarDias,
+  agoraNoFuso, diasDaSemana, horariosDoCalendario, rotuloDia, rotuloDiaCompleto, somarDias,
 } from '../utils/calendario';
 import { hoje } from '../utils/horario';
 
@@ -51,9 +52,10 @@ function useDadosDoCalendario(medicoId, de, ate) {
   return { ...dados, carregando: Boolean(medicoId) && dados.chave !== chave, recarregar: () => setRevisao((r) => r + 1) };
 }
 
-function textoDoHorario({ estado, consulta, bloqueio }) {
+function textoDoHorario({ estado, consulta, bloqueio, foraDaJornada }) {
   const paciente = consulta?.pacienteNome ?? 'Consulta';
   if (estado === 'passado') return consulta ? `Indisponível (${DESFECHO[consulta.status] ?? consulta.status})` : 'Indisponível';
+  if (foraDaJornada) return `Remarcar · ${paciente}`;
   if (estado === 'conflito') return `${paciente} · remarcar`;
   if (estado === 'ocupado') return paciente;
   if (estado === 'bloqueado') return bloqueio?.motivo || 'Bloqueado';
@@ -61,11 +63,12 @@ function textoDoHorario({ estado, consulta, bloqueio }) {
 }
 
 /** Texto completo do horário (dica da célula e detalhe da visão do dia). */
-function detalheDoHorario({ estado, consulta, bloqueio }) {
+function detalheDoHorario({ estado, consulta, bloqueio, foraDaJornada }) {
   const partes = [];
   if (consulta) partes.push(`${consulta.pacienteNome} · ${consulta.especialidadeNome} · ${STATUS[consulta.status] ?? consulta.status}`);
   if (bloqueio) partes.push(`Bloqueio: ${bloqueio.motivo || 'período bloqueado'}`);
-  if (estado === 'conflito') partes.push('Consulta dentro de um bloqueio: remarcar');
+  if (foraDaJornada) partes.push('Consulta fora da jornada');
+  else if (estado === 'conflito') partes.push('Consulta dentro de um bloqueio: remarcar');
   return partes.join(' — ');
 }
 
@@ -141,43 +144,48 @@ function Dia({ horarios, canceladas }) {
 
 export default function CalendarioPage() {
   const [params, setParams] = useSearchParams();
-  const medicoId = params.get('medicoId') ?? '';
+  const { usuario } = useAuth();
+  const agendaPropria = usuario.perfil === 'MEDICO';
+  const medicoId = agendaPropria ? 'meu' : params.get('medicoId') ?? '';
   const visao = params.get('visao') === 'dia' ? 'dia' : 'semana';
   const data = DATA_VALIDA.test(params.get('data') ?? '') ? params.get('data') : hoje();
-  const dias = visao === 'semana' ? diasDaSemana(data) : [data];
+  const dias = useMemo(() => visao === 'semana' ? diasDaSemana(data) : [data], [data, visao]);
   const de = dias[0];
   const ate = dias[dias.length - 1];
 
-  const medicos = useRecords('medicos');
+  const medicos = useRecords(agendaPropria ? null : 'medicos');
   const ativos = medicos.records.filter((m) => m.ativo !== false);
   const dados = useDadosDoCalendario(medicoId, de, ate);
 
   const ir = (mudancas) => {
-    const proximo = { medicoId, visao, data, ...mudancas };
+    const proximo = { medicoId: agendaPropria ? undefined : medicoId, visao, data, ...mudancas };
     setParams(Object.fromEntries(Object.entries(proximo).filter(([, valor]) => valor)));
   };
   const passo = visao === 'semana' ? 7 : 1;
 
   const porDia = useMemo(() => {
     const agora = agoraNoFuso(dados.agenda?.fusoHorario);
-    return Object.fromEntries(dias.map((dia) => [dia, horariosDoDia(dados.agenda, dia)
-      .map((h) => ({ ...h, ...classificarHorario(h, dados.consultas, dados.bloqueios, agora) }))]));
-  }, [dados.agenda, dados.consultas, dados.bloqueios, de, ate]); // eslint-disable-line react-hooks/exhaustive-deps
+    return Object.fromEntries(dias.map((dia) => [
+      dia, horariosDoCalendario(dados.agenda, dia, dados.consultas, dados.bloqueios, agora),
+    ]));
+  }, [dados.agenda, dados.consultas, dados.bloqueios, dias]);
 
   const contagem = Object.values(porDia).flat().reduce((total, h) => ({ ...total, [h.estado]: (total[h.estado] ?? 0) + 1 }), {});
   const periodo = visao === 'semana' ? `${dataBr(de).slice(0, 5)} a ${dataBr(ate)}` : rotuloDiaCompleto(data);
 
   return (
     <div className="page">
-      <PageHeader title="Calendário" description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados." />
+      <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados." />
 
       <Card className="search-card">
         <div className="cal-controles">
-          <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading}
-            onChange={(event) => ir({ medicoId: event.target.value })}>
-            <option value="">{medicos.loading ? 'Carregando médicos…' : 'Selecione um médico'}</option>
-            {ativos.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
-          </Field>
+          {!agendaPropria && (
+            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading}
+              onChange={(event) => ir({ medicoId: event.target.value })}>
+              <option value="">{medicos.loading ? 'Carregando médicos…' : 'Selecione um médico'}</option>
+              {ativos.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
+            </Field>
+          )}
           <div className="cal-nav" role="group" aria-label="Visualização">
             <Button variant={visao === 'semana' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'semana'} onClick={() => ir({ visao: 'semana' })}>Semana</Button>
             <Button variant={visao === 'dia' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'dia'} onClick={() => ir({ visao: 'dia' })}>Dia</Button>
