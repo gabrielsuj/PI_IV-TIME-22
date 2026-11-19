@@ -1,5 +1,6 @@
 package br.edu.puccampinas.consultafacil.repository;
 
+import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.domain.enums.StatusConsulta;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -11,9 +12,17 @@ import org.bson.types.ObjectId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.IntStream;
+import java.util.function.Supplier;
 
 public class ConsultaRepository implements PendenciasConsultaRepository {
     public static final int LIMITE_PENDENCIAS = 50;
+    public static final String SOBREPOSICAO_PACIENTE = "O paciente já tem uma consulta ativa que se sobrepõe a este horário.";
+    public static final String SOBREPOSICAO_MEDICO = "O médico já tem uma consulta ativa neste período.";
+    // Travas compartilhadas pelas instâncias do repositório no backend, com tamanho fixo (#25).
+    private static final List<Object> TRAVAS_PACIENTE = IntStream.range(0, 256).mapToObj(i -> new Object()).toList();
+    private static final List<Object> TRAVAS_MEDICO = IntStream.range(0, 256).mapToObj(i -> new Object()).toList();
     private final MongoCollection<Document> col;
 
     public ConsultaRepository(MongoDatabase db) { this.col = db.getCollection("consultas"); }
@@ -35,6 +44,12 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
+    /** Consulta ativa que ocupa o mesmo início com o médico, garantido pelo índice de reservas. */
+    public Optional<Document> ativaNaVaga(ObjectId medicoId, Date inicio) {
+        return Optional.ofNullable(col.find(Filters.and(Filters.eq("medicoId", medicoId), Filters.eq("inicio", inicio),
+                Filters.in("status", StatusConsulta.ATIVOS))).first());
+    }
+
     /** Consultas ativas do médico que começam a partir do instante informado, em ordem de início (#44). */
     public List<Document> ativasAPartirDe(ObjectId medicoId, Date inicio) {
         return col.find(Filters.and(
@@ -45,14 +60,19 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
-    /** true se o paciente já tem consulta ativa que se sobrepõe à janela, com qualquer médico (#32). */
+    /** true se o paciente já tem consulta ativa que se sobrepõe à janela, com qualquer médico (#25, #32). */
     public boolean pacienteTemAtivaSobreposta(ObjectId pacienteId, Date inicio, Date fim) {
-        return col.find(Filters.and(
-                        Filters.eq("pacienteId", pacienteId),
-                        Filters.in("status", StatusConsulta.ATIVOS),
-                        Filters.lt("inicio", fim),
-                        Filters.gt("fim", inicio)))
-                .limit(1).first() != null;
+        return temSobreposicao("pacienteId", pacienteId, inicio, fim, null);
+    }
+
+    private boolean temSobreposicao(String campo, ObjectId pessoa, Date inicio, Date fim, ObjectId ignorar) {
+        var filtros = new ArrayList<>(List.of(
+                Filters.eq(campo, pessoa),
+                Filters.in("status", StatusConsulta.ATIVOS),
+                Filters.lt("inicio", fim),
+                Filters.gt("fim", inicio)));
+        if (ignorar != null) filtros.add(Filters.ne("_id", ignorar));
+        return col.find(Filters.and(filtros)).limit(1).first() != null;
     }
 
     /** Todas as consultas do médico (qualquer status) que tocam a janela, em ordem de início. Usada pelo calendário (#23). */
@@ -80,10 +100,33 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
     @Override public Document inserirComEvento(Document consulta, Document evento) {
         Document documento = new Document(consulta)
                 .append("versao", 1).append("eventosPendentes", List.of(evento));
-        return inserir(documento);
+        return gravarSemSobreposicao(evento, null, () -> inserir(documento));
     }
 
     @Override public boolean atualizarComEvento(ObjectId id, int versao, Document campos, Document evento) {
+        boolean mudaReserva = campos.containsKey("pacienteId") || campos.containsKey("medicoId")
+                || campos.containsKey("inicio") || campos.containsKey("fim");
+        if (!mudaReserva || !StatusConsulta.ATIVOS.contains(evento.getString("statusNovo")))
+            return gravarAlteracao(id, versao, campos, evento);
+        return gravarSemSobreposicao(evento, id, () -> gravarAlteracao(id, versao, campos, evento));
+    }
+
+    private <T> T gravarSemSobreposicao(Document evento, ObjectId ignorar, Supplier<T> gravar) {
+        ObjectId medico = evento.getObjectId("medicoId"), paciente = evento.getObjectId("pacienteId");
+        Date inicio = evento.getDate("dataHoraConsulta"), fim = evento.getDate("fimConsulta");
+        // Todas as gravações adquirem primeiro a trava do médico e depois a do paciente.
+        synchronized (TRAVAS_MEDICO.get(Math.floorMod(medico.hashCode(), TRAVAS_MEDICO.size()))) {
+            synchronized (TRAVAS_PACIENTE.get(Math.floorMod(paciente.hashCode(), TRAVAS_PACIENTE.size()))) {
+                if (temSobreposicao("pacienteId", paciente, inicio, fim, ignorar))
+                    throw ApiException.conflict(SOBREPOSICAO_PACIENTE);
+                if (temSobreposicao("medicoId", medico, inicio, fim, ignorar))
+                    throw ApiException.conflict(SOBREPOSICAO_MEDICO);
+                return gravar.get();
+            }
+        }
+    }
+
+    private boolean gravarAlteracao(ObjectId id, int versao, Document campos, Document evento) {
         // Documentos antigos sem versão equivalem à versão zero.
         var versaoEsperada = versao == 0
                 ? Filters.or(Filters.exists("versao", false), Filters.eq("versao", 0))

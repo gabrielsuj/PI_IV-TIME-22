@@ -58,9 +58,17 @@ public final class SinalizacaoFilaService {
         Document consulta = consultas.buscar(consultaId).orElse(null);
         if (consulta == null || !StatusConsulta.CANCELADA.name().equals(consulta.getString("status"))) return 0;
         Date agora = Date.from(relogio.instant());
-        int total = vagaFutura(consulta, agora) ? avisarInteressados(consulta, agora) : 0;
+        int total = vagaFutura(consulta, agora) && !reconciliarVaga(consulta) ? avisarInteressados(consulta, agora) : 0;
+        // A reserva pode ter sido gravada enquanto os avisos eram criados e ainda não estavam na fila.
+        if (total > 0) reconciliarVaga(consulta);
         registrarHistorico(consulta, total, agora);
         return total;
+    }
+
+    boolean reconciliarVaga(Document origem) {
+        var ocupante = consultas.ativaNaVaga(origem.getObjectId("medicoId"), origem.getDate("inicio"));
+        ocupante.ifPresent(this::consultaAgendada);
+        return ocupante.isPresent();
     }
 
     private static boolean vagaFutura(Document consulta, Date agora) {
@@ -109,10 +117,11 @@ public final class SinalizacaoFilaService {
         int alteradas = 0;
         for (Document inscricao : fila.sinalizadasParaVaga(consulta.getObjectId("medicoId"), consulta.getDate("inicio"))) {
             ObjectId id = inscricao.getObjectId("_id");
+            ObjectId notificacaoId = inscricao.get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId");
             if (pacienteId.equals(inscricao.getObjectId("pacienteId"))) {
-                if (fila.marcarAtendida(id, consulta.getObjectId("_id"), agora)) alteradas++;
-            } else if (fila.voltarParaAguardando(id, agora)) {
-                notificacoes.descartar(inscricao.get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId"));
+                if (fila.marcarAtendida(id, notificacaoId, consulta.getObjectId("_id"), agora)) alteradas++;
+            } else if (fila.voltarParaAguardando(id, notificacaoId, agora)) {
+                notificacoes.descartar(notificacaoId);
                 alteradas++;
             }
         }

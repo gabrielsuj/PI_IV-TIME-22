@@ -188,6 +188,32 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals("AGUARDANDO", fila(proprio).getString("status"));
     }
 
+    @Test void reservaEntreACriacaoDoAvisoEAMarcacaoDaFilaInvalidaOAviso() {
+        ObjectId origem = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId inscricao = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+
+        Clock relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
+        var consultas = new ConsultaRepository(db);
+        var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
+        var notificacoes = new NotificacaoRepository(db) {
+            @Override public boolean inserirSeNova(Document aviso) {
+                boolean inserida = super.inserirSeNova(aviso);
+                // A reserva chega depois de o cancelamento criar o aviso, antes de a inscrição ficar sinalizada.
+                assertEquals("AGUARDANDO", fila(inscricao).getString("status"));
+                agendar(PACIENTES.get(2), MEDICO, VAGA);
+                return inserida;
+            }
+        };
+        var sinalizacao = new SinalizacaoFilaService(new FilaEsperaRepository(db), notificacoes, consultas,
+                new NomesRepository.Mongo(db), historico, relogio);
+        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
+
+        cancelar(origem);
+
+        assertEquals("AGUARDANDO", fila(inscricao).getString("status"));
+        assertEquals("CANCELADA", aviso(origem, PACIENTES.get(1)).getString("status"));
+    }
+
     // ---- vaga sinalizada ocupada ----
 
     @Test void quemFoiAvisadoEAgendaAVagaFicaAtendidoEOsOutrosVoltamParaAFila() {

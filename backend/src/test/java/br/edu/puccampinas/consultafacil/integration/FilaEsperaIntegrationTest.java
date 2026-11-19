@@ -1,10 +1,13 @@
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Rotas;
+import br.edu.puccampinas.consultafacil.api.handler.AvisoVagaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
+import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
+import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
 import br.edu.puccampinas.consultafacil.repository.ConsultaRepository;
 import br.edu.puccampinas.consultafacil.repository.EspecialidadeRepository;
 import br.edu.puccampinas.consultafacil.repository.FilaEsperaRepository;
@@ -18,10 +21,14 @@ import br.edu.puccampinas.consultafacil.security.Autenticador;
 import br.edu.puccampinas.consultafacil.security.Autorizacao;
 import br.edu.puccampinas.consultafacil.security.Sessoes;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
+import br.edu.puccampinas.consultafacil.service.AgendamentoService;
+import br.edu.puccampinas.consultafacil.service.AvisoVagaService;
+import br.edu.puccampinas.consultafacil.service.DisponibilidadeService;
 import br.edu.puccampinas.consultafacil.service.FilaEsperaService;
 import br.edu.puccampinas.consultafacil.service.HistoricoProcessor;
 import br.edu.puccampinas.consultafacil.service.RegistroConsultaService;
 import br.edu.puccampinas.consultafacil.service.SinalizacaoFilaService;
+import br.edu.puccampinas.consultafacil.support.RelogioAjustavel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoDatabase;
@@ -41,19 +48,20 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Fila de espera pela API (#31): POST/GET /fila-espera e DELETE /fila-espera/{id}, com o MongoDB real
- * e os validadores do banco. O último teste liga a inscrição à sinalização da #32.
+ * Fila de espera (#31) e avisos (#57) pela API, com o MongoDB real e os validadores do banco.
  *
  * Usa o banco consultafacil_test e só apaga os próprios dados (IDs com prefixo d…).
  * Relógio parado em 20/10/2026 12:00Z (09:00 em São Paulo).
@@ -70,6 +78,7 @@ class FilaEsperaIntegrationTest {
     private static final String U1 = "d50000000000000000000001";
     private static final String U2 = "d50000000000000000000002";
     private static final Instant AGORA = Instant.parse("2026-10-20T12:00:00Z");
+    private static final Instant VAGA = Instant.parse("2026-10-26T13:00:00Z");
 
     private static MongoConnection mongo;
     private final ObjectMapper json = new ObjectMapper();
@@ -79,6 +88,9 @@ class FilaEsperaIntegrationTest {
     private String base;
     private Sessoes sessoes;
     private RegistroConsultaService registro;
+    private ExecutorService threadsHttp;
+    private RelogioAjustavel relogio;
+    private volatile CyclicBarrier barreiraDeReserva;
 
     @BeforeAll static void conectar() {
         mongo = new MongoConnection("mongodb://localhost:27017/?serverSelectionTimeoutMS=3000", "consultafacil_test");
@@ -112,20 +124,52 @@ class FilaEsperaIntegrationTest {
         salvar("pacientes", new Document("_id", P3).append("nome", "Carla Fila").append("cpf", "96000000003")
                 .append("email", "fila.api3@consultafacil.test"));
 
-        Clock relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
+        relogio = new RelogioAjustavel(AGORA);
         var nomes = new NomesRepository.Mongo(db);
-        var service = new FilaEsperaService(new FilaEsperaRepository(db), new EspecialidadeRepository.Mongo(db),
-                new MedicoRepository(db), new PacienteRepository.Mongo(db), new PacienteDoUsuarioRepository(db), nomes, relogio);
+        var fila = new FilaEsperaRepository(db);
+        var notificacoes = new NotificacaoRepository(db);
+        var especialidades = new EspecialidadeRepository.Mongo(db);
+        var medicos = new MedicoRepository(db);
+        var pacienteRepo = new PacienteRepository.Mongo(db);
+        var pacienteDoUsuario = new PacienteDoUsuarioRepository(db);
+        var service = new FilaEsperaService(fila, especialidades, medicos, pacienteRepo, pacienteDoUsuario, nomes, relogio);
         var consultas = new ConsultaRepository(db);
         var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
-        var sinalizacao = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
-                consultas, nomes, historico, relogio);
-        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar);
+        var sinalizacao = new SinalizacaoFilaService(fila, notificacoes, consultas, nomes, historico, relogio);
+        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
+        var agendas = new AgendaRepository(db);
+        agendas.salvar(MEDICO, new Document("fusoHorario", "America/Sao_Paulo").append("duracaoMinutos", 30)
+                .append("jornadas", List.of(new Document("diaSemana", 1).append("faixas",
+                        List.of(new Document("inicioMinuto", 600).append("fimMinuto", 660))))));
+        var disponibilidade = new DisponibilidadeService(agendas, new BloqueioRepository(db), consultas, relogio) {
+            @Override public void exigirVagaLivre(ObjectId medico, Instant inicio, Instant fim) {
+                super.exigirVagaLivre(medico, inicio, fim);
+                var barreira = barreiraDeReserva;
+                if (barreira != null) {
+                    try {
+                        barreira.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError("Teste interrompido", e);
+                    } catch (java.util.concurrent.BrokenBarrierException | java.util.concurrent.TimeoutException e) {
+                        throw new AssertionError("Os dois pedidos precisam chegar à gravação com a vaga livre", e);
+                    }
+                }
+            }
+        };
+        var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades, pacienteRepo, pacienteDoUsuario, registro);
+        var avisos = new AvisoVagaHandler(new AvisoVagaService(notificacoes, fila, consultas, pacienteDoUsuario,
+                sinalizacao, agendamento, relogio));
 
         sessoes = new Sessoes(Duration.ofMinutes(60));
+        var cors = new Cors(List.of());
+        var autorizacao = new Autorizacao(new Autenticador(sessoes));
+        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/fila-espera", Rotas.filaEspera(new Cors(List.of()),
-                new Autorizacao(new Autenticador(sessoes)), new FilaEsperaHandler(service)));
+        threadsHttp = Executors.newFixedThreadPool(4);
+        server.setExecutor(threadsHttp);
+        server.createContext("/", router);
+        server.createContext("/fila-espera", Rotas.filaEspera(cors, autorizacao, new FilaEsperaHandler(service)));
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
         client = HttpClient.newHttpClient();
@@ -134,6 +178,7 @@ class FilaEsperaIntegrationTest {
     @AfterEach void encerrar() {
         if (client != null) client.close();
         if (server != null) server.stop(0);
+        if (threadsHttp != null) threadsHttp.shutdownNow();
     }
 
     @Test void pacienteSeInscreveEConsultaAPropriaFila() throws Exception {
@@ -258,23 +303,93 @@ class FilaEsperaIntegrationTest {
     /** Ponta a ponta com a #32: inscrição pela API → consulta compatível cancelada → paciente vê a vaga. */
     @Test void inscricaoSinalizadaMostraAVagaLiberada() throws Exception {
         inscrever(U1, ESPECIALIDADE, null);
-        Instant vaga = Instant.parse("2026-10-26T13:00:00Z");
-        UsuarioLogado sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
-        ObjectId consulta = registro.criar(new Document("pacienteId", P2).append("medicoId", MEDICO)
-                .append("especialidadeId", ESPECIALIDADE).append("inicio", Date.from(vaga))
-                .append("fim", Date.from(vaga.plus(Duration.ofMinutes(30)))), sec).getObjectId("_id");
-        registro.alterar(consulta, new Document("status", "CANCELADA"), sec);
+        ObjectId consulta = liberarVaga(P2);
 
         JsonNode i = json.readTree(enviar("GET", "/fila-espera", paciente(U1), null).body()).get(0);
         assertEquals("SINALIZADA", i.get("status").asText());
         JsonNode s = i.get("ultimaSinalizacao");
+        assertEquals(json.readTree(enviar("GET", "/avisos-vaga", paciente(U1), null).body()).get(0).get("id").asText(),
+                s.get("notificacaoId").asText());
         assertEquals(consulta.toHexString(), s.get("consultaOrigemId").asText());
         assertEquals(MEDICO.toHexString(), s.get("medicoId").asText());
         assertEquals("Dra. Paula Fila", s.get("medicoNome").asText());
-        assertEquals(vaga.toString(), s.get("dataHora").asText());
+        assertEquals(VAGA.toString(), s.get("dataHora").asText());
+    }
+
+    @Test void doisPacientesDisputamAMesmaVagaPeloAviso() throws Exception {
+        assertEquals(201, inscrever(U1, ESPECIALIDADE, null).statusCode());
+        assertEquals(201, inscrever(U2, ESPECIALIDADE, null).statusCode());
+        liberarVaga(P3);
+        String token1 = paciente(U1);
+        String token2 = paciente(U2);
+        JsonNode aviso1 = unicoAviso(token1);
+        JsonNode aviso2 = unicoAviso(token2);
+        String id1 = aviso1.get("id").asText();
+        String id2 = aviso2.get("id").asText();
+        assertNotEquals(id1, id2);
+        assertEquals("DISPONIVEL", aviso1.get("status").asText());
+        assertEquals("DISPONIVEL", aviso2.get("status").asText());
+        assertEquals(VAGA.toString(), aviso1.get("validoAte").asText());
+        assertEquals(404, enviar("POST", "/avisos-vaga", token1, Map.of("avisoId", id2)).statusCode());
+
+        barreiraDeReserva = new CyclicBarrier(2);
+        var pedido1 = client.sendAsync(requisicao("POST", "/avisos-vaga", token1, Map.of("avisoId", id1)),
+                HttpResponse.BodyHandlers.ofString());
+        var pedido2 = client.sendAsync(requisicao("POST", "/avisos-vaga", token2, Map.of("avisoId", id2)),
+                HttpResponse.BodyHandlers.ofString());
+        var resposta1 = pedido1.get(10, TimeUnit.SECONDS);
+        var resposta2 = pedido2.get(10, TimeUnit.SECONDS);
+        assertEquals(List.of(201, 409), java.util.stream.Stream.of(resposta1, resposta2)
+                .map(HttpResponse::statusCode).sorted().toList(), resposta1.body() + " / " + resposta2.body());
+
+        boolean primeiroGanhou = resposta1.statusCode() == 201;
+        String idConsulta = json.readTree((primeiroGanhou ? resposta1 : resposta2).body()).get("id").asText();
+        String tokenVencedor = primeiroGanhou ? token1 : token2;
+        String tokenPerdedor = primeiroGanhou ? token2 : token1;
+        JsonNode vencedor = unicoAviso(tokenVencedor);
+        JsonNode perdedor = unicoAviso(tokenPerdedor);
+        assertEquals("AGENDADO", vencedor.get("status").asText());
+        assertEquals(idConsulta, vencedor.get("consultaAgendadaId").asText());
+        assertEquals("EXPIRADO", perdedor.get("status").asText());
+        assertTrue(semValor(perdedor, "consultaAgendadaId"));
+        assertEquals("AGUARDANDO", json.readTree(enviar("GET", "/fila-espera", tokenPerdedor, null).body())
+                .get(0).get("status").asText());
+        assertEquals("CANCELADA", db.getCollection("notificacoes").find(Filters.eq("_id",
+                new ObjectId(perdedor.get("id").asText()))).first().getString("status"));
+        assertEquals(1, db.getCollection("consultas").countDocuments(Filters.and(
+                Filters.eq("medicoId", MEDICO), Filters.eq("inicio", Date.from(VAGA)), Filters.eq("status", "AGENDADA"))));
+    }
+
+    @Test void avisoExpiraAoChegarNoHorarioDaVaga() throws Exception {
+        assertEquals(201, inscrever(U1, ESPECIALIDADE, null).statusCode());
+        liberarVaga(P3);
+        String token = paciente(U1);
+        String id = unicoAviso(token).get("id").asText();
+
+        relogio.avancar(Duration.between(AGORA, VAGA));
+
+        assertEquals("EXPIRADO", unicoAviso(token).get("status").asText());
+        assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", id)).statusCode());
     }
 
     // ---- apoio ----
+
+    private ObjectId liberarVaga(ObjectId pacienteId) {
+        UsuarioLogado sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
+        ObjectId consulta = registro.criar(new Document("pacienteId", pacienteId).append("medicoId", MEDICO)
+                .append("especialidadeId", ESPECIALIDADE).append("inicio", Date.from(VAGA))
+                .append("fim", Date.from(VAGA.plus(Duration.ofMinutes(30)))), sec).getObjectId("_id");
+        registro.alterar(consulta, new Document("status", "CANCELADA"), sec);
+        return consulta;
+    }
+
+    private JsonNode unicoAviso(String token) throws Exception {
+        var resposta = enviar("GET", "/avisos-vaga", token, null);
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        JsonNode avisos = json.readTree(resposta.body());
+        assertEquals(1, avisos.size());
+        return avisos.get(0);
+    }
 
     /** A API (Gson padrão) omite campos null: ausente ou null contam como "sem valor". */
     private static boolean semValor(JsonNode n, String campo) { return n.path(campo).isMissingNode() || n.path(campo).isNull(); }
@@ -294,11 +409,14 @@ class FilaEsperaIntegrationTest {
     }
 
     private HttpResponse<String> enviar(String metodo, String rota, String token, Map<String, ?> corpo) throws Exception {
+        return client.send(requisicao(metodo, rota, token, corpo), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpRequest requisicao(String metodo, String rota, String token, Map<String, ?> corpo) throws Exception {
         var body = corpo == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(corpo));
-        var b = HttpRequest.newBuilder(URI.create(base + rota)).method(metodo, body)
-                .header("Authorization", "Bearer " + token).header("Content-Type", "application/json");
-        return client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+        return HttpRequest.newBuilder(URI.create(base + rota)).method(metodo, body)
+                .header("Authorization", "Bearer " + token).header("Content-Type", "application/json").build();
     }
 
     private void salvar(String colecao, Document d) {

@@ -128,9 +128,10 @@ class AgendamentoIntegrationTest {
         return inicios;
     }
 
-    private static void assertStatus(int esperado, Runnable acao) {
+    private static ApiException assertStatus(int esperado, Runnable acao) {
         ApiException e = assertThrows(ApiException.class, acao::run);
         assertEquals(esperado, e.status(), e.getMessage());
+        return e;
     }
 
     // ------------------------------------------------------------------ busca de vagas
@@ -186,25 +187,25 @@ class AgendamentoIntegrationTest {
     /** Cenário do Quadro 4: reserva em período bloqueado é recusada. */
     @Test
     void deveImpedirReservaEmPeriodoBloqueado() {
-        assertStatus(409, () -> service.agendar(
-                pedido(OUTRO_PACIENTE, "2026-10-26T12:00:00Z", "2026-10-26T12:30:00Z"), SECRETARIA));   // 09:00
+        assertTrue(assertStatus(409, () -> service.agendar(
+                pedido(OUTRO_PACIENTE, "2026-10-26T12:00:00Z", "2026-10-26T12:30:00Z"), SECRETARIA)).getMessage().contains("bloqueio"));   // 09:00
     }
 
     @Test
     void deveRecusarHorarioForaDaJornada() {
         // Terça-feira: o médico não atende.
-        assertStatus(409, () -> service.agendar(
-                pedido(OUTRO_PACIENTE, "2026-10-27T11:00:00Z", "2026-10-27T11:30:00Z"), SECRETARIA));
+        assertTrue(assertStatus(409, () -> service.agendar(
+                pedido(OUTRO_PACIENTE, "2026-10-27T11:00:00Z", "2026-10-27T11:30:00Z"), SECRETARIA)).getMessage().contains("jornada"));
         // Segunda, mas fora da grade de 30 em 30 minutos (08:10).
-        assertStatus(409, () -> service.agendar(
-                pedido(OUTRO_PACIENTE, "2026-10-26T11:10:00Z", "2026-10-26T11:40:00Z"), SECRETARIA));
+        assertTrue(assertStatus(409, () -> service.agendar(
+                pedido(OUTRO_PACIENTE, "2026-10-26T11:10:00Z", "2026-10-26T11:40:00Z"), SECRETARIA)).getMessage().contains("jornada"));
     }
 
     @Test
     void deveRecusarHorarioQueJaPassou() {
         // Segunda 19/10, antes do relógio do teste (20/10).
-        assertStatus(409, () -> service.agendar(
-                pedido(OUTRO_PACIENTE, "2026-10-19T11:00:00Z", "2026-10-19T11:30:00Z"), SECRETARIA));
+        assertTrue(assertStatus(409, () -> service.agendar(
+                pedido(OUTRO_PACIENTE, "2026-10-19T11:00:00Z", "2026-10-19T11:30:00Z"), SECRETARIA)).getMessage().contains("passou"));
     }
 
     @Test
@@ -212,8 +213,8 @@ class AgendamentoIntegrationTest {
         service.agendar(pedido(OUTRO_PACIENTE, "2026-10-26T14:00:00Z", "2026-10-26T14:30:00Z"), SECRETARIA);
 
         // Outra pessoa tenta o mesmo horário com a lista antiga na tela.
-        assertStatus(409, () -> service.agendar(
-                pedido(PACIENTE, "2026-10-26T14:00:00Z", "2026-10-26T14:30:00Z"), SECRETARIA));
+        assertTrue(assertStatus(409, () -> service.agendar(
+                pedido(PACIENTE, "2026-10-26T14:00:00Z", "2026-10-26T14:30:00Z"), SECRETARIA)).getMessage().contains("médico já tem uma consulta ativa"));
     }
 
     @Test

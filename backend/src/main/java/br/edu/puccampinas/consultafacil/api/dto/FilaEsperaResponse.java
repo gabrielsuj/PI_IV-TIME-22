@@ -12,5 +12,5 @@ public record FilaEsperaResponse(String id, String pacienteId, String pacienteNo
 
     /** Vaga liberada que gerou o aviso (preenchida só em SINALIZADA). */
     public record Sinalizacao(String consultaOrigemId, String medicoId, String medicoNome,
-                              String dataHora, String sinalizadaEm) {}
+                              String dataHora, String sinalizadaEm, String notificacaoId) {}
 }

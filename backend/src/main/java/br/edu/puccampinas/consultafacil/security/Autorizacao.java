@@ -8,6 +8,8 @@ import com.sun.net.httpserver.HttpHandler;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Autorização por perfil (#10), sempre verificada no servidor.
@@ -15,7 +17,8 @@ import java.util.Set;
  * que pode obter quem está chamando com {@link #usuario(HttpExchange)}.
  */
 public class Autorizacao {
-    private static final String ATRIBUTO_USUARIO = "consultafacil.usuario";
+    // No Java 21, os atributos do HttpExchange são compartilhados pelo HttpContext.
+    private static final ConcurrentMap<HttpExchange, UsuarioLogado> USUARIOS = new ConcurrentHashMap<>();
 
     private final Autenticador autenticador;
 
@@ -27,13 +30,17 @@ public class Autorizacao {
             UsuarioLogado usuario = autenticador.exigir(ex);   // 401
             if (!perfis.contains(usuario.perfil()))
                 throw ApiException.forbidden("Seu perfil não tem acesso a esta função.");
-            ex.setAttribute(ATRIBUTO_USUARIO, usuario);
-            destino.handle(ex);
+            USUARIOS.put(ex, usuario);
+            try {
+                destino.handle(ex);
+            } finally {
+                USUARIOS.remove(ex);
+            }
         };
     }
 
     /** Usuário autenticado da requisição. Só existe em rotas envolvidas por {@link #exigir}. */
     public static UsuarioLogado usuario(HttpExchange ex) {
-        return (UsuarioLogado) ex.getAttribute(ATRIBUTO_USUARIO);
+        return USUARIOS.get(ex);
     }
 }

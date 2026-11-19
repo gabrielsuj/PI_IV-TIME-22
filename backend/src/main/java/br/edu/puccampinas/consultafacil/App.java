@@ -5,6 +5,7 @@ import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.Router;
 import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
+import br.edu.puccampinas.consultafacil.api.handler.AvisoVagaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CadastroHandler;
 import br.edu.puccampinas.consultafacil.api.handler.CancelamentoHandler;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.concurrent.Executors;
 
 public class App {
     public static void main(String[] args) throws IOException {
@@ -76,39 +78,45 @@ public class App {
             )
         );
 
+        var relogio = Clock.systemUTC();
+        var fila = new FilaEsperaRepository(db);
+        var notificacoes = new NotificacaoRepository(db);
+        var nomes = new NomesRepository.Mongo(db);
+        var pacienteDoUsuario = new PacienteDoUsuarioRepository(db);
         // Disponibilidade (#20) e busca de vagas + agendamento (#21)
         var historicoRepo = new HistoricoRepository.Mongo(db);
         var historico = new HistoricoProcessor(consultaRepo, historicoRepo);
         // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
-        var sinalizacaoFila = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
-            consultaRepo, new NomesRepository.Mongo(db), historico, Clock.systemUTC());
+        var sinalizacaoFila = new SinalizacaoFilaService(fila, notificacoes, consultaRepo, nomes, historico, relogio);
         // e, quando uma vaga sinalizada é agendada, atualiza a fila (ATENDIDA / volta a AGUARDANDO)
-        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, Clock.systemUTC(),
+        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, relogio,
             sinalizacaoFila::sinalizar, sinalizacaoFila::consultaAgendada);
-        var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, Clock.systemUTC());
+        var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, relogio);
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
-            pacienteRepo, new PacienteDoUsuarioRepository(db), registroConsultas);
+            pacienteRepo, pacienteDoUsuario, registroConsultas);
+        var avisosVaga = new AvisoVagaHandler(new AvisoVagaService(notificacoes, fila, consultaRepo,
+            pacienteDoUsuario, sinalizacaoFila, agendamento, relogio));
 
-        // Cancelamento (#27). A fila de espera (#32) troca o AposCancelamento.NENHUM pela implementação dela.
+        // Cancelamento (#27). A fila é avisada pelo RegistroConsultaService (#32); o AposCancelamento não é usado.
         // Quem vê/mexe em qual consulta: paciente as próprias, médico as dele, secretaria todas (#27, #30)
         var acessoConsulta = new AcessoConsulta(
-            new PacienteDoUsuarioRepository(db)::buscar, new MedicoDoUsuarioRepository(db)::buscar);
+            pacienteDoUsuario::buscar, new MedicoDoUsuarioRepository(db)::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
-            acessoConsulta, registroConsultas, AposCancelamento.NENHUM, Clock.systemUTC()));
+            acessoConsulta, registroConsultas, AposCancelamento.NENHUM, relogio));
         var statusConsultaHandler = new StatusConsultaHandler(new StatusConsultaService(consultaRepo,
-            acessoConsulta, registroConsultas, Clock.systemUTC()));
+            acessoConsulta, registroConsultas, relogio));
         // Fila de espera (#31): inscrição, consulta e saída
-        var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(new FilaEsperaRepository(db), especialidades,
-            medicos, pacienteRepo, new PacienteDoUsuarioRepository(db), new NomesRepository.Mongo(db), Clock.systemUTC()));
+        var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(fila, especialidades,
+            medicos, pacienteRepo, pacienteDoUsuario, nomes, relogio));
         // Listagem e detalhe de consultas (#30)
         var consultaLeituraHandler = new ConsultaLeituraHandler(new ConsultaLeituraService(
-            consultaRepo, new NomesRepository.Mongo(db), acessoConsulta, Clock.systemUTC()));
+            consultaRepo, nomes, acessoConsulta, relogio));
         var historicoConsultaHandler = new HistoricoConsultaHandler(new HistoricoConsultaService(
-            consultaRepo, historicoRepo, acessoConsulta, new NomesRepository.Mongo(db)));
+            consultaRepo, historicoRepo, acessoConsulta, nomes));
 
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
-            consultaRepo, agendaRepo, medicos, new NomesRepository.Mongo(db)));
+            consultaRepo, agendaRepo, medicos, nomes));
 
         // Login e sessão (#9)
         var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));
@@ -123,7 +131,7 @@ public class App {
         var autorizacao = new Autorizacao(autenticador);
         Router router = Rotas.router(cors, autorizacao, new Rotas.Handlers(
             new HealthHandler(), authHandler, agendaHandler, bloqueioHandler, pacienteHandler,
-            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler));
+            new VagasHandler(agendamento), new ConsultaHandler(agendamento), consultaCalendarioHandler, avisosVaga));
 
         HttpServer server = HttpServer.create(
             new InetSocketAddress(config.serverPort()), 0
@@ -140,6 +148,10 @@ public class App {
             consultaLeituraHandler, cancelamentoHandler, statusConsultaHandler, historicoConsultaHandler));
         server.createContext("/fila-espera", Rotas.filaEspera(cors, autorizacao, filaEsperaHandler));
 
+        // Uma thread virtual por requisição (Java 21): uma requisição lenta não trava as outras.
+        // Seguro porque a Autorizacao guarda o usuário por requisição e as reservas são protegidas
+        // pelos índices do banco e pelas travas de médico e paciente (ReservasConcorrenciaIntegrationTest).
+        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
 
         System.out.println(

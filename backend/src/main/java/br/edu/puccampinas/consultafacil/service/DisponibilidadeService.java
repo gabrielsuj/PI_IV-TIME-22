@@ -1,5 +1,6 @@
 package br.edu.puccampinas.consultafacil.service;
 
+import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
 import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
 import br.edu.puccampinas.consultafacil.repository.ConsultaRepository;
@@ -64,12 +65,18 @@ public class DisponibilidadeService {
      * Revalidação na hora de confirmar (#21): o horário precisa ser exatamente uma das vagas livres.
      * Assim o mesmo cálculo garante jornada, duração, bloqueios, consultas e horário futuro.
      */
-    public boolean estaLivre(ObjectId medicoId, Instant inicio, Instant fim) {
-        Optional<Document> agenda = agendas.buscarPorMedico(medicoId);
-        if (agenda.isEmpty()) return false;
-
-        ZoneId fuso = ZoneId.of(agenda.get().getString("fusoHorario"));
-        LocalDate data = LocalDate.ofInstant(inicio, fuso);
-        return doDia(medicoId, data).vagas().contains(new Vaga(inicio, fim));
+    public void exigirVagaLivre(ObjectId medicoId, Instant inicio, Instant fim) {
+        Instant agora = relogio.instant();
+        if (inicio.isBefore(agora)) throw ApiException.conflict("O horário desta consulta já passou.");
+        Document agenda = agendas.buscarPorMedico(medicoId)
+                .orElseThrow(() -> ApiException.conflict("O médico ainda não tem jornada configurada."));
+        LocalDate data = LocalDate.ofInstant(inicio, ZoneId.of(agenda.getString("fusoHorario")));
+        if (!CalculadoraDisponibilidade.calcular(agenda, data, List.of(), List.of(), agora).contains(new Vaga(inicio, fim)))
+            throw ApiException.conflict("O horário ou a duração não corresponde à jornada do médico.");
+        Date de = Date.from(inicio), ate = Date.from(fim);
+        if (!bloqueios.sobrepostos(medicoId, de, ate).isEmpty())
+            throw ApiException.conflict("Há um bloqueio na agenda do médico neste período.");
+        if (!consultas.ativasNoPeriodo(medicoId, de, ate).isEmpty())
+            throw ApiException.conflict(ConsultaRepository.SOBREPOSICAO_MEDICO);
     }
 }

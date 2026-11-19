@@ -8,7 +8,7 @@ import java.time.ZoneOffset;
 
 /** Relógio que os testes avançam manualmente, para simular expiração sem esperar. */
 public class RelogioAjustavel extends Clock {
-    private Instant agora;
+    private volatile Instant agora;
 
     public RelogioAjustavel(Instant inicio) { this.agora = inicio; }
 
