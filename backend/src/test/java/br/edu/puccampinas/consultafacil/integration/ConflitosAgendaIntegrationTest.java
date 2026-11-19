@@ -1,6 +1,18 @@
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
+import br.edu.puccampinas.consultafacil.api.Rotas;
+import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaCalendarioHandler;
+import br.edu.puccampinas.consultafacil.api.middleware.Cors;
+import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
+import br.edu.puccampinas.consultafacil.repository.MedicoDoUsuarioRepository;
+import br.edu.puccampinas.consultafacil.security.Autenticador;
+import br.edu.puccampinas.consultafacil.security.Autorizacao;
+import br.edu.puccampinas.consultafacil.security.Sessoes;
+import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
+import br.edu.puccampinas.consultafacil.service.AcessoAgenda;
+import br.edu.puccampinas.consultafacil.service.ConsultaCalendarioService;
 import br.edu.puccampinas.consultafacil.api.dto.AgendaRequest;
 import br.edu.puccampinas.consultafacil.api.dto.BloqueioRequest;
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaCalendarioResponse;
@@ -22,6 +34,8 @@ import com.sun.net.httpserver.HttpServer;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +46,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Date;
@@ -160,28 +175,107 @@ class ConflitosAgendaIntegrationTest {
         assertEquals(1, agendas.salvar(ANA, soSegunda, true).jornadas().size());
     }
 
-    // ---------- HTTP: o 409 leva a lista; ?confirmar=true grava ----------
+    @Nested class Api {
+        final ObjectMapper json = new ObjectMapper();
+        final ObjectId bruno = new ObjectId();
+        final Sessoes sessoes = new Sessoes(Duration.ofMinutes(10));
+        HttpServer server;
+        HttpClient client;
+        String secretaria, tokenAna, tokenBruno;
 
-    @Test void respostaHttpDoConflitoTrazAsConsultasEConfirmarGrava() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/bloqueios", ex -> { try { new BloqueioHandler(bloqueios).handle(ex); } finally { ex.close(); } });
-        server.start();
-        try (HttpClient client = HttpClient.newHttpClient()) {
-            String base = "http://127.0.0.1:" + server.getAddress().getPort() + "/bloqueios";
-            String corpo = "{\"medicoId\":\"" + ANA.toHexString() + "\",\"inicio\":\"2026-11-09T08:00\",\"fim\":\"2026-11-09T12:00\"}";
-            var post = (java.util.function.Function<String, HttpRequest>) url -> HttpRequest.newBuilder(URI.create(url))
-                    .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(corpo)).build();
+        String token(ObjectId usuario, Perfil perfil) {
+            return sessoes.criar(new UsuarioLogado(usuario.toHexString(), perfil.name(), perfil)).token();
+        }
 
-            HttpResponse<String> conflito = client.send(post.apply(base), HttpResponse.BodyHandlers.ofString());
-            assertEquals(409, conflito.statusCode());
-            JsonNode json = new ObjectMapper().readTree(conflito.body());
-            assertEquals(409, json.get("status").asInt());
-            assertFalse(json.get("erro").asText().isBlank());
-            assertEquals("Paulo Paciente", json.get("consultas").get(0).get("pacienteNome").asText());
+        @BeforeEach void iniciar() throws Exception {
+            var db = mongo.database();
+            var medicos = db.getCollection("medicos");
+            var loginAna = new ObjectId();
+            var loginBruno = new ObjectId();
+            medicos.updateOne(new Document("_id", ANA), new Document("$set", new Document("usuarioId", loginAna)));
+            medicos.insertOne(new Document("_id", bruno).append("usuarioId", loginBruno).append("nome", "Bruno")
+                    .append("crmNumero", "000124").append("crmUf", "SP").append("especialidadeIds", List.of(CLINICA)).append("ativo", true));
+            agendas.salvar(bruno, jornadaAtual(), true);
+            var acesso = new AcessoAgenda(new MedicoDoUsuarioRepository(db));
+            var calendario = new ConsultaCalendarioService(new ConsultaRepository(db), new AgendaRepository(db),
+                    new MedicoRepository(db), new NomesRepository.Mongo(db));
+            var handlers = new Rotas.Handlers(null, null, new AgendaHandler(agendas, acesso),
+                    new BloqueioHandler(bloqueios, acesso), null, null, null, new ConsultaCalendarioHandler(calendario, acesso), null);
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/", Rotas.router(new Cors(List.of()), new Autorizacao(new Autenticador(sessoes)), handlers));
+            server.start();
+            client = HttpClient.newHttpClient();
+            tokenAna = token(loginAna, Perfil.MEDICO);
+            tokenBruno = token(loginBruno, Perfil.MEDICO);
+            secretaria = token(new ObjectId(), Perfil.SECRETARIA_ADMIN);
+        }
 
-            assertEquals(201, client.send(post.apply(base + "?confirmar=true"), HttpResponse.BodyHandlers.ofString()).statusCode());
-        } finally {
-            server.stop(0);
+        @AfterEach void fecharServidor() {
+            if (client != null) client.close();
+            if (server != null) server.stop(0);
+        }
+
+        JsonNode chamar(String token, String metodo, String rota, Object corpo, int status) throws Exception {
+            var pedido = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + rota))
+                    .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
+                    .method(metodo, corpo == null ? HttpRequest.BodyPublishers.noBody()
+                            : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(corpo))).build();
+            var resposta = client.send(pedido, HttpResponse.BodyHandlers.ofString());
+            assertEquals(status, resposta.statusCode(), metodo + " " + rota + " " + resposta.body());
+            return json.readTree(resposta.body());
+        }
+
+        @Test void respostaHttpDoConflitoTrazAsConsultasEConfirmarGrava() throws Exception {
+            var corpo = bloqueio("2026-11-09T08:00", "2026-11-09T12:00");
+            var conflito = chamar(secretaria, "POST", "/bloqueios", corpo, 409);
+            assertEquals(409, conflito.get("status").asInt());
+            assertFalse(conflito.get("erro").asText().isBlank());
+            assertEquals("Paulo Paciente", conflito.get("consultas").get(0).get("pacienteNome").asText());
+            chamar(secretaria, "POST", "/bloqueios?confirmar=true", corpo, 201);
+        }
+
+        @Test void cadaMedicoAcessaSomenteSuaAgendaESecretariaAcessaAmbas() throws Exception {
+            verificarEscopo(ANA, tokenAna, tokenBruno);
+            verificarEscopo(bruno, tokenBruno, tokenAna);
+        }
+
+        private void verificarEscopo(ObjectId medico, String dono, String outro) throws Exception {
+            String id = medico.toHexString();
+            String agenda = "/agendas?medicoId=" + id;
+            String lista = "/bloqueios?medicoId=" + id;
+            String calendario = "/consultas?de=2026-11-09&ate=2026-11-09&medicoId=" + id;
+            for (String rota : List.of(agenda, lista, calendario))
+                chamar(outro, "GET", rota, null, 403);
+            var novaJornada = new AgendaRequest(20, "America/Sao_Paulo", jornadaAtual().jornadas());
+            chamar(outro, "PUT", agenda + "&confirmar=true", novaJornada, 403);
+            assertEquals(30, chamar(dono, "GET", agenda, null, 200).get("duracaoMinutos").asInt());
+            assertEquals(id, chamar(dono, "GET", "/agendas?medicoId=meu", null, 200).get("medicoId").asText());
+            for (String autorizado : List.of(dono, secretaria)) {
+                var jornada = autorizado.equals(dono) ? novaJornada : jornadaAtual();
+                chamar(autorizado, "PUT", agenda, jornada, 200);
+                var gravada = chamar(autorizado, "GET", agenda, null, 200);
+                assertEquals(id, gravada.get("medicoId").asText());
+                assertEquals(jornada.duracaoMinutos().intValue(), gravada.get("duracaoMinutos").asInt());
+                var registros = chamar(autorizado, "GET", calendario, null, 200);
+                assertEquals(medico.equals(ANA) ? 2 : 0, registros.size());
+                registros.forEach(c -> assertEquals(id, c.get("medicoId").asText()));
+                var corpo = new BloqueioRequest(id, "2026-11-09T15:00", "2026-11-09T16:00", "Reunião");
+                chamar(outro, "POST", "/bloqueios?confirmar=true", corpo, 403);
+                var salvo = chamar(autorizado, "POST", "/bloqueios", corpo, 201);
+                String excluir = "/bloqueios?id=" + salvo.get("id").asText();
+                chamar(outro, "DELETE", excluir, null, 404);
+                assertEquals(salvo.get("id"), chamar(autorizado, "GET", lista, null, 200).get(0).get("id"));
+                chamar(autorizado, "DELETE", excluir, null, 200);
+                assertEquals(0, chamar(autorizado, "GET", lista, null, 200).size());
+            }
+        }
+
+        @Test void medicoSemVinculoNaoRecebeAcessoIrrestrito() throws Exception {
+            var semVinculo = token(new ObjectId(), Perfil.MEDICO);
+            chamar(semVinculo, "GET", "/agendas?medicoId=meu", null, 403);
+            var salvo = bloqueios.criar(bloqueio("2026-11-09T15:00", "2026-11-09T16:00"));
+            chamar(semVinculo, "DELETE", "/bloqueios?id=" + salvo.id(), null, 403);
+            assertEquals(1, bloqueios.listar(ANA, null, null).size());
         }
     }
 }

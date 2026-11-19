@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 public class BloqueioService {
     private final BloqueioRepository bloqueios;
@@ -41,7 +42,10 @@ public class BloqueioService {
      * consultas, que aparecem como "Remarcar" no calendário (#23).
      */
     public BloqueioResponse criar(BloqueioRequest r, boolean confirmado) {
-        ObjectId medicoId = Query.objectId(r.medicoId(), "medicoId");
+        return criar(Query.objectId(r.medicoId(), "medicoId"), r, confirmado);
+    }
+
+    public BloqueioResponse criar(ObjectId medicoId, BloqueioRequest r, boolean confirmado) {
         if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
 
         ZoneId fuso = fusoDo(medicoId);
@@ -81,8 +85,8 @@ public class BloqueioService {
         return docs.stream().map(d -> paraResposta(d, fuso)).toList();
     }
 
-    public void remover(ObjectId id) {
-        if (!bloqueios.remover(id)) throw ApiException.notFound("Bloqueio não encontrado");
+    public void remover(ObjectId id, Optional<ObjectId> medicoAutorizado) {
+        if (!bloqueios.remover(id, medicoAutorizado)) throw ApiException.notFound("Bloqueio não encontrado");
     }
 
     private ZoneId fusoDo(ObjectId medicoId) {

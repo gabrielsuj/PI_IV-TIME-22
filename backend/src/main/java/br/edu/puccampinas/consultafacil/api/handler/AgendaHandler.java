@@ -6,6 +6,8 @@ import br.edu.puccampinas.consultafacil.api.Http;
 import br.edu.puccampinas.consultafacil.api.Query;
 import br.edu.puccampinas.consultafacil.api.dto.AgendaRequest;
 import br.edu.puccampinas.consultafacil.service.AgendaService;
+import br.edu.puccampinas.consultafacil.security.Autorizacao;
+import br.edu.puccampinas.consultafacil.service.AcessoAgenda;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.bson.types.ObjectId;
@@ -16,12 +18,16 @@ import java.io.IOException;
 public class AgendaHandler implements HttpHandler {
     private final AgendaService service;
 
-    public AgendaHandler(AgendaService service) { this.service = service; }
+    private final AcessoAgenda acesso;
+
+    public AgendaHandler(AgendaService service, AcessoAgenda acesso) {
+        this.service = service;
+        this.acesso = acesso;
+    }
 
     @Override
     public void handle(HttpExchange ex) throws IOException {
-        // Perfil verificado em Rotas (#10). Pendente: restringir o MEDICO à própria agenda (medicos.usuarioId).
-        ObjectId medicoId = Query.objectId(Query.obrigatorio(ex, "medicoId"), "medicoId");
+        ObjectId medicoId = acesso.medicoAutorizado(Autorizacao.usuario(ex), Query.obrigatorio(ex, "medicoId"));
         switch (ex.getRequestMethod()) {
             case "GET" -> Http.sendJson(ex, 200, service.buscar(medicoId));
             case "PUT" -> {
