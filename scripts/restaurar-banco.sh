@@ -62,12 +62,31 @@ PASTA_VALIDACAO="$(mktemp -d "${TMPDIR:-/tmp}/consultafacil-restauracao.XXXXXXXX
 COPIA_BACKUP="$PASTA_VALIDACAO/backup.archive.gz"
 BANCO_VALIDACAO=""
 
+# O arquivo de retorno precisa sobreviver também à queda do processo/host.
+PASTA_RETORNO=""
+RETORNO_PENDENTE=false
 limpar() {
+  local status=$?
+  if [ "$RETORNO_PENDENTE" = true ]; then
+    echo "Recuperando o estado anterior de $DESTINO..." >&2
+    if apagar_banco "$DESTINO" && docker exec -i "$CONTAINER" mongorestore --quiet --archive --gzip --stopOnError \
+        --nsInclude "$DESTINO.*" < "$ANTERIOR"; then
+      echo "Estado anterior de $DESTINO recuperado." >&2
+      RETORNO_PENDENTE=false
+    else
+      echo "Recuperação automática incompleta. Cópia anterior preservada em: $ANTERIOR" >&2
+    fi
+  fi
+  if [ -n "$PASTA_RETORNO" ] && [ "$RETORNO_PENDENTE" = false ]; then
+    rm -f -- "$ANTERIOR"
+    rmdir -- "$PASTA_RETORNO"
+  fi
   if [ -n "$BANCO_VALIDACAO" ] && ! apagar_banco "$BANCO_VALIDACAO"; then
     echo "Não foi possível remover o banco temporário $BANCO_VALIDACAO." >&2
   fi
   rm -f -- "$COPIA_BACKUP"
   rmdir -- "$PASTA_VALIDACAO"
+  return "$status"
 }
 trap limpar EXIT
 trap 'exit 130' INT
@@ -92,8 +111,18 @@ if ! restaurar_em "$BANCO_VALIDACAO" || ! docker exec "$CONTAINER" mongosh "$BAN
   exit 1
 fi
 
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+PASTA_BACKUPS="${BACKUP_DIR:-$RAIZ/backups}"
+mkdir -p -- "$PASTA_BACKUPS"
+PASTA_RETORNO="$(mktemp -d "$PASTA_BACKUPS/retorno.XXXXXXXX")"
+ANTERIOR="$PASTA_RETORNO/$DESTINO-anterior.archive.gz"
+docker exec "$CONTAINER" mongodump --quiet --db "$DESTINO" --archive --gzip > "$ANTERIOR"
+gzip -t "$ANTERIOR"
+echo "Cópia do destino antes da substituição: $ANTERIOR"
+RETORNO_PENDENTE=true
 apagar_banco "$DESTINO"
 restaurar_em "$DESTINO"
+RETORNO_PENDENTE=false
 
 echo "Backup $NOME restaurado em $DESTINO:"
 docker exec "$CONTAINER" mongosh "$DESTINO" --quiet --eval '
