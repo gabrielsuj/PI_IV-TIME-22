@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
+import HistoricoConsulta from '../components/consultas/HistoricoConsulta';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -36,7 +37,7 @@ function useConsulta(id) {
   }, [id, chave]);
 
   // Ao recarregar, mantém a consulta anterior na tela até a nova chegar (sem "piscar").
-  return { ...estado, carregando: estado.chave !== chave, recarregar: () => setRevisao((r) => r + 1) };
+  return { ...estado, revisao, carregando: estado.chave !== chave, recarregar: () => setRevisao((r) => r + 1) };
 }
 
 function mensagemDeErro(erro) {
@@ -92,7 +93,7 @@ export default function ConsultaDetalhePage() {
 
 function DetalheConsulta({ id }) {
   const { usuario } = useAuth();
-  const { consulta, erro, carregando, recarregar, chave } = useConsulta(id);
+  const { consulta, erro, carregando, recarregar, chave, revisao } = useConsulta(id);
   const [cancelando, setCancelando] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [enviandoStatus, setEnviandoStatus] = useState(null);
@@ -223,7 +224,7 @@ function DetalheConsulta({ id }) {
         )}
       </Card>
 
-      {/* Necessita issue #46 para exibir o histórico. */}
+      <HistoricoConsulta consultaId={consulta.id} revisao={revisao} />
 
       {cancelando && (
         <CancelarConsultaModal

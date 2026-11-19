@@ -305,6 +305,20 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 /* Consultas (#30): o resumo e as ações ocupam a largura do card (o .card__content alinha os filhos ao início) */
 .consulta-resumo .card__content > * { align-self: stretch; }
 
+.historico-card .card__content > * { align-self: stretch; min-width: 0; }
+.historico-card .button { min-height: 44px; white-space: normal; }
+.historico-lista { list-style: none; margin: 0; padding: 0; }
+.historico-item { position: relative; padding: 0 0 var(--space-6) var(--space-5); border-left: 2px solid var(--color-border); overflow-wrap: anywhere; }
+.historico-item::before { content: ''; position: absolute; top: 7px; left: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); }
+.historico-item:last-child { padding-bottom: 0; }
+.historico-item h3 { font-size: 1rem; }
+.historico-data { color: var(--color-text-muted); font-size: 0.875rem; margin-block: var(--space-1) var(--space-3); }
+.historico-dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--space-3); margin: 0 0 var(--space-3); }
+.historico-dados > div { min-width: 0; }
+.historico-dados dt { color: var(--color-text-muted); font-size: 0.875rem; }
+.historico-dados dd { margin: 0; }
+.historico-alteracoes { margin: 0; padding-left: var(--space-5); }
+
 
 
 
