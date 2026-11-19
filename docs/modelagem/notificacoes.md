@@ -6,6 +6,7 @@
 |------|-------|--------|-------------|
 | 2026-11-07 | Davi Vitoreti | v1.0.0 | Versão inicial da coleção `notificacoes`: campos, referências, status, regras por status da consulta e índices. |
 | 2026-11-13 | Gabriel Martins | v1.1.0 | Situação da implementação: `VAGA_LIBERADA` gerada pela sinalização da fila (#32). |
+| 2026-11-15 | Gabriel Martins | v1.2.0 | Avisos de vaga exibidos ao paciente, com agendamento e expiração (#57). |
 
 ## Entidades
 
@@ -13,7 +14,7 @@ A seguir é documentada a entidade (coleção MongoDB) e seus dados (atributos) 
 
 > Observação: a coleção `notificacoes` não consta na lista de coleções da seção 3.2.3 do relatório de ideação (pacientes, medicos, especialidades, agendas, consultas, filaEspera e historico). Ela foi acrescentada ao banco pelo script `database/init/09-esquema-notificacoes.js`.
 
-> **Situação da implementação:** a API gera hoje apenas `VAGA_LIBERADA`, criada com `status = AGENDADA` quando um interessado da fila é sinalizado (#32, ver [filaEspera.md](filaEspera.md#implementação-da-sinalização-32)). Se a vaga é ocupada por outra pessoa antes do envio, o aviso passa a `CANCELADA`. Confirmação de agendamento, lembretes e aviso de cancelamento ainda não são gerados.
+> **Situação da implementação:** a API gera hoje apenas `VAGA_LIBERADA`, criada com `status = AGENDADA` quando um interessado da fila é sinalizado (#32, ver [filaEspera.md](filaEspera.md#implementação-da-sinalização-32)). Se a vaga é ocupada por outra pessoa antes do envio, o aviso passa a `CANCELADA`. O paciente vê e usa os avisos na tela **Avisos de vaga** (`GET/POST /avisos-vaga`, #57, ver [fila-espera.md](../api/fila-espera.md#7-avisos-de-vaga-e-agendamento-57)), onde cada aviso aparece como disponível, agendado ou expirado. Confirmação de agendamento, lembretes e aviso de cancelamento ainda não são gerados (#34).
 
 ### 1. Notificacao (coleção `notificacoes`)
 

@@ -79,7 +79,7 @@ Respostas de erro:
 - **Campos sem valor não aparecem na resposta** (a API omite `null`, como nas outras rotas). No front, trate campo ausente como vazio.
 - `medicoId`/`medicoNome` ficam sem valor quando a inscrição vale para qualquer médico.
 - `dataInicio`/`dataFim` são datas locais (`AAAA-MM-DD`), sem valor quando não foram informadas. Datas com hora estão em ISO 8601 UTC.
-- `ultimaSinalizacao` só aparece quando `status = SINALIZADA`: é a vaga liberada que o paciente pode tentar agendar em `POST /consultas` (com o `medicoId` e o horário dela).
+- `ultimaSinalizacao` só aparece quando `status = SINALIZADA`: inclui o `notificacaoId` usado para o agendamento em `POST /avisos-vaga`.
 
 Status: `AGUARDANDO`, `SINALIZADA`, `ATENDIDA`, `CANCELADA`, `EXPIRADA` (significados em [filaEspera.md](../modelagem/filaEspera.md#status-do-interesse)).
 
@@ -113,3 +113,22 @@ Remove a inscrição: o status passa a `CANCELADA` e a resposta (200) traz a ins
 - Lista "Minhas inscrições" (`GET /fila-espera`) com o status. Em `SINALIZADA`, mostrar a vaga liberada e um atalho para agendar.
 - Botão "Sair da fila" (`DELETE /fila-espera/{id}`).
 - Mensagens de erro: usar o campo `erro` da resposta (`{ "status": 409, "erro": "..." }`), como nas outras telas.
+
+## 7. Avisos de vaga e agendamento (#57)
+
+Na tela da fila, o paciente abre o aviso indicado por `ultimaSinalizacao.notificacaoId`. A secretaria pode iniciar o agendamento em nome do paciente.
+
+A opção **Avisos de vaga** aparece no menu do paciente. O aviso nasce quando uma consulta é cancelada e há uma inscrição compatível. O paciente pode abrir o aviso, conferir o horário e confirmar a consulta. A tela atualiza a lista a cada 15 segundos, ao recuperar o foco e depois de uma tentativa de agendamento.
+
+| Método | Caminho | Resultado |
+|---|---|---|
+| GET | `/avisos-vaga` | Lista os próprios avisos de vaga, incluindo expirados e agendados, do mais recente ao mais antigo. |
+| POST | `/avisos-vaga` | Recebe `{ "avisoId": "…" }` e devolve 201 com a consulta criada. Médico, especialidade e horário vêm da consulta de origem do aviso. |
+
+As rotas exigem token de paciente vinculado a um cadastro. ID malformado retorna 400. Aviso inexistente ou de outro paciente retorna 404. Aviso expirado, já usado ou horário indisponível retorna 409.
+
+A lista devolve `id`, `medicoNome`, `inicio`, `fim`, `validoAte`, `status` e, quando agendado, `consultaAgendadaId`. Os horários estão em ISO 8601 UTC. A validade termina no início da vaga ou no vencimento da inscrição, o que ocorrer primeiro.
+
+- **`DISPONIVEL`**: o paciente pode tentar agendar. A confirmação revalida a jornada, os bloqueios e a ocupação.
+- **`AGENDADO`**: o paciente ficou com a vaga. A inscrição passa a `ATENDIDA`.
+- **`EXPIRADO`**: a vaga venceu, outra pessoa a ocupou ou a inscrição deixou de corresponder ao aviso. Ao perder a vaga para outro paciente, a inscrição volta a `AGUARDANDO` e mantém a posição.
