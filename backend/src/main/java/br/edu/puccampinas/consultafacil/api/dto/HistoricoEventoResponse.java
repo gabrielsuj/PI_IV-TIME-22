@@ -29,6 +29,11 @@ public record HistoricoEventoResponse(String id, int sequencia, String evento,
                 "SINALIZACAO_FILA".equals(tipo) ? documento.getInteger("totalSinalizados") : null);
     }
 
+    public HistoricoEventoResponse comNomeDoAtor(String nome) {
+        return new HistoricoEventoResponse(id, sequencia, evento, statusAnterior, statusNovo, ocorridoEm,
+                dataHoraConsulta, fimConsulta, ator == null ? null : ator.comNome(nome), alteracoes, motivo, totalSinalizados);
+    }
+
     private static String id(ObjectId id) { return id == null ? null : id.toHexString(); }
     private static String data(Date data) { return data == null ? null : data.toInstant().toString(); }
 }

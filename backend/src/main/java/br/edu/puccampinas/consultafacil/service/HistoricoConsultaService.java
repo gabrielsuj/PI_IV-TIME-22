@@ -4,9 +4,14 @@ import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.api.dto.HistoricoConsultaResponse;
 import br.edu.puccampinas.consultafacil.api.dto.HistoricoEventoResponse;
 import br.edu.puccampinas.consultafacil.repository.HistoricoLeituraRepository;
+import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.repository.PendenciasConsultaRepository;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
 import org.bson.types.ObjectId;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** Leitura autorizada da #46; não processa pendências nem gera eventos como efeito colateral. */
 public final class HistoricoConsultaService {
@@ -14,12 +19,14 @@ public final class HistoricoConsultaService {
     private final PendenciasConsultaRepository consultas;
     private final HistoricoLeituraRepository historico;
     private final AcessoConsulta acesso;
+    private final NomesRepository nomes;
 
     public HistoricoConsultaService(PendenciasConsultaRepository consultas, HistoricoLeituraRepository historico,
-                                    AcessoConsulta acesso) {
+                                    AcessoConsulta acesso, NomesRepository nomes) {
         this.consultas = consultas;
         this.historico = historico;
         this.acesso = acesso;
+        this.nomes = nomes;
     }
 
     public HistoricoConsultaResponse listar(ObjectId consultaId, UsuarioLogado ator) {
@@ -40,7 +47,18 @@ public final class HistoricoConsultaService {
         Integer ultima = eventos.isEmpty() ? null : eventos.getLast().sequencia();
         // Uma leitura adicional de no máximo um evento evita anunciar uma página extra inexistente.
         boolean temMais = limiteAtingido && !historico.listarPorConsulta(consultaId, ultima, 1).isEmpty();
+        var ids = eventos.stream().map(HistoricoEventoResponse::ator).filter(Objects::nonNull)
+                .filter(atorEvento -> !"SISTEMA".equals(atorEvento.perfil())).map(atorEvento -> atorEvento.id())
+                .filter(Objects::nonNull).map(ObjectId::new).collect(Collectors.toSet());
+        Map<ObjectId, String> nomesUsuarios = ids.isEmpty() ? Map.of() : nomes.usuarios(ids);
+        eventos = eventos.stream().map(evento -> nomeDoAtor(evento, nomesUsuarios)).toList();
         return new HistoricoConsultaResponse(consultaId.toHexString(), eventos, aposSequencia, limite, limiteAtingido,
                 temMais, temMais ? ultima : null);
+    }
+
+    private static HistoricoEventoResponse nomeDoAtor(HistoricoEventoResponse evento, Map<ObjectId, String> nomes) {
+        if (evento.ator() == null || evento.ator().id() == null) return evento;
+        ObjectId id = new ObjectId(evento.ator().id());
+        return nomes.containsKey(id) ? evento.comNomeDoAtor(nomes.get(id)) : evento;
     }
 }

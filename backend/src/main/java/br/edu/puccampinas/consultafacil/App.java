@@ -104,7 +104,7 @@ public class App {
         var consultaLeituraHandler = new ConsultaLeituraHandler(new ConsultaLeituraService(
             consultaRepo, new NomesRepository.Mongo(db), acessoConsulta, Clock.systemUTC()));
         var historicoConsultaHandler = new HistoricoConsultaHandler(new HistoricoConsultaService(
-            consultaRepo, historicoRepo, acessoConsulta));
+            consultaRepo, historicoRepo, acessoConsulta, new NomesRepository.Mongo(db)));
 
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(

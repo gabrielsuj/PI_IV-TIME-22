@@ -5,6 +5,7 @@ import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.handler.HistoricoConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
+import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.security.*;
 import br.edu.puccampinas.consultafacil.service.*;
 import br.edu.puccampinas.consultafacil.support.ConsultasEmMemoria;
@@ -42,6 +43,8 @@ class HistoricoConsultaHttpTest {
     private ObjectId id;
     private int leituras;
     private RegistroConsultaService registro;
+    private final Map<ObjectId, Document> usuarios = new HashMap<>();
+    private final List<Set<ObjectId>> lotesNomes = new ArrayList<>();
 
     @BeforeEach void iniciar() throws Exception {
         registro = new RegistroConsultaService(consultas, new HistoricoProcessor(consultas, eventos::add),
@@ -52,12 +55,25 @@ class HistoricoConsultaHttpTest {
         var acesso = new AcessoConsulta(
                 login -> Optional.ofNullable(PACIENTE_LOGADO.id().equals(login) ? PACIENTE : null),
                 login -> Optional.ofNullable(MEDICO_LOGADO.id().equals(login) ? MEDICO : null));
+        usuarios.put(new ObjectId(SECRETARIA.id()), new Document("nome", "Sofia Secretaria")
+                .append("email", "privado@example.com").append("senha", new Document("hash", "credencial-interna")));
+        NomesRepository nomes = new NomesRepository() {
+            public Map<ObjectId, String> pacientes(Collection<ObjectId> ids) { throw new AssertionError("Usar usuarios._id"); }
+            public Map<ObjectId, String> especialidades(Collection<ObjectId> ids) { throw new AssertionError("Usar usuarios._id"); }
+            @Override public Map<ObjectId, String> usuarios(Collection<ObjectId> ids) {
+                lotesNomes.add(Set.copyOf(ids));
+                Map<ObjectId, String> resultado = new HashMap<>();
+                for (ObjectId usuarioId : ids) if (usuarios.containsKey(usuarioId))
+                    resultado.put(usuarioId, usuarios.get(usuarioId).getString("nome"));
+                return resultado;
+            }
+        };
         var handler = new HistoricoConsultaHandler(new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
             leituras++;
             return eventos.stream().filter(e -> consultaId.equals(e.getObjectId("consultaId")))
                     .filter(e -> e.getInteger("sequencia") > apos)
                     .sorted(Comparator.comparingInt(e -> e.getInteger("sequencia"))).limit(limite).toList();
-        }, acesso));
+        }, acesso, nomes));
         var cors = new Cors(List.of("http://localhost:5173"));
         var autz = new Autorizacao(new Autenticador(sessoes));
         HttpHandler eco = ex -> Http.sendJson(ex, 200, Map.of("rota", "existente"));
@@ -93,6 +109,11 @@ class HistoricoConsultaHttpTest {
         assertEquals("AGENDADA", evento.get("statusNovo").asText());
         assertEquals("2026-11-18T12:30:00Z", evento.get("ocorridoEm").asText());
         assertEquals(SECRETARIA.id(), evento.get("ator").get("id").asText());
+        assertEquals("Sofia Secretaria", evento.get("ator").get("nome").asText());
+        assertEquals(List.of(Set.of(new ObjectId(SECRETARIA.id()))), lotesNomes);
+        assertFalse(resposta.body().contains("privado@example.com"));
+        assertFalse(resposta.body().contains("credencial-interna"));
+        assertFalse(resposta.body().contains("senha"));
         assertFalse(resposta.body().contains("eventosPendentes"));
         assertFalse(resposta.body().contains("versao"));
         assertFalse(resposta.body().contains("$oid"));
@@ -108,6 +129,7 @@ class HistoricoConsultaHttpTest {
         conferirErro(enviar("GET", caminho(), token(ator)), 403);
         conferirErro(enviar("GET", caminho() + "?aposSequencia=1&limite=1", token(ator)), 403);
         assertEquals(0, leituras);
+        assertTrue(lotesNomes.isEmpty());
     }
 
     @Test void exigeSessaoValida() throws Exception {
@@ -278,8 +300,51 @@ class HistoricoConsultaHttpTest {
         assertEquals(total, evento.get("totalSinalizados").asInt());
         assertEquals("SISTEMA", evento.get("ator").get("perfil").asText());
         assertTrue(evento.get("ator").get("id").isNull());
+        assertEquals("Sistema", evento.get("ator").get("nome").asText());
+        assertTrue(lotesNomes.isEmpty());
         assertFalse(evento.has("motivo"));
         assertFalse(evento.has("alteracoes"));
+    }
+
+    @Test void nomesDosResponsaveisVemDeUmUnicoLoteDeUsuarios() throws Exception {
+        registro.alterar(id, new Document("status", "CONFIRMADA"), PACIENTE_LOGADO);
+        registro.alterar(id, new Document("inicio", Date.from(Instant.parse("2026-12-01T12:05:00Z"))), SECRETARIA);
+        registro.alterar(id, new Document("status", "CONCLUIDA"), MEDICO_LOGADO);
+        usuarios.put(new ObjectId(PACIENTE_LOGADO.id()), new Document("nome", "Paulo Paciente").append("ativo", false));
+        usuarios.put(new ObjectId(MEDICO_LOGADO.id()), new Document("nome", "Ana Médica"));
+        var resposta = enviar("GET", caminho(), token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var lista = json.readTree(resposta.body()).get("eventos");
+        assertEquals("Sofia Secretaria", lista.get(0).get("ator").get("nome").asText());
+        assertEquals("Paulo Paciente", lista.get(1).get("ator").get("nome").asText());
+        assertEquals("Sofia Secretaria", lista.get(2).get("ator").get("nome").asText());
+        assertEquals("Ana Médica", lista.get(3).get("ator").get("nome").asText());
+        assertEquals(List.of(Set.of(new ObjectId(SECRETARIA.id()), new ObjectId(PACIENTE_LOGADO.id()), new ObjectId(MEDICO_LOGADO.id()))), lotesNomes);
+        assertEquals(PACIENTE_LOGADO.id(), lista.get(1).get("ator").get("id").asText());
+        assertEquals("PACIENTE", lista.get(1).get("ator").get("perfil").asText());
+        assertFalse(resposta.body().contains("credencial-interna"));
+        assertFalse(resposta.body().contains("privado@example.com"));
+    }
+
+    @Test void usuarioRemovidoPreservaIdEPerfilSemImpedirLeituraDoHistorico() throws Exception {
+        usuarios.clear();
+        var resposta = enviar("GET", caminho(), token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var ator = json.readTree(resposta.body()).get("eventos").get(0).get("ator");
+        assertEquals("Usuário não encontrado", ator.get("nome").asText());
+        assertEquals(SECRETARIA.id(), ator.get("id").asText());
+        assertEquals("SECRETARIA_ADMIN", ator.get("perfil").asText());
+    }
+
+    @Test void eventoLegadoSemAtorNaoConsultaUsuariosNemInventaIdentidade() throws Exception {
+        eventos.getFirst().remove("ator");
+        var resposta = enviar("GET", caminho(), token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var ator = json.readTree(resposta.body()).get("eventos").get(0).get("ator");
+        assertEquals("Responsável não identificado", ator.get("nome").asText());
+        assertTrue(ator.get("id").isNull());
+        assertTrue(ator.get("perfil").isNull());
+        assertTrue(lotesNomes.isEmpty());
     }
 
     private static UsuarioLogado usuario(Perfil perfil) { return new UsuarioLogado(new ObjectId().toHexString(), "Teste", perfil); }
