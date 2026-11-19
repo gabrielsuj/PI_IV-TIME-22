@@ -179,3 +179,19 @@ Interesse sinalizado após o cancelamento de uma consulta:
   "atualizadoEm": { "$date": "2026-11-12T14:32:10Z" }
 }
 ```
+
+## Retomada da sinalização após falha
+
+O cancelamento grava `sinalizacaoFila=PENDENTE` na consulta junto com a mudança de status e o evento de cancelamento. A API tenta sinalizar a fila imediatamente. Ao iniciar e depois a cada 15 segundos, um executor da API retoma lotes de até 50 consultas pendentes. Essa rotina cuida das vagas liberadas pelo cancelamento.
+
+Ao retomar, o serviço verifica novamente se a vaga continua futura e livre e se as inscrições continuam compatíveis. Reutiliza o aviso identificado por consulta, paciente, tipo e canal. Ao passar a inscrição para `SINALIZADA`, registra na mesma escrita o ID da consulta em `sinalizacoesPendentes`. Esses comprovantes permitem contar inclusive os pacientes que já saíram do estado sinalizado. O evento de histórico com o total e o estado `LIMPAR` são gravados juntos na consulta. A última etapa remove os comprovantes e a pendência. Repetir essa limpeza é seguro.
+
+**Atualização de um banco existente.** Antes de iniciar a versão nova, reaplique os dois scripts abaixo ao banco usado pela API. Eles atualizam os validadores e índices preservando os dados. Substitua o nome do banco conforme o ambiente.
+
+```bash
+for schema in database/init/03-esquema-consultas.js database/init/08-esquema-fila-espera.js; do
+  docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < "$schema"
+done
+```
+
+A retomada automática abrange os cancelamentos gravados com a pendência. Consultas já canceladas por versões anteriores seguem com o histórico existente.

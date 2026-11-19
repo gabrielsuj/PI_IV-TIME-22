@@ -1,5 +1,8 @@
 package br.edu.puccampinas.consultafacil.repository;
 
+import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
+import java.util.Date;
 import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -32,6 +35,32 @@ public class NotificacaoRepository {
             if (e.getError().getCode() == 11000) return false;
             throw e;
         }
+    }
+
+    private Bson caixa(Perfil perfil, ObjectId destinatario) {
+        return Filters.and(Filters.eq("destinatarioPerfil", perfil.name()), Filters.eq("destinatarioId", destinatario),
+                Filters.eq("canal", "SISTEMA"), Filters.eq("status", "ENVIADA"));
+    }
+
+    public List<Document> entregues(Perfil perfil, ObjectId destinatario) {
+        return col.find(caixa(perfil, destinatario)).sort(Sorts.descending("enviadaEm", "_id")).into(new ArrayList<>());
+    }
+
+    public Optional<Document> entregue(ObjectId id, Perfil perfil, ObjectId destinatario) {
+        return Optional.ofNullable(col.find(Filters.and(caixa(perfil, destinatario), Filters.eq("_id", id))).first());
+    }
+
+    public void registrarLeitura(ObjectId id, Perfil perfil, ObjectId destinatario, Date agora, boolean confirmou) {
+        var campos = new Document("lidaEm", new Document("$ifNull", List.of("$lidaEm", agora)));
+        if (confirmou) campos.append("confirmadaEm", new Document("$ifNull", List.of("$confirmadaEm", agora)));
+        var resultado = col.updateOne(Filters.and(caixa(perfil, destinatario), Filters.eq("_id", id)),
+                List.of(new Document("$set", campos)));
+        if (resultado.getMatchedCount() == 0) throw ApiException.notFound("Notificação não encontrada");
+    }
+
+    public List<Document> avisosDaConsulta(ObjectId origem) {
+        return col.find(Filters.and(Filters.eq("consultaId", origem), Filters.eq("tipo", "VAGA_LIBERADA"),
+                Filters.eq("canal", "SISTEMA"))).into(new ArrayList<>());
     }
 
     public List<Document> avisosDeVaga(ObjectId pacienteId) {

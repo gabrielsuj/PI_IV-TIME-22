@@ -16,7 +16,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 
@@ -42,6 +44,7 @@ public final class SinalizacaoFilaService {
     private final NomesRepository nomes;
     private final HistoricoProcessor historico;
     private final Clock relogio;
+    private ObjectId cursor;
 
     public SinalizacaoFilaService(FilaEsperaRepository fila, NotificacaoRepository notificacoes, ConsultaRepository consultas,
                                   NomesRepository nomes, HistoricoProcessor historico, Clock relogio) {
@@ -53,16 +56,44 @@ public final class SinalizacaoFilaService {
         this.relogio = relogio;
     }
 
-    /** Chamado logo após o CANCELAMENTO ser gravado. Retorna quantos interessados foram sinalizados. */
-    public int sinalizar(ObjectId consultaId) {
+    /** A API tem uma instância; serializa o callback imediato e a retomada periódica. */
+    public synchronized int sinalizar(ObjectId consultaId) {
         Document consulta = consultas.buscar(consultaId).orElse(null);
-        if (consulta == null || !StatusConsulta.CANCELADA.name().equals(consulta.getString("status"))) return 0;
-        Date agora = Date.from(relogio.instant());
-        int total = vagaFutura(consulta, agora) && !reconciliarVaga(consulta) ? avisarInteressados(consulta, agora) : 0;
-        // A reserva pode ter sido gravada enquanto os avisos eram criados e ainda não estavam na fila.
-        if (total > 0) reconciliarVaga(consulta);
-        registrarHistorico(consulta, total, agora);
+        if (consulta == null || consulta.get("sinalizacaoFila") == null) return 0;
+        int total = 0;
+        if ("PENDENTE".equals(consulta.getString("sinalizacaoFila"))) {
+            Date agora = Date.from(relogio.instant());
+            Map<ObjectId, Document> avisos = new HashMap<>();
+            for (Document aviso : notificacoes.avisosDaConsulta(consultaId))
+                avisos.put(aviso.getObjectId("destinatarioId"), aviso);
+            if (vagaFutura(consulta, agora) && !reconciliarVaga(consulta))
+                avisarInteressados(consulta, agora, avisos);
+
+            var sinalizadas = new HashSet<>(fila.inscricoesSinalizadas(consultaId));
+            for (Document aviso : avisos.values()) {
+                if (!sinalizadas.contains(aviso.getObjectId("filaEsperaId")))
+                    notificacoes.descartar(aviso.getObjectId("_id"));
+            }
+            total = sinalizadas.size();
+            if (total > 0) reconciliarVaga(consulta);
+            if (!registrarHistorico(consulta, total, agora)) return total;
+        }
+        fila.limparComprovantes(consultaId);
+        consultas.concluirLimpezaFila(consultaId);
         return total;
+    }
+
+    public void recuperarPendentes() {
+        try {
+            var ids = consultas.sinalizacoesPendentes(cursor, 50);
+            for (ObjectId id : ids) {
+                try { sinalizar(id); }
+                catch (RuntimeException e) { LOG.warn("Sinalização pendente para consulta {}", id, e); }
+            }
+            cursor = ids.size() == 50 ? ids.getLast() : null;
+        } catch (RuntimeException e) {
+            LOG.warn("Recuperação da sinalização adiada", e);
+        }
     }
 
     boolean reconciliarVaga(Document origem) {
@@ -75,7 +106,7 @@ public final class SinalizacaoFilaService {
         return consulta.getDate("inicio").after(agora);
     }
 
-    private int avisarInteressados(Document consulta, Date agora) {
+    private void avisarInteressados(Document consulta, Date agora, Map<ObjectId, Document> avisos) {
         ObjectId consultaId = consulta.getObjectId("_id");
         ObjectId medicoId = consulta.getObjectId("medicoId");
         Date inicio = consulta.getDate("inicio");
@@ -86,23 +117,26 @@ public final class SinalizacaoFilaService {
         // Quem cancelou não é avisado da própria vaga; e cada paciente recebe no máximo um aviso por vaga.
         Set<ObjectId> pacientesConsiderados = new HashSet<>();
         pacientesConsiderados.add(consulta.getObjectId("pacienteId"));
-        int total = 0;
         for (Document interesse : fila.candidatos(consulta.getObjectId("especialidadeId"), medicoId, inicio, agora)) {
             ObjectId pacienteId = interesse.getObjectId("pacienteId");
             if (!turnoCompativel(interesse.getString("turnoPreferido"), inicio.toInstant())) continue;
             if (!pacientesConsiderados.add(pacienteId)) continue;
             if (consultas.pacienteTemAtivaSobreposta(pacienteId, inicio, fim)) continue;
 
-            ObjectId notificacaoId = new ObjectId();
-            Document aviso = notificacao(notificacaoId, pacienteId, consultaId, interesse.getObjectId("_id"),
-                    inicio, medicoNome, agora);
-            if (!notificacoes.inserirSeNova(aviso)) continue; // já avisado num processamento anterior
+            ObjectId inscricao = interesse.getObjectId("_id");
+            Document aviso = avisos.get(pacienteId);
+            if (aviso == null) {
+                aviso = notificacao(new ObjectId(), pacienteId, consultaId, inscricao, inicio, medicoNome, agora);
+                if (!notificacoes.inserirSeNova(aviso))
+                    throw new IllegalStateException("Aviso criado simultaneamente; retomar a sinalização");
+                avisos.put(pacienteId, aviso);
+            }
+            if (!inscricao.equals(aviso.getObjectId("filaEsperaId")) || "CANCELADA".equals(aviso.getString("status"))
+                    || interesse.getList("sinalizacoesPendentes", ObjectId.class, List.of()).contains(consultaId)) continue;
             Document ultima = new Document("consultaOrigemId", consultaId).append("medicoId", medicoId)
-                    .append("dataHora", inicio).append("sinalizadaEm", agora).append("notificacaoId", notificacaoId);
-            if (fila.marcarSinalizada(interesse.getObjectId("_id"), ultima, agora)) total++;
-            else notificacoes.descartar(notificacaoId); // o interesse mudou nesse meio-tempo
+                    .append("dataHora", inicio).append("sinalizadaEm", agora).append("notificacaoId", aviso.getObjectId("_id"));
+            fila.marcarSinalizada(inscricao, ultima, agora);
         }
-        return total;
     }
 
     /**
@@ -159,7 +193,7 @@ public final class SinalizacaoFilaService {
     }
 
     /** Evento SINALIZACAO_FILA pela mesma caixa de pendências usada pelo RegistroConsultaService. */
-    private void registrarHistorico(Document consulta, int total, Date agora) {
+    private boolean registrarHistorico(Document consulta, int total, Date agora) {
         ObjectId id = consulta.getObjectId("_id");
         int versao = consulta.getInteger("versao", 0);
         int sequencia = (versao == 0 ? historico.ultimaSequencia(id) : versao) + 1;
@@ -174,7 +208,11 @@ public final class SinalizacaoFilaService {
                 .append("ator", new Document("perfil", "SISTEMA").append("id", null))
                 .append("totalSinalizados", total)
                 .append("ocorridoEm", agora);
-        if (consultas.atualizarComEvento(id, versao, new Document(), evento)) historico.processarConsulta(id);
-        else LOG.warn("SINALIZACAO_FILA não registrada para a consulta {} (versão mudou)", id);
+        if (!consultas.atualizarComEvento(id, versao, new Document("sinalizacaoFila", "LIMPAR"), evento)) {
+            historico.processarConsulta(id);
+            return false;
+        }
+        historico.processarConsulta(id);
+        return true;
     }
 }

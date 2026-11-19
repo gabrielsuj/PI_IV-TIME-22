@@ -73,6 +73,7 @@ aplicarEsquema("filaEspera", {
             enum: ["AGUARDANDO", "SINALIZADA", "ATENDIDA", "CANCELADA", "EXPIRADA"],
             description: "Padrão na criação (API): AGUARDANDO"
           },
+          sinalizacoesPendentes: { bsonType: "array", items: OID },
           ultimaSinalizacao: { anyOf: [NULO, ultimaSinalizacaoObj] },
           consultaAgendadaId: OID_OU_NULO,
           atendidaEm: DATA_OU_NULA,

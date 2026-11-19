@@ -51,8 +51,19 @@ public class FilaEsperaRepository {
                 Updates.combine(
                         Updates.set("status", "SINALIZADA"),
                         Updates.set("ultimaSinalizacao", ultimaSinalizacao),
+                        Updates.addToSet("sinalizacoesPendentes", ultimaSinalizacao.getObjectId("consultaOrigemId")),
                         Updates.set("atualizadoEm", agora)))
                 .getModifiedCount() == 1;
+    }
+
+    /** Comprovantes sobrevivem à saída da fila ou à ocupação da vaga até o registro no histórico. */
+    public List<ObjectId> inscricoesSinalizadas(ObjectId origem) {
+        return col.find(Filters.eq("sinalizacoesPendentes", origem)).projection(new Document("_id", 1))
+                .map(d -> d.getObjectId("_id")).into(new ArrayList<>());
+    }
+
+    public void limparComprovantes(ObjectId origem) {
+        col.updateMany(Filters.eq("sinalizacoesPendentes", origem), Updates.pull("sinalizacoesPendentes", origem));
     }
 
     // ------------------------------------------------------------------ cadastro (#31)
