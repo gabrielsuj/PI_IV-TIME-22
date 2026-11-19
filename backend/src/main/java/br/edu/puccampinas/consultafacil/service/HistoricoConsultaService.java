@@ -7,8 +7,10 @@ import br.edu.puccampinas.consultafacil.repository.HistoricoLeituraRepository;
 import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.repository.PendenciasConsultaRepository;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -52,8 +54,17 @@ public final class HistoricoConsultaService {
                 .filter(Objects::nonNull).map(ObjectId::new).collect(Collectors.toSet());
         Map<ObjectId, String> nomesUsuarios = ids.isEmpty() ? Map.of() : nomes.usuarios(ids);
         eventos = eventos.stream().map(evento -> nomeDoAtor(evento, nomesUsuarios)).toList();
+        // Uma projeção ou escrita pode terminar entre a busca dos eventos e esta confirmação.
+        var atual = consultas.buscar(consultaId).orElseThrow(() -> ApiException.notFound("Consulta não encontrada"));
+        acesso.verificar(atual, ator);
+        boolean atualizacaoPendente = possuiPendencias(consulta) || possuiPendencias(atual)
+                || !Objects.equals(consulta.getInteger("versao", 0), atual.getInteger("versao", 0));
         return new HistoricoConsultaResponse(consultaId.toHexString(), eventos, aposSequencia, limite, limiteAtingido,
-                temMais, temMais ? ultima : null);
+                temMais, temMais ? ultima : null, atualizacaoPendente);
+    }
+
+    private static boolean possuiPendencias(Document consulta) {
+        return !consulta.getList("eventosPendentes", Document.class, List.of()).isEmpty();
     }
 
     private static HistoricoEventoResponse nomeDoAtor(HistoricoEventoResponse evento, Map<ObjectId, String> nomes) {

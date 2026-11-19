@@ -41,6 +41,7 @@ export async function buscarHistoricoConsulta(id, { aposSequencia = 0, limite = 
   const invalida = () => { throw new Error('Não foi possível ler o histórico recebido. Atualize o histórico para tentar novamente.'); };
   if (!pagina || pagina.consultaId !== id || pagina.aposSequencia !== aposSequencia || pagina.limite !== limite
     || !Array.isArray(pagina.eventos) || pagina.eventos.length > limite || typeof pagina.temMais !== 'boolean'
+    || typeof pagina.atualizacaoPendente !== 'boolean'
     || pagina.limiteAtingido !== (pagina.eventos.length === limite)) invalida();
   const ids = new Set();
   let ultima = aposSequencia;

@@ -11,12 +11,13 @@ export default function HistoricoConsulta({ consultaId, revisao }) {
 }
 
 function ConteudoHistorico({ consultaId }) {
-  const { eventos, pagina, carregando, erro, primeiroNovoId, atualizar, tentarNovamente, carregarMais } = useHistoricoConsulta(consultaId);
+  const { eventos, pagina, carregando, erro, primeiroNovoId, atualizar, tentarNovamente, carregarMais,
+    leituraAutomatica, atualizacaoPausada, revisitarInicio } = useHistoricoConsulta(consultaId);
   const erroRef = useRef(null);
   const novoEvento = useRef(null);
   const acessoRecusado = erro && [400, 403, 404].includes(erro.status);
 
-  useEffect(() => { if (erro) erroRef.current?.focus(); }, [erro]);
+  useEffect(() => { if (erro && !leituraAutomatica) erroRef.current?.focus(); }, [erro, leituraAutomatica]);
   useEffect(() => { if (!carregando && !erro && primeiroNovoId) novoEvento.current?.focus(); }, [carregando, erro, primeiroNovoId]);
 
   const mensagem = erro?.status === 403 ? 'Você não tem acesso ao histórico desta consulta.'
@@ -33,7 +34,12 @@ function ConteudoHistorico({ consultaId }) {
         action={!acessoRecusado && <Button variant="outline" onClick={tentarNovamente}>Tentar novamente</Button>}>
         {mensagem} {eventos.length > 0 && 'Os eventos já exibidos foram mantidos; a atualização não foi concluída.'}
       </Alert>}
-      {!carregando && !erro && eventos.length === 0 && <p role="status">Nenhum evento disponível no momento.</p>}
+      {(pagina?.atualizacaoPendente || revisitarInicio) && !acessoRecusado && <Alert tone="info">
+        {atualizacaoPausada
+          ? 'O histórico ainda pode estar incompleto. A atualização automática foi pausada; use Atualizar histórico para conferir os eventos desde o início.'
+          : 'Há atualizações recentes que ainda podem não aparecer no histórico. Ações já confirmadas não precisam ser repetidas.'}
+      </Alert>}
+      {!carregando && !erro && !pagina?.atualizacaoPendente && eventos.length === 0 && <p role="status">Nenhum evento disponível no momento.</p>}
       {eventos.length > 0 && <ol className="historico-lista" aria-label="Eventos do histórico">
         {eventos.map((evento) => {
           const quando = dataHoraDoHistorico(evento.ocorridoEm);

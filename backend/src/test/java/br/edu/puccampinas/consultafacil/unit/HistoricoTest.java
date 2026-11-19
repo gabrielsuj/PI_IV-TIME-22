@@ -259,6 +259,7 @@ class HistoricoTest {
         assertEquals(secretaria.id(), resposta.eventos().getFirst().ator().id());
         assertEquals(100, resposta.limite());
         assertFalse(resposta.limiteAtingido());
+        assertFalse(resposta.atualizacaoPendente());
         assertEquals(1, leituras.get());
         assertNotEquals(outra.toHexString(), resposta.consultaId());
         assertThrows(UnsupportedOperationException.class, () -> resposta.eventos().clear());
@@ -298,9 +299,57 @@ class HistoricoTest {
         var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
         assertTrue(resposta.eventos().isEmpty());
         assertFalse(resposta.limiteAtingido());
+        assertTrue(resposta.atualizacaoPendente());
         assertEquals(antes, consultas.docs.get(id));
         assertEquals(1, consultas.docs.get(id).getList("eventosPendentes", Document.class).size());
         assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void projecaoConcluidaDuranteALeituraAindaSinalizaPaginaPossivelmenteIncompleta() {
+        indisponivel = true;
+        ObjectId id = criar();
+        var acesso = new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            indisponivel = false;
+            processor.processarConsulta(consultaId);
+            return List.of(); // Snapshot obtido antes de outro processador concluir a projeção.
+        }, acesso, nomes);
+        var resposta = leitorConcorrente.listar(id, secretaria);
+        assertTrue(resposta.eventos().isEmpty());
+        assertTrue(resposta.atualizacaoPendente());
+        assertTrue(consultas.docs.get(id).getList("eventosPendentes", Document.class).isEmpty());
+        var atualizada = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(1, atualizada.eventos().size());
+        assertFalse(atualizada.atualizacaoPendente());
+    }
+
+    @Test void escritaJaProjetadaDuranteALeituraSinalizaMudancaDeVersaoSemInventarEvento() {
+        ObjectId id = criar();
+        var acesso = new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            var snapshot = List.copyOf(eventos.values());
+            service.alterar(consultaId, new Document("status", "CONFIRMADA"), secretaria);
+            return snapshot;
+        }, acesso, nomes);
+        var resposta = leitorConcorrente.listar(id, secretaria);
+        assertEquals(List.of("CRIACAO"), resposta.eventos().stream().map(e -> e.evento()).toList());
+        assertTrue(resposta.atualizacaoPendente());
+        assertTrue(consultas.docs.get(id).getList("eventosPendentes", Document.class).isEmpty());
+        var atualizada = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(List.of("CRIACAO", "CONFIRMACAO"), atualizada.eventos().stream().map(e -> e.evento()).toList());
+        assertFalse(atualizada.atualizacaoPendente());
+    }
+
+    @Test void revalidaAcessoSeAVinculacaoMudarDuranteALeitura() {
+        ObjectId id = criar();
+        ObjectId pacienteOriginal = consultas.docs.get(id).getObjectId("pacienteId");
+        var acesso = new AcessoConsulta(login -> Optional.of(pacienteOriginal), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            var snapshot = List.copyOf(eventos.values());
+            service.alterar(consultaId, new Document("pacienteId", new ObjectId()), secretaria);
+            return snapshot;
+        }, acesso, nomes);
+        assertEquals(403, assertThrows(ApiException.class, () -> leitorConcorrente.listar(id, paciente)).status());
     }
 
     @Test void leituraNuncaSerializaDocumentoBrutoOuCredenciais() {

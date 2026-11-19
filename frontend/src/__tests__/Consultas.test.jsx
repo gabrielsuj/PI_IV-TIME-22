@@ -83,7 +83,8 @@ function paginaHistorico(consultaId, eventos, parametros = new URLSearchParams()
   const restantes = eventos.filter((e) => e.sequencia > aposSequencia).sort((a, b) => a.sequencia - b.sequencia);
   const pagina = restantes.slice(0, limite);
   return { consultaId, eventos: pagina, aposSequencia, limite, limiteAtingido: pagina.length === limite,
-    temMais: restantes.length > limite, ...(restantes.length > limite ? { proximaSequencia: pagina.at(-1).sequencia } : {}) };
+    atualizacaoPendente: false, temMais: restantes.length > limite,
+    ...(restantes.length > limite ? { proximaSequencia: pagina.at(-1).sequencia } : {}) };
 }
 
 const eventoHistorico = (sequencia, extra = {}) => ({ id: `h${sequencia}`, sequencia, evento: 'CRIACAO', statusAnterior: null,
@@ -319,13 +320,155 @@ describe('histórico no detalhe da consulta (#46)', () => {
     expect(historico.queryByRole('heading', { name: 'Consulta criada' })).not.toBeInTheDocument();
   });
 
-  it.each(['outro-id', 'cursor-invalido', 'sequencia-repetida'])('resposta inválida (%s) vira erro isolado', async (caso) => {
+  it('pendência sem eventos mostra aviso e uma nova leitura exibe somente eventos recebidos', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let primeira = true;
+      const leitura = pendente();
+      const fetchMock = mockApi({ historico: (id, parametros) => {
+        if (!primeira) return leitura.promise;
+        primeira = false;
+        return { ...paginaHistorico(id, [], parametros), atualizacaoPendente: true };
+      } });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      expect(historico.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      expect(historico.queryByText('Nenhum evento disponível no momento.')).not.toBeInTheDocument();
+      expect(historico.queryByRole('list')).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.getByRole('button', { name: 'Atualizar histórico' })).toBeDisabled();
+      await act(async () => { leitura.resolver(paginaHistorico('c1', [eventoHistorico(1)])); });
+      expect(historico.getByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+      expect(historico.queryByText(/Há atualizações recentes/)).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+      expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('limita a três atualizações automáticas e permite reiniciar pela atualização manual', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true,
+      }) });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+        expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(tentativa + 2);
+      }
+      expect(historico.getByText(/atualização automática foi pausada/)).toBeInTheDocument();
+      expect(historico.getAllByRole('listitem')).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(4);
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(5);
+      expect(historico.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(6);
+      expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('falha na atualização automática preserva eventos e interrompe novas tentativas', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let leituras = 0;
+      const fetchMock = mockApi({ historico: (id, parametros) => ++leituras === 1
+        ? { ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true }
+        : erro(500, 'Falha temporária no histórico.') });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.getByText(/Falha temporária no histórico/)).toBeInTheDocument();
+      expect(historico.getByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+      expect(historico.getByText(/Falha temporária no histórico/)).not.toHaveFocus();
+      expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('sair da consulta cancela a atualização automática agendada', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true,
+      }) });
+      let router;
+      await act(async () => { router = renderAt('/consultas/c1'); });
+      expect(screen.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      await act(async () => { await router.navigate('/consultas'); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('paginação pausa as leituras automáticas e mantém aviso até conferir o início', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const eventos = Array.from({ length: 21 }, (_, indice) => eventoHistorico(indice + 1));
+      let leituras = 0;
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, eventos, parametros), atualizacaoPendente: ++leituras === 1,
+      }) });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Carregar mais eventos' })); });
+      expect(historico.getAllByRole('listitem')).toHaveLength(21);
+      expect(historico.getByText(/atualização automática foi pausada/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(historico.getAllByRole('listitem')).toHaveLength(20);
+      expect(historico.queryByText(/histórico ainda pode estar incompleto/)).not.toBeInTheDocument();
+      expect(chamadas(fetchMock, '/consultas/c1/historico').map(({ url }) => url.searchParams.get('aposSequencia'))).toEqual(['0', '20', '0']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('ação salva continua confirmada enquanto só a leitura do histórico é repetida', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let atual = consulta('c1');
+      const eventos = [eventoHistorico(1)];
+      const fetchMock = mockApi({ detalhes: () => atual,
+        alterarStatus: () => { atual = { ...atual, status: 'CONFIRMADA', podeCancelar: false }; return json(atual); },
+        historico: (id, parametros) => ({ ...paginaHistorico(id, eventos, parametros), atualizacaoPendente: atual.status === 'CONFIRMADA' && eventos.length === 1 }),
+      });
+      await act(async () => { renderAt('/consultas/c1'); });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirmar consulta' })); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      expect(screen.getByText('Consulta confirmada.')).toBeInTheDocument();
+      expect(historico.getByText(/Ações já confirmadas não precisam ser repetidas/)).toBeInTheDocument();
+      for (let tentativa = 0; tentativa < 3; tentativa++) await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.queryByRole('heading', { name: 'Consulta confirmada' })).not.toBeInTheDocument();
+      expect(screen.getByText('Consulta confirmada.')).toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(5);
+      eventos.push(eventoHistorico(2, { evento: 'CONFIRMACAO', statusAnterior: 'AGENDADA', statusNovo: 'CONFIRMADA' }));
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(historico.getByRole('heading', { name: 'Consulta confirmada' })).toBeInTheDocument();
+      expect(historico.queryByText(/histórico ainda pode estar incompleto/)).not.toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['outro-id', 'cursor-invalido', 'sequencia-repetida', 'pendencia-ausente', 'pendencia-invalida'])('resposta inválida (%s) vira erro isolado', async (caso) => {
     entrarComo(PAULO);
     mockApi({ historico: (id, parametros) => {
       const pagina = paginaHistorico(id, [eventoHistorico(1)], parametros);
       if (caso === 'outro-id') pagina.consultaId = 'c2';
       if (caso === 'cursor-invalido') { pagina.temMais = true; pagina.proximaSequencia = 0; }
       if (caso === 'sequencia-repetida') pagina.eventos.push(eventoHistorico(1, { id: 'duplicado' }));
+      if (caso === 'pendencia-ausente') delete pagina.atualizacaoPendente;
+      if (caso === 'pendencia-invalida') pagina.atualizacaoPendente = 'true';
       return pagina;
     } });
     renderAt('/consultas/c1');

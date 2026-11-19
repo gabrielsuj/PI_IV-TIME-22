@@ -69,6 +69,28 @@ class HistoricoPersistenceIntegrationTest {
         assertTrue(consultas.buscar(id).orElseThrow().getList("eventosPendentes", Document.class).isEmpty());
     }
 
+    @Test void leituraSinalizaPendenciaPersistidaEAcompanhaProjecaoSemModificarConsulta() {
+        ObjectId id = criarPendente();
+        var acesso = new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty());
+        var leitor = new HistoricoConsultaService(consultas, historico, acesso, new NomesRepository.Mongo(mongo.database()));
+        Document antes = consultas.buscar(id).orElseThrow();
+        var pendente = leitor.listar(id, ator);
+        assertTrue(pendente.atualizacaoPendente());
+        assertTrue(pendente.eventos().isEmpty());
+        assertFalse(pendente.temMais());
+        assertEquals(antes, consultas.buscar(id).orElseThrow());
+        assertEquals(0, historico.ultimaSequencia(id));
+
+        new HistoricoProcessor(consultas, historico).processarConsulta(id);
+        Document projetada = consultas.buscar(id).orElseThrow();
+        var atualizada = leitor.listar(id, ator);
+        assertFalse(atualizada.atualizacaoPendente());
+        assertEquals(1, atualizada.eventos().size());
+        assertEquals("CRIACAO", atualizada.eventos().getFirst().evento());
+        assertEquals(projetada, consultas.buscar(id).orElseThrow());
+        assertEquals(antes.getInteger("versao"), projetada.getInteger("versao"));
+    }
+
     @Test void identidadeDivergenteNaoApagaPendencia() {
         ObjectId id = criarPendente();
         Document e = consultas.buscar(id).orElseThrow().getList("eventosPendentes", Document.class).getFirst();

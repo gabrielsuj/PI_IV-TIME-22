@@ -101,6 +101,7 @@ class HistoricoConsultaHttpTest {
         assertEquals(0, corpo.get("aposSequencia").asInt());
         assertFalse(corpo.get("limiteAtingido").asBoolean());
         assertFalse(corpo.get("temMais").asBoolean());
+        assertFalse(corpo.get("atualizacaoPendente").asBoolean());
         assertFalse(corpo.has("proximaSequencia"));
         assertEquals(1, corpo.get("eventos").size());
         var evento = corpo.get("eventos").get(0);
@@ -130,6 +131,34 @@ class HistoricoConsultaHttpTest {
         conferirErro(enviar("GET", caminho() + "?aposSequencia=1&limite=1", token(ator)), 403);
         assertEquals(0, leituras);
         assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void acaoSalvaComHistoricoPendenteSinalizaAtrasoSemReprocessarNoGet() throws Exception {
+        var registroComFalha = new RegistroConsultaService(consultas, new HistoricoProcessor(consultas,
+                evento -> { throw new IllegalStateException("Projeção indisponível"); }), Clock.systemUTC());
+        var salva = registroComFalha.alterar(id, new Document("status", "CONFIRMADA"), SECRETARIA);
+        assertEquals("CONFIRMADA", salva.getString("status"));
+        var antes = consultas.buscar(id).orElseThrow();
+        String token = token(SECRETARIA);
+        var resposta = enviar("GET", caminho(), token);
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var corpo = json.readTree(resposta.body());
+        assertTrue(corpo.get("atualizacaoPendente").isBoolean());
+        assertTrue(corpo.get("atualizacaoPendente").asBoolean());
+        assertEquals(1, corpo.get("eventos").size());
+        assertEquals("CRIACAO", corpo.get("eventos").get(0).get("evento").asText());
+        assertFalse(corpo.get("temMais").asBoolean());
+        assertFalse(corpo.has("proximaSequencia"));
+        assertFalse(resposta.body().contains("eventosPendentes"));
+        assertFalse(resposta.body().contains("versao"));
+        assertEquals(antes, consultas.buscar(id).orElseThrow());
+        assertEquals(1, eventos.size());
+        new HistoricoProcessor(consultas, eventos::add).processarConsulta(id);
+        var atualizada = json.readTree(enviar("GET", caminho(), token).body());
+        assertFalse(atualizada.get("atualizacaoPendente").asBoolean());
+        assertEquals(2, atualizada.get("eventos").size());
+        assertEquals("CONFIRMACAO", atualizada.get("eventos").get(1).get("evento").asText());
+        assertEquals(antes.getInteger("versao"), consultas.buscar(id).orElseThrow().getInteger("versao"));
     }
 
     @Test void exigeSessaoValida() throws Exception {
