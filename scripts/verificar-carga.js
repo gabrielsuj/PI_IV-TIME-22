@@ -84,6 +84,26 @@ confere("login de paciente tem cadastro de paciente com o mesmo e-mail e CPF", u
   .filter((u) => u.perfil === "PACIENTE" && ![...pacientes.values()].some((p) => p.email === u.email && p.cpf === u.cpf))
   .map((u) => u.email));
 
+const filaDemo = db.filaEspera.find({ _id: { $in: [
+  ObjectId("810000000000000000000001"), ObjectId("810000000000000000000002")
+] } }).toArray();
+confere("dois pacientes da demonstração com inscrições e logins vinculados",
+  filaDemo.length === 2 && filaDemo.every(f => {
+    const p = pacientes.get(f.pacienteId.toHexString());
+    return p && p.usuarioId && p.usuarioId.equals(f.registradoPor.id);
+  })
+    ? [] : ["Confira os vínculos das inscrições de Carla e Diego."]);
+const avisoDemo = db.notificacoes.findOne({ _id: ObjectId("820000000000000000000001") });
+confere("notificação de cancelamento ligada à consulta do destinatário",
+  avisoDemo && consultas.some(c => c._id.equals(avisoDemo.consultaId) && c.status === "CANCELADA"
+    && c.pacienteId.equals(avisoDemo.destinatarioId)) ? [] : ["Confira a notificação do seed 08."]);
+if (filaDemo.length === 2 && filaDemo.every(f => f.status === "AGUARDANDO")) {
+  const f = filaDemo[0];
+  const c = consultas.find(c => c.medicoId.equals(f.medicoId) && c.especialidadeId.equals(f.especialidadeId)
+    && +c.fim === +f.validoAte && ATIVAS.includes(c.status));
+  if (c) print("Consulta para a demonstração da fila: " + c._id.toHexString() + " — " + c.inicio.toISOString());
+}
+
 print("\n== Próximos 7 dias (ativas) por médico ==");
 const agora = new Date(), semana = new Date(Date.now() + 7 * 86400000);
 db.consultas.aggregate([
@@ -93,3 +113,4 @@ db.consultas.aggregate([
   .forEach((g) => print("  " + medicos.get(g._id.toHexString()).nome.padEnd(26) + g.n));
 
 print("\n" + (falhas === 0 ? "Carga coerente: todas as verificações passaram." : falhas + " verificação(ões) falharam."));
+if (falhas) quit(1);
