@@ -1,6 +1,23 @@
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
+import br.edu.puccampinas.consultafacil.api.dto.AgendaRequest;
+import br.edu.puccampinas.consultafacil.api.dto.BloqueioRequest;
+import br.edu.puccampinas.consultafacil.api.dto.FaixaDto;
+import br.edu.puccampinas.consultafacil.api.dto.JornadaDto;
+import br.edu.puccampinas.consultafacil.service.AgendaService;
+import br.edu.puccampinas.consultafacil.service.BloqueioService;
+import br.edu.puccampinas.consultafacil.service.ConsultasAfetadas;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import br.edu.puccampinas.consultafacil.api.dto.AgendamentoRequest;
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
 import br.edu.puccampinas.consultafacil.api.dto.VagaDto;
@@ -110,6 +127,95 @@ class AgendamentoIntegrationTest {
                 consultas, relogio);
         service = new AgendamentoService(disponibilidade, new MedicoRepository(db), new EspecialidadeRepository.Mongo(db),
                 new PacienteRepository.Mongo(db), new PacienteDoUsuarioRepository(db), registro);
+    }
+
+    /** A primeira operação espera depois de validar e antes de persistir, com a segunda em andamento. */
+    @ParameterizedTest(name = "{0}, reserva primeiro = {1}")
+    @CsvSource({"bloqueio,true", "bloqueio,false", "jornada,true", "jornada,false"})
+    void reservaDisputaHorarioComMudancaDaAgenda(String mudanca, boolean reservaPrimeiro) throws Exception {
+        var validada = new CountDownLatch(1);
+        var liberar = new CountDownLatch(1);
+        Runnable pausar = () -> {
+            validada.countDown();
+            try {
+                assertTrue(liberar.await(10, TimeUnit.SECONDS));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            }
+        };
+
+        var db = mongo.database();
+        var agendas = new AgendaRepository(db) {
+            @Override public Document salvar(ObjectId id, Document dados) {
+                if (!reservaPrimeiro) pausar.run();
+                return super.salvar(id, dados);
+            }
+        };
+        var bloqueios = new BloqueioRepository(db) {
+            @Override public Document inserir(Document dados) {
+                if (!reservaPrimeiro) pausar.run();
+                return super.inserir(dados);
+            }
+        };
+        var consultas = new ConsultaRepository(db);
+        var medicos = new MedicoRepository(db);
+        var relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
+        var afetadas = new ConsultasAfetadas(consultas, new NomesRepository.Mongo(db));
+        var disponibilidade = new DisponibilidadeService(agendas, bloqueios, consultas, relogio) {
+            @Override public void exigirVagaLivre(ObjectId id, Instant inicio, Instant fim) {
+                super.exigirVagaLivre(id, inicio, fim);
+                if (reservaPrimeiro) pausar.run();
+            }
+        };
+        var registro = new RegistroConsultaService(consultas,
+                new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db)), relogio);
+        var reservas = new AgendamentoService(disponibilidade, medicos, new EspecialidadeRepository.Mongo(db),
+                new PacienteRepository.Mongo(db), new PacienteDoUsuarioRepository(db), registro);
+        var agenda = new AgendaService(agendas, medicos, afetadas, relogio);
+        var bloqueio = new BloqueioService(bloqueios, agendas, medicos, afetadas);
+        String inicio = SEGUNDA + "T11:00:00Z"; // 08:00 em São Paulo
+        Callable<String> reservar = () -> reservas.agendar(pedido(PACIENTE, inicio, SEGUNDA + "T11:30:00Z"), SECRETARIA).id();
+        Consumer<Boolean> alterar = confirmado -> {
+            if (mudanca.equals("bloqueio")) {
+                bloqueio.criar(new BloqueioRequest(MEDICO.toHexString(), SEGUNDA + "T08:00",
+                        SEGUNDA + "T08:30", "Reunião"), confirmado);
+            } else {
+                var segunda = new JornadaDto(1, List.of(new FaixaDto(600, 720)));
+                agenda.salvar(MEDICO, new AgendaRequest(30, "America/Sao_Paulo", List.of(segunda)), confirmado);
+            }
+        };
+        Callable<String> mudar = () -> { alterar.accept(false); return null; };
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var primeira = executor.submit(reservaPrimeiro ? reservar : mudar);
+            var segundaIniciada = new CountDownLatch(1);
+            var concorrente = reservaPrimeiro ? mudar : reservar;
+            java.util.concurrent.Future<String> segunda;
+            try {
+                assertTrue(validada.await(5, TimeUnit.SECONDS));
+                segunda = executor.submit(() -> {
+                    segundaIniciada.countDown();
+                    return concorrente.call();
+                });
+                assertTrue(segundaIniciada.await(5, TimeUnit.SECONDS));
+                assertThrows(TimeoutException.class, () -> segunda.get(200, TimeUnit.MILLISECONDS));
+            } finally {
+                liberar.countDown();
+            }
+            String reservaId = primeira.get(5, TimeUnit.SECONDS);
+            var falha = assertThrows(ExecutionException.class, () -> segunda.get(5, TimeUnit.SECONDS)).getCause();
+            assertEquals(409, assertInstanceOf(ApiException.class, falha).status());
+            if (reservaPrimeiro) {
+                var conflito = assertInstanceOf(ConflitoComConsultasException.class, falha);
+                assertEquals(List.of(reservaId), conflito.consultas().stream().map(c -> c.id()).toList());
+                alterar.accept(true);
+                assertEquals("AGENDADA", consultas.buscar(new ObjectId(reservaId)).orElseThrow().getString("status"));
+            } else {
+                assertEquals(0, db.getCollection("consultas").countDocuments());
+            }
+            assertFalse(iniciosDasVagas(SEGUNDA).contains(inicio));
+        }
     }
 
     private static void salvar(MongoDatabase db, String colecao, Document d) {

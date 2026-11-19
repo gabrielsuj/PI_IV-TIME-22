@@ -93,6 +93,59 @@ class SinalizacaoFilaIntegrationTest {
         registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void retomaCancelamentoSemDuplicarAvisos(boolean falharAposInserirAviso) {
+        ObjectId origem = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId primeira = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        ObjectId segunda = interesse(PACIENTES.get(2), ESPECIALIDADE, null, "QUALQUER", 2, null, null, 90);
+        Clock relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
+        var consultas = new ConsultaRepository(db);
+        var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
+        var fila = new FilaEsperaRepository(db);
+        var nomes = new NomesRepository.Mongo(db);
+        var falha = new NotificacaoRepository(db) {
+            @Override public boolean inserirSeNova(Document aviso) {
+                boolean inserida = super.inserirSeNova(aviso);
+                if (segunda.equals(aviso.getObjectId("filaEsperaId")))
+                    throw new IllegalStateException("Interrompido após inserir o segundo aviso");
+                return inserida;
+            }
+        };
+        var interrompida = new SinalizacaoFilaService(fila, falha, consultas, nomes, historico, relogio);
+        registro = new RegistroConsultaService(consultas, historico, relogio, id -> {
+            if (!falharAposInserirAviso) throw new IllegalStateException("Interrompido após cancelar");
+            interrompida.sinalizar(id);
+        });
+
+        assertEquals("CANCELADA", cancelar(origem).getString("status"));
+        assertEquals("PENDENTE", consultaDoBanco(origem).getString("sinalizacaoFila"));
+        var avisos = new NotificacaoRepository(db);
+        var anteriores = avisos.avisosDaConsulta(origem);
+        assertEquals(falharAposInserirAviso ? 2 : 0, anteriores.size());
+        assertEquals(falharAposInserirAviso ? "SINALIZADA" : "AGUARDANDO", fila(primeira).getString("status"));
+        assertEquals("AGUARDANDO", fila(segunda).getString("status"));
+
+        // Nova instância sem estado em memória, como após reiniciar a API.
+        var retomada = new SinalizacaoFilaService(fila, avisos, consultas, nomes, historico, relogio);
+        retomada.recuperarPendentes();
+        retomada.recuperarPendentes();
+        assertNull(consultaDoBanco(origem).get("sinalizacaoFila"));
+        assertEquals(2, avisos.avisosDaConsulta(origem).size());
+        for (Document anterior : anteriores) assertNotNull(aviso(anterior.getObjectId("_id")));
+        for (ObjectId inscricao : List.of(primeira, segunda)) {
+            var item = fila(inscricao);
+            assertEquals("SINALIZADA", item.getString("status"));
+            ObjectId id = item.get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId");
+            assertEquals(inscricao, aviso(id).getObjectId("filaEsperaId"));
+            assertEquals("AGENDADA", aviso(id).getString("status"));
+        }
+        assertEquals(List.of("CRIACAO", "CANCELAMENTO", "SINALIZACAO_FILA"),
+                historico(origem).stream().map(e -> e.getString("evento")).toList());
+        assertEquals(2, historico(origem).getLast().getInteger("totalSinalizados"));
+        assertTrue(fila.inscricoesSinalizadas(origem).isEmpty());
+    }
+
     @Test void deveLiberarVagaRegistrarHistoricoESinalizarFila() {
         ObjectId consulta = agendar(PACIENTES.get(0), MEDICO, VAGA);
         ObjectId ocupado = PACIENTES.get(7);

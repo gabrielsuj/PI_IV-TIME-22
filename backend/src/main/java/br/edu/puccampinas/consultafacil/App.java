@@ -105,8 +105,8 @@ public class App {
             pacienteDoUsuario::buscar, medicoDoUsuario::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
             acessoConsulta, registroConsultas, AposCancelamento.NENHUM, relogio));
-        var statusConsultaHandler = new StatusConsultaHandler(new StatusConsultaService(consultaRepo,
-            acessoConsulta, registroConsultas, relogio));
+        var statusConsulta = new StatusConsultaService(consultaRepo, acessoConsulta, registroConsultas, relogio);
+        var statusConsultaHandler = new StatusConsultaHandler(statusConsulta);
         // Fila de espera (#31): inscrição, consulta e saída
         var filaEsperaHandler = new FilaEsperaHandler(new FilaEsperaService(fila, especialidades,
             medicos, pacienteRepo, pacienteDoUsuario, nomes, relogio));
@@ -155,12 +155,15 @@ public class App {
         // pelos índices do banco e pelas travas de médico e paciente (ReservasConcorrenciaIntegrationTest).
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
+        var recuperacaoFila = Executors.newSingleThreadScheduledExecutor();
+        recuperacaoFila.scheduleWithFixedDelay(sinalizacaoFila::recuperarPendentes, 0, 15, java.util.concurrent.TimeUnit.SECONDS);
 
         System.out.println(
             "Servidor rodando na porta " + config.serverPort()
         );
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            recuperacaoFila.shutdownNow();
             server.stop(0);
             mongo.close();
         }));

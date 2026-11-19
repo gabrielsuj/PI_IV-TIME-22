@@ -12,6 +12,7 @@ const validator = {
       fim:                 { bsonType: "date" },
       status:             { enum: ["AGENDADA", "CONFIRMADA", "CANCELADA", "CONCLUIDA", "FALTA"] },
       // Opcionais para manter compatibilidade com consultas anteriores à auditoria.
+      sinalizacaoFila: { enum: ["PENDENTE", "LIMPAR"] },
       versao: { bsonType: "int", minimum: 0 },
       eventosPendentes: {
         bsonType: "array", maxItems: 50,
@@ -62,3 +63,5 @@ db.consultas.createIndex({ pacienteId: 1, inicio: 1 },
   { unique: true, name: "uk_consulta_paciente_inicio", partialFilterExpression: somenteAtivas });
 db.consultas.createIndex({ medicoId: 1, inicio: 1, fim: 1 }, { name: "ix_consulta_medico_periodo" });
 db.consultas.createIndex({ pacienteId: 1, inicio: -1 }, { name: "ix_consulta_paciente" });
+db.consultas.createIndex({ sinalizacaoFila: 1, _id: 1 },
+  { name: "ix_sinalizacao_pendente", partialFilterExpression: { sinalizacaoFila: { $exists: true } } });
