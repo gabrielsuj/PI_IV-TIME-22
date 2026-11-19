@@ -2,15 +2,16 @@
 
 Como o ConsultaFácil impede reservas duplicadas ou sobrepostas, e como isso é testado.
 
-## Três camadas de proteção
+## Proteção das reservas
 
 | Camada | Onde | O que garante |
 |---|---|---|
 | 1. Busca de vagas | `CalculadoraDisponibilidade` / `GET /vagas` | Só oferece horários dentro da jornada, na grade da duração, fora de bloqueios, sem consulta ativa e ainda não iniciados |
-| 2. Revalidação no agendamento | `AgendamentoService.agendar` (`DisponibilidadeService.estaLivre`) | No `POST /consultas`, o horário precisa ser **exatamente** uma das vagas livres naquele momento; senão, **409** |
-| 3. Índices únicos parciais no banco | `database/init/03-esquema-consultas.js` | Entre as consultas **ativas** (`AGENDADA`/`CONFIRMADA`), no máximo uma por **(médico, início)** e uma por **(paciente, início)**. A violação (código 11000) vira **409** em `MongoErros` |
+| 2. Revalidação no agendamento | `AgendamentoService.agendar` (`DisponibilidadeService.exigirVagaLivre`) | No `POST /consultas`, o horário precisa ser **exatamente** uma das vagas livres naquele momento; senão, **409** |
+| 3. Intervalos do médico e do paciente | `ConsultaRepository.inserirComEvento` e `atualizarComEvento` | A instância do backend serializa a verificação e a gravação por médico e por paciente, na criação e nas alterações de horário, médico ou paciente. A sobreposição com uma consulta ativa retorna **409**, mesmo entre médicos diferentes e com inícios diferentes. |
+| 4. Índices únicos parciais no banco | `database/init/03-esquema-consultas.js` | Entre as consultas **ativas** (`AGENDADA`/`CONFIRMADA`), no máximo uma por **(médico, início)** e uma por **(paciente, início)**. A violação (código 11000) vira **409** em `MongoErros` |
 
-A camada 2 sozinha não basta: dois pedidos simultâneos podem passar pela revalidação ao mesmo tempo, porque os dois veem a vaga livre. Quem decide é a camada 3. O MongoDB aceita só a primeira gravação, a segunda é recusada pelo índice, e o usuário recebe "horário não está mais disponível".
+Dois pedidos simultâneos podem encontrar ambas as vagas livres. A seção crítica na gravação verifica os dois intervalos. Quando a segunda requisição encontra uma consulta ativa sobreposta, recebe 409 com o motivo do conflito.
 
 Os índices são **parciais**: consultas canceladas, concluídas ou faltas não ocupam a vaga. Por isso uma vaga cancelada pode ser reservada de novo, e o histórico da consulta cancelada é preservado.
 
@@ -23,16 +24,17 @@ Os índices são **parciais**: consultas canceladas, concluídas ou faltas não 
 | 8 pedidos simultâneos para vagas **diferentes** | `pedidosSimultaneosEmVagasDiferentesSaoTodosAceitos` | 8 × 201 (sem conflito falso) |
 | Médico já ocupado: mesmo horário ou horário fora da grade | `deveRecusarSobreposicaoDeHorario` | 409; a vaga seguinte continua livre |
 | Cancelamento libera a vaga | `cancelamentoLiberaAVagaParaOutroPaciente` | A vaga volta à busca, outro paciente reserva (201), histórico `CRIACAO → CANCELAMENTO` e nova `CRIACAO` |
-| Mesmo paciente em horários **sobrepostos com início diferente** em outro médico | `pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes` | **Desativado: pendente #25** (hoje a API aceita) |
+| Mesmo paciente em horários **sobrepostos com início diferente** em outro médico | `pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes` | 409 para sobreposição e 201 para horários adjacentes ou liberados por cancelamento |
+| Consulta movida para cima de outra do mesmo paciente | `alteracaoDeHorarioNaoPodeSobreporOutraConsultaDoPaciente` | 409 sem gravar evento; horário adjacente e sobreposição com o próprio horário antigo são aceitos |
+| Dois pedidos simultâneos do mesmo paciente com sobreposição e inícios diferentes | `mesmoPacienteNaoReservaHorariosSobrepostosComIniciosDiferentesAoMesmoTempo` | 201 e 409, com uma consulta ativa e um evento de criação |
 | Gravação direta no banco, em paralelo | `ConsultaReservaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` | Só uma gravação aceita pelo índice |
 
-Os testes de `ReservasConcorrenciaIntegrationTest` passam pela **API de verdade**: autenticação, permissões de `Rotas`, `POST /consultas` e `GET /vagas`, com o MongoDB real. O servidor de teste atende com **16 threads**, e uma largada única (`CountDownLatch`) libera todos os pedidos juntos, para que eles disputem a vaga de fato. A suíte rodou 8 vezes seguidas sem nenhuma falha.
+Os testes de `ReservasConcorrenciaIntegrationTest` usam o MongoDB real e passam pela autenticação, por `POST /consultas` e por `GET /vagas`. O servidor de teste atende com **16 threads**. No cenário da #25, uma barreira faz com que os dois pedidos encontrem as vagas livres antes da disputa pela gravação.
 
 ## Observações
 
-- **O servidor da aplicação atende um pedido por vez.** O `App.java` não define executor no `HttpServer`, que então processa as requisições numa única thread. Hoje a corrida nem acontece em produção, mas o teste mostra que a garantia continua valendo se o servidor passar a usar várias threads (`server.setExecutor(...)`), porque ela vem do banco e não da ordem de chegada.
-- **Lacuna conhecida (#25):** o índice do paciente só compara o **início**. Com médicos de durações diferentes, o mesmo paciente consegue 09:00–09:30 com um e 09:20–09:40 com outro. A correção prevista é verificar, no agendamento, as consultas ativas do paciente que se sobrepõem ao horário pedido. Quando isso for feito, basta remover o `@Disabled` do teste correspondente.
-- **Cancelamento pela API (#27):** o teste usa `RegistroConsultaService.alterar`, o mesmo serviço que a rota de cancelamento vai usar.
+- A proteção de intervalos de médico e paciente cobre requisições simultâneas atendidas pela mesma instância do backend. As gravações diretas no MongoDB têm as garantias dos índices únicos.
+- **Cancelamento pela API (#27):** o teste usa `RegistroConsultaService.alterar`, o mesmo serviço que a rota de cancelamento usa.
 
 ## Como executar
 

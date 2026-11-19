@@ -22,6 +22,7 @@ Executados em ordem alfabética, cada um depende dos anteriores.
 | `05-usuarios-equipe.js` | Login de cada médico ativo, uma segunda secretária (Lucas) e logins de Carla e Diego |
 | `06-pacientes-ampliados.js` | 147 pacientes gerados com semente fixa, CPFs válidos e e-mails `@example.com` |
 | `07-consultas-historico.js` | Consultas e histórico de 3 semanas antes a 3 semanas depois do dia da carga |
+| `08-fila-notificacoes.js` | Inscrições de Carla e Diego para uma consulta futura e uma notificação interna de cancelamento de Paulo |
 
 ## Como as consultas são geradas
 
@@ -51,7 +52,7 @@ Executados em ordem alfabética, cada um depende dos anteriores.
 - integridade do histórico de cada consulta;
 - vínculos de login.
 
-Ao final, imprime as consultas da próxima semana por médico.
+O verificador informa o ID da consulta que a secretaria pode cancelar na demonstração da fila e retorna erro se alguma verificação falhar.
 
 ## Observações
 

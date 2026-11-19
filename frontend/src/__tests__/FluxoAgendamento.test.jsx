@@ -369,16 +369,20 @@ describe('fluxo integrado do frontend de agendamento', () => {
     expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/vagas')).toHaveLength(1);
   });
 
-  it('recarrega vagas após 409, descarta o horário ocupado e preserva paciente e filtros', async () => {
+  it.each([
+    ['horário ocupado', undefined, 'Escolha outro horário na lista atualizada.'],
+    ['conflito do paciente', 'O paciente já tem uma consulta ativa que se sobrepõe a este horário.',
+      'O paciente já tem uma consulta ativa que se sobrepõe a este horário.'],
+  ])('recarrega vagas após 409 por %s e preserva paciente e filtros', async (_caso, message, aviso) => {
     const buscarVagas = vi.fn().mockResolvedValueOnce(vagas).mockResolvedValueOnce({ ...vagas, horarios: [outroHorario] });
-    const confirmarAgendamento = vi.fn().mockRejectedValueOnce({ status: 409 }).mockResolvedValueOnce({ id: 'c2' });
+    const confirmarAgendamento = vi.fn().mockRejectedValueOnce({ status: 409, message }).mockResolvedValueOnce({ id: 'c2' });
     renderFluxo({ buscarVagas, confirmarAgendamento });
     const user = userEvent.setup();
     await preencher(user);
     await revisar(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
     await screen.findByRole('radio', { name: '10:00 às 10:30' });
-    expect(screen.getByRole('alert')).toHaveTextContent('Escolha outro horário na lista atualizada.');
+    expect(screen.getByRole('alert')).toHaveTextContent(aviso);
     expect(screen.queryByRole('radio', { name: '09:00 às 09:30' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revisar agendamento' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('p1');

@@ -27,7 +27,7 @@ Implementado em `service/CalculadoraDisponibilidade.java` (sem banco) e `service
 
 Exemplo (cenário de referência de [medicos-agenda.md §6](../modelagem/medicos-agenda.md)): Ana, segunda 26/10/2026, jornada 08h–12h, consultas de 30 min, bloqueio das 09h às 10h → `08:00, 08:30, 10:00, 10:30, 11:00, 11:30`.
 
-O mesmo cálculo é usado na confirmação (`DisponibilidadeService.estaLivre`). O horário enviado precisa ser **exatamente** uma das vagas livres, e por isso nunca se agenda fora da jornada, fora da grade de horários, em bloqueio ou no passado.
+O mesmo cálculo é usado na confirmação (`DisponibilidadeService.exigirVagaLivre`). O horário enviado precisa ser **exatamente** uma das vagas livres, e por isso nunca se agenda fora da jornada, fora da grade de horários, em bloqueio ou no passado.
 
 ## 3. GET /vagas (#21)
 
@@ -82,6 +82,7 @@ Resposta 201:
 - **Secretaria:** `pacienteId` é obrigatório (agenda em nome do paciente).
 - **Paciente:** pode omitir `pacienteId`. A API usa o cadastro ligado ao login (`pacientes.usuarioId`, ver [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md)). Informar outro paciente → 403.
 - A disponibilidade é **revalidada no momento da confirmação**. Se duas pessoas confirmarem a mesma vaga ao mesmo tempo, o índice único `uk_consulta_medico_inicio` aceita só uma (ver [consultas.md §5](../modelagem/consultas.md)).
+- A confirmação recusa qualquer sobreposição com outra consulta ativa do paciente, inclusive com outro médico e horários de início diferentes. Horários adjacentes são permitidos. Veja as [garantias de reserva](../testes/garantias-de-reserva.md).
 - A gravação passa pelo `RegistroConsultaService`, que registra o evento `CRIACAO` no histórico.
 
 ## 5. Erros
@@ -94,7 +95,7 @@ Formato: `{ "status": 409, "erro": "mensagem" }`.
 | 401 | Sem sessão ou sessão expirada |
 | 403 | Perfil sem acesso; paciente agendando para outra pessoa; login de paciente sem cadastro ligado |
 | 404 | Médico, especialidade ou paciente inexistente ou inativo |
-| 409 | O horário não está livre: ocupado, bloqueado, fora da jornada/grade ou já passou |
+| 409 | A mensagem identifica consulta ativa do médico, conflito do paciente, bloqueio, jornada/grade incompatível, ausência de jornada ou horário passado |
 
 ## 6. Testes
 
@@ -102,6 +103,7 @@ Formato: `{ "status": 409, "erro": "mensagem" }`.
 |---|---|---|
 | `unit/CalculadoraDisponibilidadeTest` | não | Jornada × duração, bloqueio (cenário de referência), consulta ativa, sobreposição parcial, dia sem jornada, horário passado, horário que não cabe na faixa |
 | `integration/AgendamentoIntegrationTest` | sim (`consultafacil_test`) | Busca por dia e por intervalo, médico sem agenda, especialidade errada, agendamento pela secretaria e pelo paciente, `deveImpedirReservaEmPeriodoBloqueado` (Quadro 4), fora da jornada, horário passado, 409 para horário já reservado |
+| `integration/ReservasConcorrenciaIntegrationTest` | sim (`consultafacil_test`) | Sobreposição do mesmo paciente entre médicos diferentes e pedidos simultâneos com inícios diferentes |
 | `integration/RotasAutorizacaoTest` | não | Perfis de `/vagas` e `/consultas` |
 | `frontend/src/__tests__/agendamentoService.test.js` | não | Chamadas do front para `/vagas` e `/consultas` |
 
@@ -111,8 +113,7 @@ cd backend
 ./mvnw test -Dtest=AgendamentoIntegrationTest                   # com o Mongo no ar
 ```
 
-## 7. Pendências relacionadas
+## 7. Operação
 
-- **#25:** recusar sobreposição de horário do **mesmo paciente** com outro médico quando os inícios forem diferentes (há um `TODO #25` em `AgendamentoService`). O mesmo instante de início já é barrado pelo índice `uk_consulta_paciente_inicio`.
-- **#44:** ao alterar a agenda ou criar bloqueio, tratar consultas já marcadas no período.
+- A configuração da agenda exibe as consultas afetadas por mudanças na jornada ou bloqueios. [Alterações de agenda](alteracoes-agenda.md)
 - Pacientes cadastrados antes desta mudança não têm `usuarioId`. O seed de demonstração liga o Paulo ao login `paciente@consultafacil.demo`.

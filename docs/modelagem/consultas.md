@@ -139,7 +139,7 @@ Como a regra está no índice, ela vale mesmo com requisições concorrentes: o 
 ### 5.2 Na API
 
 - **Tradução dos erros:** a violação de índice único (11000) vira **409** com a mensagem "Horário indisponível…", e a recusa do validador (121) vira **400** (`MongoErros`).
-- **Sobreposição com início diferente:** os índices só comparam o **instante de início**. Uma consulta de 09:00–09:30 e outra de 09:15–09:45 **não** são barradas pelo banco. Essa verificação é feita na API com `ativasNoPeriodo()` (#25), além dos índices.
+- **Sobreposição de consultas (#25)**. A instância do backend verifica os intervalos do médico e do paciente e grava dentro da mesma seção crítica. Isso vale para a criação e para mudanças de horário, médico ou paciente. Os índices únicos protegem as reservas com o mesmo início no MongoDB.
 - **Jornada e bloqueios:** a consulta precisa estar dentro de uma faixa da agenda do médico e fora de bloqueios (#20 e #21).
 - **Referências:** paciente, médico e especialidade precisam existir e estar ativos, e a especialidade precisa ser uma das do médico.
 - **Transições de status:** conforme a seção 3 (#27 e #28).

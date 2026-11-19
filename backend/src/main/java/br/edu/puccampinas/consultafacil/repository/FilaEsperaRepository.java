@@ -47,7 +47,7 @@ public class FilaEsperaRepository {
      */
     public boolean marcarSinalizada(ObjectId id, Document ultimaSinalizacao, Date agora) {
         return col.updateOne(
-                Filters.and(Filters.eq("_id", id), Filters.eq("status", "AGUARDANDO")),
+                Filters.and(Filters.eq("_id", id), Filters.eq("status", "AGUARDANDO"), Filters.gt("validoAte", agora)),
                 Updates.combine(
                         Updates.set("status", "SINALIZADA"),
                         Updates.set("ultimaSinalizacao", ultimaSinalizacao),
@@ -115,9 +115,9 @@ public class FilaEsperaRepository {
     }
 
     /** SINALIZADA -> ATENDIDA: o próprio interessado agendou a vaga. */
-    public boolean marcarAtendida(ObjectId id, ObjectId consultaId, Date agora) {
+    public boolean marcarAtendida(ObjectId id, ObjectId notificacaoId, ObjectId consultaId, Date agora) {
         return col.updateOne(
-                Filters.and(Filters.eq("_id", id), Filters.eq("status", "SINALIZADA")),
+                sinalizacaoAtual(id, notificacaoId),
                 Updates.combine(
                         Updates.set("status", "ATENDIDA"),
                         Updates.set("ultimaSinalizacao", null),
@@ -128,11 +128,16 @@ public class FilaEsperaRepository {
     }
 
     /** SINALIZADA -> AGUARDANDO: a vaga não está mais disponível. criadoEm (posição na fila) não muda. */
-    public boolean voltarParaAguardando(ObjectId id, Date agora) {
+    public boolean voltarParaAguardando(ObjectId id, ObjectId notificacaoId, Date agora) {
         return col.updateOne(
-                Filters.and(Filters.eq("_id", id), Filters.eq("status", "SINALIZADA")),
+                sinalizacaoAtual(id, notificacaoId),
                 paraAguardando(agora))
                 .getModifiedCount() == 1;
+    }
+
+    private static Bson sinalizacaoAtual(ObjectId id, ObjectId notificacaoId) {
+        return Filters.and(Filters.eq("_id", id), Filters.eq("status", "SINALIZADA"),
+                Filters.eq("ultimaSinalizacao.notificacaoId", notificacaoId));
     }
 
     /**

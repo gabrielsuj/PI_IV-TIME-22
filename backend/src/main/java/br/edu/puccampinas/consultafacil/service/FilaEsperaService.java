@@ -208,7 +208,8 @@ public class FilaEsperaService {
             Document s = d.get("ultimaSinalizacao", Document.class);
             FilaEsperaResponse.Sinalizacao sinalizacao = s == null ? null : new FilaEsperaResponse.Sinalizacao(
                     s.getObjectId("consultaOrigemId").toHexString(), s.getObjectId("medicoId").toHexString(),
-                    nomesMedicos.get(s.getObjectId("medicoId")), iso(s.getDate("dataHora")), iso(s.getDate("sinalizadaEm")));
+                    nomesMedicos.get(s.getObjectId("medicoId")), iso(s.getDate("dataHora")), iso(s.getDate("sinalizadaEm")),
+                    s.getObjectId("notificacaoId") == null ? null : s.getObjectId("notificacaoId").toHexString());
             lista.add(new FilaEsperaResponse(
                     d.getObjectId("_id").toHexString(),
                     d.getObjectId("pacienteId").toHexString(), nomesPacientes.get(d.getObjectId("pacienteId")),

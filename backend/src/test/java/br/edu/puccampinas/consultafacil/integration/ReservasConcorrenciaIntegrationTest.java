@@ -35,7 +35,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
@@ -50,20 +49,22 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Garantias de reserva pela API de verdade (#55): POST /consultas e GET /vagas com o MongoDB real.
  *
- * O servidor de teste processa as requisições em várias threads ao mesmo tempo (o App usa o executor
- * padrão, de uma thread). Assim os pedidos simultâneos disputam a vaga de fato e o teste prova que a
- * garantia vem dos índices únicos parciais do banco, e não da ordem de chegada.
+ * O servidor de teste usa várias threads para exercitar os índices do banco e a validação
+ * de sobreposição do paciente em agendamentos simultâneos.
  *
  * Usa o banco consultafacil_test (scripts/recriar-banco.sh consultafacil_test) e só apaga os próprios dados.
  * Relógio parado em 20/10/2026; consultas na segunda 26/10. Horários em UTC: 09:00 em São Paulo = 12:00Z.
@@ -90,6 +91,7 @@ class ReservasConcorrenciaIntegrationTest {
     private String base;
     private String token;
     private RegistroConsultaService registro;
+    private volatile CyclicBarrier barreiraDeDisponibilidade;
 
     @BeforeAll static void conectar() {
         mongo = new MongoConnection("mongodb://localhost:27017/?serverSelectionTimeoutMS=3000", "consultafacil_test");
@@ -120,8 +122,23 @@ class ReservasConcorrenciaIntegrationTest {
         Clock relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
         var consultas = new ConsultaRepository(db);
         registro = new RegistroConsultaService(consultas, new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db)), relogio);
-        var agendamento = new AgendamentoService(
-                new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio),
+        var disponibilidade = new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio) {
+            @Override public void exigirVagaLivre(ObjectId medico, Instant inicio, Instant fim) {
+                super.exigirVagaLivre(medico, inicio, fim);
+                var barreira = barreiraDeDisponibilidade;
+                if (barreira != null) {
+                    try {
+                        barreira.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Teste interrompido", e);
+                    } catch (BrokenBarrierException | TimeoutException e) {
+                        throw new IllegalStateException("Os dois pedidos precisam encontrar a agenda do médico livre", e);
+                    }
+                }
+            }
+        };
+        var agendamento = new AgendamentoService(disponibilidade,
                 new MedicoRepository(db), new EspecialidadeRepository.Mongo(db),
                 new PacienteRepository.Mongo(db), new PacienteDoUsuarioRepository(db), registro);
 
@@ -129,7 +146,7 @@ class ReservasConcorrenciaIntegrationTest {
         token = sessoes.criar(SECRETARIA).token();
         var autz = new Autorizacao(new Autenticador(sessoes));
         var router = Rotas.router(new Cors(List.of()), autz, new Rotas.Handlers(NAO_USADO, NAO_USADO, NAO_USADO,
-                NAO_USADO, NAO_USADO, new VagasHandler(agendamento), new ConsultaHandler(agendamento), NAO_USADO));
+                NAO_USADO, NAO_USADO, new VagasHandler(agendamento), new ConsultaHandler(agendamento), NAO_USADO, NAO_USADO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsDoServidor = Executors.newFixedThreadPool(16);
@@ -163,7 +180,7 @@ class ReservasConcorrenciaIntegrationTest {
         assertFalse(iniciosDasVagas(MEDICO_30).contains("2026-10-26T12:00:00Z"), "a vaga saiu da busca");
     }
 
-    /** O mesmo paciente tenta dois médicos no mesmo horário ao mesmo tempo: o índice do paciente barra um deles. */
+    /** O mesmo paciente tenta dois médicos no mesmo horário ao mesmo tempo. */
     @Test void mesmoPacienteNaoReservaDoisMedicosNoMesmoHorarioAoMesmoTempo() throws Exception {
         ObjectId paciente = PACIENTES.get(0);
         List<Integer> status = simultaneos(List.of(
@@ -172,6 +189,19 @@ class ReservasConcorrenciaIntegrationTest {
 
         assertEquals(List.of(201, 409), status.stream().sorted().toList());
         assertEquals(1, ativas(Filters.eq("pacienteId", paciente)));
+    }
+
+    @Test void mesmoPacienteNaoReservaHorariosSobrepostosComIniciosDiferentesAoMesmoTempo() throws Exception {
+        ObjectId paciente = PACIENTES.get(0);
+        barreiraDeDisponibilidade = new CyclicBarrier(2);
+
+        List<Integer> status = simultaneos(List.of(
+                corpo(paciente, MEDICO_30, "12:00", "12:30"),
+                corpo(paciente, MEDICO_20, "12:20", "12:40")));
+
+        assertEquals(List.of(201, 409), status.stream().sorted().toList());
+        assertEquals(1, ativas(Filters.eq("pacienteId", paciente)));
+        assertEquals(1, mongo.database().getCollection("historico").countDocuments(Filters.eq("pacienteId", paciente)));
     }
 
     /** Pedidos simultâneos para vagas diferentes não podem gerar conflito falso. */
@@ -198,11 +228,53 @@ class ReservasConcorrenciaIntegrationTest {
     }
 
     /** Quadro 4: paciente já ocupado em outro médico, em horário que se sobrepõe com início diferente. */
-    @Disabled("Pendente #25: hoje só o mesmo instante de início é barrado (índice uk_consulta_paciente_inicio)")
     @Test void pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes() throws Exception {
         ObjectId paciente = PACIENTES.get(0);
-        assertEquals(201, post(corpo(paciente, MEDICO_30, "12:00", "12:30")).statusCode()); // 09:00–09:30
-        assertEquals(409, post(corpo(paciente, MEDICO_20, "12:20", "12:40")).statusCode()); // 09:20–09:40
+        var primeira = post(corpo(paciente, MEDICO_30, "12:00", "12:30"));
+        assertEquals(201, primeira.statusCode(), primeira.body());
+        String sobreposta = corpo(paciente, MEDICO_20, "12:20", "12:40");
+        var conflito = post(sobreposta);
+        assertEquals(409, conflito.statusCode(), conflito.body());
+        assertTrue(json.readTree(conflito.body()).get("erro").asText().contains("paciente já tem uma consulta ativa"));
+        assertEquals(201, post(corpo(paciente, MEDICO_20, "11:40", "12:00")).statusCode(), "horários adjacentes");
+
+        ObjectId id = new ObjectId(json.readTree(primeira.body()).get("id").asText());
+        registro.alterar(id, new Document("status", "CANCELADA"), SECRETARIA);
+        assertEquals(201, post(sobreposta).statusCode(), "consulta cancelada libera o intervalo do paciente");
+    }
+
+    /** #25 também na alteração de horário: a consulta não pode ser movida para cima de outra do mesmo paciente. */
+    @Test void alteracaoDeHorarioNaoPodeSobreporOutraConsultaDoPaciente() throws Exception {
+        ObjectId paciente = PACIENTES.get(0);
+        var primeira = post(corpo(paciente, MEDICO_30, "12:00", "12:30"));
+        var segunda = post(corpo(paciente, MEDICO_20, "13:00", "13:20"));
+        assertEquals(201, primeira.statusCode(), primeira.body());
+        assertEquals(201, segunda.statusCode(), segunda.body());
+        ObjectId a = new ObjectId(json.readTree(primeira.body()).get("id").asText());
+        ObjectId b = new ObjectId(json.readTree(segunda.body()).get("id").asText());
+
+        var erro = assertThrows(br.edu.puccampinas.consultafacil.api.ApiException.class,
+                () -> registro.alterar(b, horario("12:20", "12:40"), SECRETARIA));
+        assertEquals(409, erro.status());
+        assertEquals(ConsultaRepository.SOBREPOSICAO_PACIENTE, erro.getMessage());
+        assertEquals(List.of("CRIACAO"), eventos(b), "a alteração recusada não gera evento");
+
+        assertDoesNotThrow(() -> registro.alterar(b, horario("12:30", "12:50"), SECRETARIA), "horário adjacente");
+        assertDoesNotThrow(() -> registro.alterar(a, horario("11:50", "12:20"), SECRETARIA),
+                "a consulta pode se sobrepor ao próprio horário antigo");
+        assertEquals(2, ativas(Filters.eq("pacienteId", paciente)));
+    }
+
+    @Test void alteracaoDeMedicoRespeitaIntervalosDeOutrosPacientes() throws Exception {
+        assertEquals(201, post(corpo(PACIENTES.get(0), MEDICO_30, "12:00", "12:30")).statusCode());
+        var segunda = post(corpo(PACIENTES.get(1), MEDICO_20, "12:20", "12:40"));
+        assertEquals(201, segunda.statusCode());
+        ObjectId id = new ObjectId(json.readTree(segunda.body()).get("id").asText());
+        var erro = assertThrows(br.edu.puccampinas.consultafacil.api.ApiException.class,
+                () -> registro.alterar(id, new Document("medicoId", MEDICO_30), SECRETARIA));
+        assertEquals(409, erro.status());
+        assertEquals(ConsultaRepository.SOBREPOSICAO_MEDICO, erro.getMessage());
+        assertEquals(List.of("CRIACAO"), eventos(id));
     }
 
     /** Cancelamento libera a vaga para outra pessoa e registra os dois eventos no histórico. */
@@ -224,6 +296,12 @@ class ReservasConcorrenciaIntegrationTest {
     }
 
     // ---------------------------------------------------------------- apoio
+
+    /** Campos de alteração de horário em UTC no dia 26/10. */
+    private static Document horario(String inicioUtc, String fimUtc) {
+        return new Document("inicio", java.util.Date.from(Instant.parse("2026-10-26T" + inicioUtc + ":00Z")))
+                .append("fim", java.util.Date.from(Instant.parse("2026-10-26T" + fimUtc + ":00Z")));
+    }
 
     private static void salvar(MongoDatabase db, String colecao, Document d) {
         db.getCollection(colecao).replaceOne(Filters.eq("_id", d.get("_id")), d, new ReplaceOptions().upsert(true));

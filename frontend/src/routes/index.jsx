@@ -3,6 +3,7 @@ import AppLayout from '../components/AppLayout';
 import RequireAuth from '../components/RequireAuth';
 import AuthProvider from '../contexts/AuthProvider';
 import AgendaPage from '../pages/AgendaPage';
+import AvisosVagaPage from '../pages/AvisosVagaPage';
 import CalendarioPage from '../pages/CalendarioPage';
 import ConsultaDetalhePage from '../pages/ConsultaDetalhePage';
 import ConsultasPage from '../pages/ConsultasPage';
@@ -51,6 +52,7 @@ export const routes = [
               { path: 'calendario', element: <CalendarioPage /> },
               { path: 'consultas', element: <ConsultasPage /> },
               { path: 'consultas/:id', element: <ConsultaDetalhePage /> },
+              { path: 'avisos-vaga', element: <AvisosVagaPage /> },
               {
                 path: 'nova-consulta',
                 element: <NovaConsultaPage buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />,

@@ -25,6 +25,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,6 +42,7 @@ class RotasAutorizacaoTest {
     private final ObjectMapper json = new ObjectMapper();
     private HttpServer server;
     private HttpClient client;
+    private ExecutorService executor;
     private String base;
 
     /** Responde 200 com o perfil que a Autorizacao deixou na requisição. */
@@ -49,9 +54,11 @@ class RotasAutorizacaoTest {
     @BeforeEach void iniciar() throws Exception {
         var cors = new Cors(List.of());
         var autz = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        server.setExecutor(executor);
         server.createContext("/", router);
         server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
         server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO, ECO, ECO));
@@ -64,6 +71,7 @@ class RotasAutorizacaoTest {
     @AfterEach void encerrar() {
         if (client != null) client.close();
         if (server != null) server.stop(0);
+        if (executor != null) executor.shutdownNow();
     }
 
     /** Cenário do Quadro 4: acesso a uma função de outro perfil retorna 403. */
@@ -139,6 +147,11 @@ class RotasAutorizacaoTest {
         "GET,    /fila-espera,                MEDICO,           403",
         "GET,    /fila-espera/abc/def,        PACIENTE,         404",
         "GET,    /fila-esperaX,               PACIENTE,         404",
+        // Avisos (#57): somente o paciente
+        "GET,    /avisos-vaga,                PACIENTE,         200",
+        "POST,   /avisos-vaga,                PACIENTE,         200",
+        "GET,    /avisos-vaga,                MEDICO,           403",
+        "POST,   /avisos-vaga,                SECRETARIA_ADMIN, 403",
     })
     void matrizDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
         var r = enviar(metodo, rota, token(perfil));
@@ -158,6 +171,8 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("GET", "/consultas/lista", null).statusCode());
         assertEquals(401, enviar("GET", "/consultas/abc", null).statusCode());
         assertEquals(401, enviar("GET", "/fila-espera", null).statusCode());
+        assertEquals(401, enviar("GET", "/avisos-vaga", null).statusCode());
+        assertEquals(401, enviar("POST", "/avisos-vaga", null).statusCode());
     }
 
     /** O contexto "/consultas/" não pode engolir o "/consultas" sem barra, que continua no Router. */
@@ -175,6 +190,27 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("GET", "/agendas", t).statusCode());
     }
 
+    @Test void pedidosSimultaneosMantemOsUsuariosSeparados() throws Exception {
+        var barreira = new CyclicBarrier(2);
+        var autz = new Autorizacao(new Autenticador(sessoes));
+        server.createContext("/sessao-concorrente", autz.exigir(ex -> {
+            try {
+                barreira.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new java.io.IOException(e);
+            } catch (java.util.concurrent.BrokenBarrierException | java.util.concurrent.TimeoutException e) {
+                throw new java.io.IOException(e);
+            }
+            Http.sendJson(ex, 200, Map.of("usuarioId", Autorizacao.usuario(ex).id()));
+            ex.close();
+        }, Perfil.PACIENTE));
+        var resposta1 = consultarSessao("paciente-1");
+        var resposta2 = consultarSessao("paciente-2");
+        assertEquals("paciente-1", json.readTree(resposta1.get(10, TimeUnit.SECONDS).body()).get("usuarioId").asText());
+        assertEquals("paciente-2", json.readTree(resposta2.get(10, TimeUnit.SECONDS).body()).get("usuarioId").asText());
+    }
+
     @Test void rotasPublicasNaoExigemLogin() throws Exception {
         assertEquals(200, enviar("GET", "/health", null).statusCode());
     }
@@ -188,6 +224,13 @@ class RotasAutorizacaoTest {
 
     private String token(Perfil perfil) {
         return sessoes.criar(new UsuarioLogado("u-" + perfil, "Teste " + perfil, perfil)).token();
+    }
+
+    private java.util.concurrent.CompletableFuture<HttpResponse<String>> consultarSessao(String id) {
+        String token = sessoes.criar(new UsuarioLogado(id, id, Perfil.PACIENTE)).token();
+        var req = HttpRequest.newBuilder(URI.create(base + "/sessao-concorrente"))
+                .header("Authorization", "Bearer " + token).GET().build();
+        return client.sendAsync(req, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> enviar(String metodo, String rota, String token) throws Exception {

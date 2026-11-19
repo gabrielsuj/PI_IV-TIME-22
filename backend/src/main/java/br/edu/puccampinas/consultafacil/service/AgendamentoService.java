@@ -37,8 +37,6 @@ import java.util.Optional;
 public class AgendamentoService {
     /** Maior intervalo aceito na busca de vagas, em dias. */
     public static final int MAX_DIAS_BUSCA = 31;
-    public static final String HORARIO_INDISPONIVEL =
-            "Este horário não está mais disponível. Escolha outro horário na lista atualizada.";
 
     private final DisponibilidadeService disponibilidade;
     private final MedicoRepository medicos;
@@ -100,11 +98,8 @@ public class AgendamentoService {
         ObjectId pacienteId = pacienteDaConsulta(r.pacienteId(), ator);
 
         // Outra pessoa pode ter reservado depois da busca, ou o horário saiu da jornada / foi bloqueado.
-        if (!disponibilidade.estaLivre(medicoId, inicio, fim))
-            throw ApiException.conflict(HORARIO_INDISPONIVEL);
-        // TODO #25: recusar sobreposição com outra consulta ativa do mesmo paciente em outro médico
-        //           (hoje o índice uk_consulta_paciente_inicio só barra o mesmo instante de início).
-
+        disponibilidade.exigirVagaLivre(medicoId, inicio, fim);
+        // A gravação auditada verifica também os intervalos das consultas ativas do paciente (#25).
         Document dados = new Document("pacienteId", pacienteId)
                 .append("medicoId", medicoId)
                 .append("especialidadeId", especialidadeId)
