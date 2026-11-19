@@ -86,10 +86,10 @@ describe('menu e telas por perfil', () => {
     expect(menu()).toEqual(['Início', 'Consultas', 'Pacientes', 'Agenda', 'Calendário', 'Perfis de acesso']);
   });
 
-  it('paciente vê início, nova consulta e perfis', () => {
+  it('paciente vê início, consultas, avisos de vaga e perfis', () => {
     entrarComo({ id: 'u-paciente', nome: 'Paulo Paciente', perfil: 'PACIENTE' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Fila de espera', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Fila de espera', 'Avisos de vaga', 'Perfis de acesso']);
   });
 
   it('bloqueia a tela aberta pelo endereço quando o perfil não tem acesso', () => {

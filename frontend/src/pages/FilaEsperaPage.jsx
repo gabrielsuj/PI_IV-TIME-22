@@ -204,6 +204,10 @@ export default function FilaEsperaPage() {
 
   function agendarSinalizacao(item) {
     const sinal = item.ultimaSinalizacao;
+    if (perfil === 'PACIENTE') {
+      navigate('/avisos-vaga', { state: { avisoId: sinal?.notificacaoId } });
+      return;
+    }
     if (item.status !== 'SINALIZADA' || !sinal?.dataHora || !sinal?.medicoId || !item.especialidadeId) {
       setAviso('A sinalização não contém todos os dados para iniciar o agendamento. Atualize a fila.');
       return;

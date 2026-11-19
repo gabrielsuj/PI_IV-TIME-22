@@ -5,6 +5,7 @@ import AccessDeniedPage from '../pages/AccessDeniedPage';
 import UserMenu from './UserMenu';
 import {
   House,
+  Bell,
   CalendarPlus,
   ClipboardList,
   ListOrdered,
@@ -25,6 +26,7 @@ export default function AppLayout() {
   '/nova-consulta': CalendarPlus,
   '/consultas': ClipboardList,
   '/fila-espera': ListOrdered,
+  '/avisos-vaga': Bell,
   '/pacientes': Users,
   '/medicos': Stethoscope,
   '/agenda': CalendarCheck2,
