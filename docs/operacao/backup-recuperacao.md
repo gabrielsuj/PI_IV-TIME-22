@@ -9,10 +9,14 @@ Todos rodam a partir da raiz do projeto, com o container no ar (`docker compose 
 | Ação | Comando | Resultado |
 |---|---|---|
 | Fazer backup | `bash scripts/backup-banco.sh [banco]` | Arquivo compactado em `backups/<banco>-AAAAMMDD-HHMMSS.archive.gz` com dados, índices e validadores. Padrão: `consultafacil_demo` |
-| Restaurar | `bash scripts/restaurar-banco.sh <arquivo> [banco-destino] [--sim]` | **Apaga** o banco de destino e o recria exatamente como no backup. Pede confirmação; `--sim` dispensa. O destino padrão é o banco de origem, lido do nome do arquivo |
-| Testar a recuperação | `bash scripts/testar-recuperacao.sh [banco]` | Faz o backup, restaura numa cópia temporária (`<banco>_recuperacao`), compara tudo e apaga a cópia. **Não altera o banco original** |
+| Restaurar | `bash scripts/restaurar-banco.sh <arquivo> [banco-destino] [--sim]` | Valida o backup em um banco temporário antes de apagar e recriar o destino. Pede confirmação, dispensada por `--sim`. Por padrão, o destino é o banco de origem, lido do nome do arquivo. |
+| Testar a recuperação | `bash scripts/testar-recuperacao.sh [banco]` | Faz o backup, restaura numa cópia temporária (`<banco>_<sufixo>_recuperacao`), compara tudo e apaga a cópia. **Não altera o banco original** |
 
 A pasta `backups/` está no `.gitignore`: os backups ficam só na máquina de quem os gerou.
+
+A restauração copia o arquivo, confere a integridade do gzip e testa a cópia em um banco temporário. Se houver erro ou o arquivo não contiver coleções do banco de origem informado, o destino é preservado. Após a validação, o script usa a mesma cópia para restaurar o destino.
+
+O teste `bash scripts/testes/restaurar-banco.test.sh` usa um container MongoDB descartável. Ele verifica que arquivos inválidos ou de outra origem preservam o destino e que um backup válido restaura os dados, os índices e os validadores.
 
 ## O que o teste de recuperação confere
 
@@ -28,7 +32,7 @@ Exemplo com a carga de demonstração:
 ```text
 1/3 Backup de consultafacil_demo
     76K gerados
-2/3 Restauração na cópia temporária consultafacil_demo_recuperacao
+2/3 Restauração na cópia temporária consultafacil_demo_<sufixo>_recuperacao
 3/3 Comparação do original com a cópia restaurada
     coleção         documentos  conteúdo  índices  validador
     agendas         10          ok        ok       ok
