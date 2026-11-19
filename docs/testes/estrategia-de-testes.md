@@ -1,11 +1,9 @@
 # Estratégia de testes
 
-Resultado em 13/11/2026: **198 testes Vitest** no front-end e, no back-end:
-
-| Comando | Resultado esperado |
+| Comando | Cobertura |
 |---|---|
-| `./mvnw test` | **289 rodados, 0 falhas, 3 pulados**: o teste da #25 (desativado de propósito) e os 2 opcionais de `CadastroMongoIntegrationTest`. Os 5 opcionais de `HistoricoPersistenceIntegrationTest` não entram na contagem. |
-| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | **294 rodados, 0 falhas, 1 pulado** (só o da #25) |
+| `./mvnw test` | Testes unitários e de integração com MongoDB. |
+| `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | Inclui também as suítes de cadastro e persistência do histórico, como no workflow de CI. |
 
 ## Como os testes são organizados
 
@@ -29,7 +27,7 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | Cenário | Teste | Situação |
 |---|---|---|
 | Dois usuários escolhem a mesma vaga: só um agendamento é confirmado | `ReservasConcorrenciaIntegrationTest.deveConfirmarApenasUmAgendamentoParaMesmaVaga` (10 pedidos simultâneos pela API) e `ConsultaReservaIntegrationTest` (gravações simultâneas no banco) | ✅ |
-| Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest.deveRecusarSobreposicaoDeHorario` e `mesmoPacienteNaoReservaDoisMedicosNoMesmoHorarioAoMesmoTempo`; `ConsultaReservaIntegrationTest.deveRecusarMesmoPacienteNoMesmoHorario` | ✅ parcial. Mesmo paciente em horários **sobrepostos com início diferente** em outro médico ainda não é recusado: o teste já existe, desativado até a #25 |
+| Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest` cobre o médico ocupado e a sobreposição do paciente entre médicos diferentes, inclusive com pedidos simultâneos e inícios diferentes. | ✅ |
 | Horário bloqueado ou fora da agenda não aparece nem pode ser reservado | `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado`, `deveRecusarHorarioForaDaJornada`, `deveRecusarHorarioQueJaPassou`; `CalculadoraDisponibilidadeTest` | ✅ |
 | Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `SinalizacaoFilaIntegrationTest.deveLiberarVagaRegistrarHistoricoESinalizarFila`; `CancelamentoIntegrationTest.deveLiberarAVagaParaABuscaEParaNovaReserva`; `FilaEsperaIntegrationTest.inscricaoSinalizadaMostraAVagaLiberada`; `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `HistoricoTest` | ✅ |
 | Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado` e a matriz de permissões | ✅ |
@@ -112,7 +110,6 @@ bash scripts/recriar-banco.sh consultafacil_demo
 docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/verificar-carga.js
 ```
 
-## Pendências conhecidas
+## Acesso à agenda
 
-- **#25**: recusar sobreposição do mesmo paciente em horários com início diferente (hoje só o mesmo início é barrado pelo índice). O teste `pacienteNaoPodeTerConsultasSobrepostasEmMedicosDiferentes` já está pronto e desativado; ligado, ele falha com 201 no lugar de 409.
-- **#42**: o médico ainda pode consultar e alterar a agenda de outros médicos (o perfil é verificado, o dono do registro não).
+A suíte HTTP de `ConflitosAgendaIntegrationTest` usa dois médicos vinculados a logins distintos e uma secretaria. Verifica leitura e gravação de jornada, calendário, criação e remoção de bloqueios e recusa de médico sem vínculo (#42).
