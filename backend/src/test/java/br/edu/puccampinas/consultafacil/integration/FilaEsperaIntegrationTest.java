@@ -1,5 +1,7 @@
 package br.edu.puccampinas.consultafacil.integration;
 
+import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
+import br.edu.puccampinas.consultafacil.api.dto.AgendamentoRequest;
 import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.handler.AvisoVagaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
@@ -141,9 +143,9 @@ class FilaEsperaIntegrationTest {
         agendas.salvar(MEDICO, new Document("fusoHorario", "America/Sao_Paulo").append("duracaoMinutos", 30)
                 .append("jornadas", List.of(new Document("diaSemana", 1).append("faixas",
                         List.of(new Document("inicioMinuto", 600).append("fimMinuto", 660))))));
-        var disponibilidade = new DisponibilidadeService(agendas, new BloqueioRepository(db), consultas, relogio) {
-            @Override public void exigirVagaLivre(ObjectId medico, Instant inicio, Instant fim) {
-                super.exigirVagaLivre(medico, inicio, fim);
+        var disponibilidade = new DisponibilidadeService(agendas, new BloqueioRepository(db), consultas, relogio);
+        var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades, pacienteRepo, pacienteDoUsuario, registro) {
+            @Override public ConsultaResponse agendar(AgendamentoRequest pedido, UsuarioLogado ator) {
                 var barreira = barreiraDeReserva;
                 if (barreira != null) {
                     try {
@@ -152,12 +154,12 @@ class FilaEsperaIntegrationTest {
                         Thread.currentThread().interrupt();
                         throw new AssertionError("Teste interrompido", e);
                     } catch (java.util.concurrent.BrokenBarrierException | java.util.concurrent.TimeoutException e) {
-                        throw new AssertionError("Os dois pedidos precisam chegar à gravação com a vaga livre", e);
+                        throw new AssertionError("Os dois avisos devem chegar ao agendamento antes da disputa pela vaga", e);
                     }
                 }
+                return super.agendar(pedido, ator);
             }
         };
-        var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades, pacienteRepo, pacienteDoUsuario, registro);
         var avisos = new AvisoVagaHandler(new AvisoVagaService(notificacoes, fila, consultas, pacienteDoUsuario,
                 sinalizacao, agendamento, relogio));
 

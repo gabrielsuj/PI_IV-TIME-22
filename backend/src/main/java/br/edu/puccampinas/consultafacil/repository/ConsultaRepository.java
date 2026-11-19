@@ -22,7 +22,6 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
     public static final String SOBREPOSICAO_MEDICO = "O médico já tem uma consulta ativa neste período.";
     // Travas compartilhadas pelas instâncias do repositório no backend, com tamanho fixo (#25).
     private static final List<Object> TRAVAS_PACIENTE = IntStream.range(0, 256).mapToObj(i -> new Object()).toList();
-    private static final List<Object> TRAVAS_MEDICO = IntStream.range(0, 256).mapToObj(i -> new Object()).toList();
     private final MongoCollection<Document> col;
 
     public ConsultaRepository(MongoDatabase db) { this.col = db.getCollection("consultas"); }
@@ -93,6 +92,18 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
                 .into(new ArrayList<>());
     }
 
+    public List<ObjectId> sinalizacoesPendentes(ObjectId depoisDe, int limite) {
+        var filtro = Filters.exists("sinalizacaoFila");
+        if (depoisDe != null) filtro = Filters.and(filtro, Filters.gt("_id", depoisDe));
+        return col.find(filtro).projection(new Document("_id", 1)).sort(Sorts.ascending("_id"))
+                .limit(limite).map(d -> d.getObjectId("_id")).into(new ArrayList<>());
+    }
+
+    public void concluirLimpezaFila(ObjectId id) {
+        col.updateOne(Filters.and(Filters.eq("_id", id), Filters.eq("sinalizacaoFila", "LIMPAR")),
+                new Document("$unset", new Document("sinalizacaoFila", "")));
+    }
+
     @Override public java.util.Optional<Document> buscar(ObjectId id) {
         return java.util.Optional.ofNullable(col.find(Filters.eq("_id", id)).first());
     }
@@ -115,7 +126,7 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
         ObjectId medico = evento.getObjectId("medicoId"), paciente = evento.getObjectId("pacienteId");
         Date inicio = evento.getDate("dataHoraConsulta"), fim = evento.getDate("fimConsulta");
         // Todas as gravações adquirem primeiro a trava do médico e depois a do paciente.
-        synchronized (TRAVAS_MEDICO.get(Math.floorMod(medico.hashCode(), TRAVAS_MEDICO.size()))) {
+        synchronized (TravaAgenda.porMedico(medico)) {
             synchronized (TRAVAS_PACIENTE.get(Math.floorMod(paciente.hashCode(), TRAVAS_PACIENTE.size()))) {
                 if (temSobreposicao("pacienteId", paciente, inicio, fim, ignorar))
                     throw ApiException.conflict(SOBREPOSICAO_PACIENTE);
