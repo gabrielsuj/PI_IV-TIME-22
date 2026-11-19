@@ -1,4 +1,3 @@
 package br.edu.puccampinas.consultafacil.api.dto;
 
-public class ValidateCPFRequest {
-}
+public record ValidateCPFRequest(String cpf) {}
