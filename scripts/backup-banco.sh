@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Backup completo de um banco do ConsultaFácil (dados, índices e validadores) em backups/ (#45).
-# O arquivo é compactado e leva o banco e a data no nome: backups/<banco>-AAAAMMDD-HHMMSS.archive.gz
+# O arquivo é compactado e leva o banco e a data no nome: backups/<banco>-AAAAMMDD-HHMMSS-<sufixo>.archive.gz
 #
 # Uso (a partir da raiz do projeto, com o container no ar):
 #   bash scripts/backup-banco.sh                      # consultafacil_demo
@@ -23,13 +23,17 @@ if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
 fi
 
 mkdir -p "$PASTA"
-ARQUIVO="$PASTA/$BANCO-$(date +%Y%m%d-%H%M%S).archive.gz"
-trap 'rm -f "$ARQUIVO"; echo "Backup interrompido; nenhum arquivo foi mantido." >&2' ERR
+# Escreve no mesmo sistema de arquivos e publica somente após o dump completo.
+TEMP="$(mktemp "$PASTA/.dump.XXXXXXXX")"
+trap 'rm -f -- "$TEMP"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+ARQUIVO="$PASTA/$BANCO-$(date +%Y%m%d-%H%M%S)-${TEMP##*.}.archive.gz"
 
 echo "Gerando backup de $BANCO..."
-docker exec "$CONTAINER" mongodump --quiet --db "$BANCO" --archive --gzip > "$ARQUIVO"
-[ -s "$ARQUIVO" ] || { echo "O backup saiu vazio." >&2; false; }
-trap - ERR
+docker exec "$CONTAINER" mongodump --quiet --db "$BANCO" --archive --gzip > "$TEMP"
+[ -s "$TEMP" ] || { echo "O backup saiu vazio." >&2; exit 1; }
+ln "$TEMP" "$ARQUIVO"  # criação atômica, falha caso o nome já exista
 
 echo "Backup salvo em: ${ARQUIVO#"$RAIZ"/} ($(du -h "$ARQUIVO" | cut -f1))"
 docker exec "$CONTAINER" mongosh "$BANCO" --quiet --eval '
