@@ -46,6 +46,17 @@ jobs:
             done
           done
 
+      - name: Preparar o Maven Wrapper
+        working-directory: backend
+        shell: bash
+        run: |
+          for tentativa in 1 2 3; do
+            ./mvnw --batch-mode --version && exit 0
+            echo "Download do Maven falhou (tentativa $tentativa). Nova tentativa em 15 s."
+            sleep 15
+          done
+          exit 1
+
       - name: Rodar testes do backend
         working-directory: backend
         env:
