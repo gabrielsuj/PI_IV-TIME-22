@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NovaConsultaPage from '../pages/NovaConsultaPage';
+import FluxoAgendamento from '../components/agendamento/FluxoAgendamento';
 import { routes } from '../routes';
 import { buscarVagas as buscarVagasApi, confirmarAgendamento as confirmarAgendamentoApi } from '../services/agendamentoService';
 import { encerrarSessaoExpirada } from '../services/sessao';
@@ -18,6 +20,48 @@ const pacientes = [
   { id: 'p2', nome: 'Paulo Teste', cpf: '52998224725' },
 ];
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+
+describe('integração da vaga sinalizada com o agendamento', () => {
+  const propriedades = {
+    usuario: { id: 'u1', nome: 'Paciente Teste', perfil: 'PACIENTE' }, especialidade: { id: 'e1', nome: 'Cardiologia', ativa: true },
+    medico: { id: 'm1', nome: 'Ana Teste', ativo: true, especialidadeIds: ['e1'] }, data: '2026-12-01', vagaInicial: horario.inicio,
+  };
+
+  it('conclui a busca automática em StrictMode e não confirma a consulta automaticamente', async () => {
+    const buscarVagas = vi.fn(async () => vagas);
+    const confirmarAgendamento = vi.fn();
+    render(<StrictMode><FluxoAgendamento {...propriedades} buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} /></StrictMode>);
+    expect(await screen.findByRole('radio', { name: '09:00 às 09:30' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Revisar agendamento' })).toBeEnabled();
+    expect(buscarVagas.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(buscarVagas.mock.lastCall[1].signal.aborted).toBe(false);
+    expect(confirmarAgendamento).not.toHaveBeenCalled();
+  });
+
+  it('mantém o outro horário escolhido pelo usuário ao atualizar as vagas', async () => {
+    const user = userEvent.setup();
+    const buscarVagas = vi.fn(async () => vagas);
+    render(<FluxoAgendamento {...propriedades} buscarVagas={buscarVagas} />);
+    await screen.findByRole('radio', { name: '09:00 às 09:30' });
+    await user.click(screen.getByRole('radio', { name: '10:00 às 10:30' }));
+    await user.click(screen.getByRole('button', { name: 'Buscar horários' }));
+    expect(await screen.findByRole('radio', { name: '10:00 às 10:30' })).toBeChecked();
+    expect(buscarVagas).toHaveBeenCalledTimes(2);
+  });
+
+  it('não seleciona novamente a oferta após conflito de confirmação', async () => {
+    const user = userEvent.setup();
+    const buscarVagas = vi.fn(async () => vagas);
+    const confirmarAgendamento = vi.fn(async () => { throw Object.assign(new Error('Horário ocupado.'), { status: 409 }); });
+    render(<FluxoAgendamento {...propriedades} buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />);
+    await screen.findByRole('radio', { name: '09:00 às 09:30' });
+    await user.click(screen.getByRole('button', { name: 'Revisar agendamento' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
+    expect(await screen.findByRole('radio', { name: '09:00 às 09:30' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Revisar agendamento' })).toBeDisabled();
+    expect(confirmarAgendamento).toHaveBeenCalledTimes(1);
+  });
+});
 
 function deferred() {
   let resolve;
