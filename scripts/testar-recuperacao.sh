@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Teste de recuperação (#45): faz o backup de um banco, restaura numa cópia temporária
-# (<banco>_recuperacao) e confere, coleção por coleção, documentos, conteúdo (hash),
+# com nome exclusivo e confere, coleção por coleção, documentos, conteúdo (hash),
 # índices e validadores. O banco original não é alterado; a cópia é apagada no final.
 #
 # Uso (a partir da raiz do projeto, com o container no ar):
@@ -9,10 +9,14 @@
 set -euo pipefail
 
 BANCO="${1:-consultafacil_demo}"
-COPIA="${BANCO}_recuperacao"
+case "$BANCO" in
+  consultafacil|consultafacil_test|consultafacil_demo) ;;
+  *) echo "Banco de origem inválido: $BANCO" >&2; exit 1 ;;
+esac
 CONTAINER="${MONGO_CONTAINER:-consultafacil-mongo}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMP="$(mktemp -d)"
+TEMP="$(mktemp -d "${TMPDIR:-/tmp}/consultafacil-recuperacao.XXXXXXXX")"
+COPIA="${BANCO}_${TEMP##*.}_recuperacao"
 
 limpar() {
   rm -rf "$TEMP"

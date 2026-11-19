@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Restaura um backup gerado por scripts/backup-banco.sh (#45).
-# O banco de destino é apagado e recriado exatamente como estava no backup (dados, índices e validadores).
+# Valida o backup em um banco temporário antes de substituir o banco de destino.
 #
 # Uso (a partir da raiz do projeto, com o container no ar):
 #   bash scripts/restaurar-banco.sh backups/consultafacil_demo-20261120-1830.archive.gz
@@ -46,9 +46,54 @@ if [ "$CONFIRMADO" != true ]; then
   case "$resposta" in s|S|sim|SIM) ;; *) echo "Restauração cancelada."; exit 0 ;; esac
 fi
 
-docker exec "$CONTAINER" mongosh "$DESTINO" --quiet --eval 'db.dropDatabase()' > /dev/null
-docker exec -i "$CONTAINER" mongorestore --quiet --archive --gzip \
-  --nsInclude "$ORIGEM.*" --nsFrom "$ORIGEM.*" --nsTo "$DESTINO.*" < "$ARQUIVO"
+apagar_banco() {
+  docker exec "$CONTAINER" mongosh "$1" --quiet --eval '
+    const resultado = db.dropDatabase();
+    if (resultado.ok !== 1) { printjson(resultado); quit(1); }
+  ' > /dev/null
+}
+
+restaurar_em() {
+  docker exec -i "$CONTAINER" mongorestore --quiet --archive --gzip --stopOnError \
+    --nsInclude "$ORIGEM.*" --nsFrom "$ORIGEM.*" --nsTo "$1.*" < "$COPIA_BACKUP"
+}
+
+PASTA_VALIDACAO="$(mktemp -d "${TMPDIR:-/tmp}/consultafacil-restauracao.XXXXXXXX")"
+COPIA_BACKUP="$PASTA_VALIDACAO/backup.archive.gz"
+BANCO_VALIDACAO=""
+
+limpar() {
+  if [ -n "$BANCO_VALIDACAO" ] && ! apagar_banco "$BANCO_VALIDACAO"; then
+    echo "Não foi possível remover o banco temporário $BANCO_VALIDACAO." >&2
+  fi
+  rm -f -- "$COPIA_BACKUP"
+  rmdir -- "$PASTA_VALIDACAO"
+}
+trap limpar EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# As duas restaurações usam os mesmos bytes, mesmo que o arquivo original seja substituído.
+cp -- "$ARQUIVO" "$COPIA_BACKUP"
+if ! gzip -t "$COPIA_BACKUP"; then
+  echo "Backup inválido. O banco $DESTINO foi preservado." >&2
+  exit 1
+fi
+
+BANCO_VALIDACAO="consultafacil_validacao_${PASTA_VALIDACAO##*.}"
+echo "Validando o backup em um banco temporário..."
+if ! restaurar_em "$BANCO_VALIDACAO" || ! docker exec "$CONTAINER" mongosh "$BANCO_VALIDACAO" --quiet --eval '
+  if (db.getCollectionInfos().length === 0) {
+    print("Nenhuma coleção do banco de origem foi restaurada.");
+    quit(1);
+  }
+'; then
+  echo "A validação do backup falhou. O banco $DESTINO foi preservado." >&2
+  exit 1
+fi
+
+apagar_banco "$DESTINO"
+restaurar_em "$DESTINO"
 
 echo "Backup $NOME restaurado em $DESTINO:"
 docker exec "$CONTAINER" mongosh "$DESTINO" --quiet --eval '
