@@ -1,7 +1,6 @@
 package br.edu.puccampinas.consultafacil.client;
 
 import br.edu.puccampinas.consultafacil.connection.TratadoraDeComunicadoDeDesligamento;
-import br.edu.puccampinas.consultafacil.core.Teclado;
 import br.edu.puccampinas.consultafacil.handler.ValidarCPFRequest;
 import br.edu.puccampinas.consultafacil.handler.ValidarCPFResponse;
 import br.edu.puccampinas.consultafacil.protocol.Comunicado;
@@ -10,92 +9,52 @@ import br.edu.puccampinas.consultafacil.protocol.PedidoParaSair;
 
 import java.net.*;
 import java.io.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
-public class Cliente {
+public class Cliente implements AutoCloseable {
 	public static final String HOST_PADRAO  = "localhost";
 	public static final int    PORTA_PADRAO = 3000;
 
-	public static void main (String[] args) {
-        if (args.length>2) {
-            System.err.println ("Uso esperado: java Cliente [HOST [PORTA]]\n");
-            return;
-        }
+    private final Socket conexao;
+    private final ObjectOutputStream transmissor;
+    private final ObjectInputStream receptor;
 
-        Socket conexao=null;
+    private final Parceiro servidor;
+
+    private final TratadoraDeComunicadoDeDesligamento tratadoraDeComunicadoDeDesligamento;
+    private final BlockingQueue<Comunicado> respostas = new LinkedBlockingQueue<>();
+
+    public Cliente(String host, int porta) throws Exception {
         try {
-            String host = Cliente.HOST_PADRAO;
-            int    porta= Cliente.PORTA_PADRAO;
-
-            if (args.length>0) host = args[0];
-            if (args.length==2) porta = Integer.parseInt(args[1]);
-
-            conexao = new Socket (host, porta);
+            this.conexao = new Socket(host, porta);
         } catch(Exception erro) {
-            System.err.println ("Indique o servidor e a porta corretos!\n");
-            return;
+            throw new Exception("Host e/ou porta não foram informandos!");
         }
 
-        ObjectOutputStream transmissor=null;
-        try {
-            transmissor = new ObjectOutputStream(conexao.getOutputStream());
-        } catch(Exception erro) {
-            System.err.println ("Indique o servidor e a porta corretos!\n");
-            return;
-        }
+        this.transmissor = new ObjectOutputStream(conexao.getOutputStream());
+        this.receptor    = new ObjectInputStream(conexao.getInputStream());
+        this.servidor    = new Parceiro(conexao, receptor, transmissor);
 
-        ObjectInputStream receptor=null;
-        try {
-            receptor = new ObjectInputStream(conexao.getInputStream());
-        } catch(Exception erro) {
-            System.err.println ("Indique o servidor e a porta corretos!\n");
-            return;
-        }
+        this.tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento(servidor, respostas);
+    }
 
-        Parceiro servidor=null;
-        try {
-            servidor = new Parceiro (conexao, receptor, transmissor);
-        } catch(Exception erro) {
-            System.err.println ("Indique o servidor e a porta corretos!\n");
-            return;
-        }
+    public Cliente() throws Exception { this(HOST_PADRAO, PORTA_PADRAO); }
 
-        TratadoraDeComunicadoDeDesligamento tratadoraDeComunicadoDeDesligamento = null;
-        try {
-			tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento (servidor);
-		} catch(Exception ignored) {}
+    public synchronized ValidarCPFResponse validarCPF(ValidarCPFRequest cpf) throws Exception {
+        servidor.receba(cpf);
 
-        tratadoraDeComunicadoDeDesligamento.start();
-
-        Object ret;
+        Comunicado resposta = null;
         do {
-            // Fazer que ret receba do Backend
-            // ret = servidor.envie();
-            try {
-                if (ret instanceof ValidarCPFRequest) {
-                    ValidarCPFRequest cpf = null;
-                    try {
-                        cpf = (ValidarCPFRequest)(ret);
-                        servidor.receba(new ValidarCPFRequest(cpf.getCPF()));
-                    } catch (Exception e) {
-                        System.err.println("Não foi recebido o CPF corretamente.");
-                    }
+            resposta = (Comunicado)(servidor.espie());
+        } while(!(resposta instanceof ValidarCPFResponse));
 
-                    Comunicado comunicado;
-                    do {
-                        comunicado = (Comunicado)(servidor.espie());
-                    } while (!(comunicado instanceof ValidarCPFResponse));
+        return (ValidarCPFResponse)(resposta);
+    }
 
-                    // Mandar resposta para o backend
-                    // ValidarCPFResponse resposta = (ValidarCPFResponse)(servidor.envie());
-                }
-            } catch (Exception ignored) {}
-        } while(!(ret instanceof PedidoParaSair));
-
-		try {
-			servidor.receba(new PedidoParaSair());
-		} catch(Exception ignored) {}
-		
-		System.out.println ("Obrigado por usar este programa!");
-		System.exit(0);
-	}
+    @Override
+    public synchronized void close() {
+        try { servidor.receba(new PedidoParaSair()); } catch (Exception ignored) {}
+        try { servidor.adeus(); } catch (Exception ignored) {}
+    }
 }
