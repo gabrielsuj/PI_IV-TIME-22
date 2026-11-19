@@ -383,6 +383,8 @@ describe('fluxo integrado do frontend de agendamento', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
     await screen.findByRole('radio', { name: '10:00 às 10:30' });
     expect(screen.getByRole('alert')).toHaveTextContent(aviso);
+    expect(screen.getByRole('alert')).toHaveTextContent('Escolha outro horário na lista atualizada.');
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1');
     expect(screen.queryByRole('radio', { name: '09:00 às 09:30' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revisar agendamento' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: /^Paciente/ })).toHaveValue('p1');
