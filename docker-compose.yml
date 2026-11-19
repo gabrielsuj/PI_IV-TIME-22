@@ -3,7 +3,7 @@ services:
     image: mongo:7
     container_name: consultafacil-mongo
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_DATABASE: consultafacil
     volumes:
