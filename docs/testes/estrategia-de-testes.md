@@ -87,16 +87,15 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 docker compose up -d mongo
 bash scripts/recriar-banco.sh consultafacil_test     # validadores e índices, sem dados de exemplo
 
-cd backend && ./mvnw test                            # unidade + integração
-cd frontend && npm test                              # Vitest
-cd frontend && npm run lint                          # ESLint
+(cd backend && ./mvnw test)                         # unidade + integração
+(cd frontend && npm ci && npm test && npm run lint && npm run build)
 ```
 
 Os dois testes opcionais exigem a ativação explícita, porque usam o validador real do banco:
 
 ```bash
 # banco exclusivo do teste de histórico (o recriar-banco.sh não aceita esse nome)
-for f in database/init/*.js; do docker exec -i consultafacil-mongo mongosh consultafacil_historico_test --quiet < "$f"; done
+for f in database/init/*.js; do docker exec -i consultafacil-mongo mongosh consultafacil_historico_test --quiet --file /dev/stdin < "$f"; done
 
 cd backend
 HISTORICO_MONGO_URI="mongodb://localhost:27017/?serverSelectionTimeoutMS=3000" \
@@ -107,7 +106,7 @@ Conferência da carga de demonstração:
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_demo
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/verificar-carga.js
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
 ```
 
 ## Acesso à agenda
