@@ -3,8 +3,16 @@ package br.edu.puccampinas.consultafacil.repository;
 import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Sorts;
 import org.bson.Document;
+import org.bson.types.ObjectId;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.gt;
 
 /** Apenas inserção. Repetir o mesmo evento é seguro; divergências não são ocultadas. */
 @FunctionalInterface
@@ -14,9 +22,20 @@ public interface HistoricoRepository {
     /** Base para documentos legados; destinos sem histórico anterior retornam zero. */
     default int ultimaSequencia(org.bson.types.ObjectId consultaId) { return 0; }
 
-    class Mongo implements HistoricoRepository {
+    class Mongo implements HistoricoRepository, HistoricoLeituraRepository {
         private final MongoCollection<Document> col;
         public Mongo(MongoDatabase db) { col = db.getCollection("historico"); }
+
+        @Override public List<Document> listarPorConsulta(ObjectId consultaId, int aposSequencia, int limite) {
+            if (consultaId == null) throw new IllegalArgumentException("Consulta é obrigatória para ler o histórico");
+            if (aposSequencia < 0) throw new IllegalArgumentException("Sequência inicial não pode ser negativa");
+            if (limite < 1 || limite > LIMITE_MAXIMO)
+                throw new IllegalArgumentException("Limite do histórico deve ser de 1 a " + LIMITE_MAXIMO);
+            return col.find(and(eq("consultaId", consultaId), gt("sequencia", aposSequencia)))
+                    .sort(Sorts.ascending("sequencia"))
+                    .limit(limite)
+                    .into(new ArrayList<>());
+        }
 
         @Override public int ultimaSequencia(org.bson.types.ObjectId consultaId) {
             Document ultimo = col.find(eq("consultaId", consultaId))

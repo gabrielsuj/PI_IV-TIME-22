@@ -32,3 +32,27 @@ export function cancelarConsulta(id, motivo) {
 export function alterarStatusConsulta(id, status) {
   return api.post(`/consultas/${encodeURIComponent(id)}/status`, { status });
 }
+
+export const LIMITE_HISTORICO = 20;
+
+/** Uma página do histórico autorizado (#46), ordenada por sequência e sem recuperar pendências no servidor. */
+export async function buscarHistoricoConsulta(id, { aposSequencia = 0, limite = LIMITE_HISTORICO } = {}, { signal } = {}) {
+  const pagina = await api.get(`/consultas/${encodeURIComponent(id)}/historico`, { params: { aposSequencia, limite }, signal });
+  const invalida = () => { throw new Error('Não foi possível ler o histórico recebido. Atualize o histórico para tentar novamente.'); };
+  if (!pagina || pagina.consultaId !== id || pagina.aposSequencia !== aposSequencia || pagina.limite !== limite
+    || !Array.isArray(pagina.eventos) || pagina.eventos.length > limite || typeof pagina.temMais !== 'boolean'
+    || typeof pagina.atualizacaoPendente !== 'boolean'
+    || pagina.limiteAtingido !== (pagina.eventos.length === limite)) invalida();
+  const ids = new Set();
+  let ultima = aposSequencia;
+  for (const evento of pagina.eventos) {
+    if (typeof evento?.id !== 'string' || !evento.id.trim() || ids.has(evento.id)
+      || !Number.isInteger(evento.sequencia) || evento.sequencia <= ultima || evento.sequencia > 2_147_483_647
+      || typeof evento.evento !== 'string' || !evento.evento.trim()) invalida();
+    ids.add(evento.id);
+    ultima = evento.sequencia;
+  }
+  if (pagina.temMais && (!pagina.limiteAtingido || pagina.eventos.length === 0 || pagina.proximaSequencia !== ultima)) invalida();
+  if (!pagina.temMais && pagina.proximaSequencia != null) invalida();
+  return pagina;
+}

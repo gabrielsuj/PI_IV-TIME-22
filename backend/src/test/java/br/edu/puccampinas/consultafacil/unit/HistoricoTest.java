@@ -1,15 +1,25 @@
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.Json;
+import br.edu.puccampinas.consultafacil.api.dto.HistoricoAlteracaoResponse;
+import br.edu.puccampinas.consultafacil.domain.enums.EventoHistorico;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.*;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
 import br.edu.puccampinas.consultafacil.service.*;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.bson.types.Decimal128;
+import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HistoricoTest {
@@ -25,6 +35,22 @@ class HistoricoTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-11T12:00:00Z"), ZoneOffset.UTC);
     private final RegistroConsultaService service = new RegistroConsultaService(consultas, processor, clock);
     private final UsuarioLogado secretaria = new UsuarioLogado(new ObjectId().toHexString(), "Teste", Perfil.SECRETARIA_ADMIN);
+    private final UsuarioLogado paciente = new UsuarioLogado(new ObjectId().toHexString(), "Paciente", Perfil.PACIENTE);
+    private final UsuarioLogado medico = new UsuarioLogado(new ObjectId().toHexString(), "Médico", Perfil.MEDICO);
+    private final Map<ObjectId, String> nomesUsuarios = new HashMap<>();
+    private final List<Set<ObjectId>> lotesNomes = new ArrayList<>();
+    private boolean nomesIndisponiveis;
+    private final NomesRepository nomes = new NomesRepository() {
+        public Map<ObjectId, String> pacientes(Collection<ObjectId> ids) { throw new AssertionError("Responsável vem de usuarios"); }
+        public Map<ObjectId, String> especialidades(Collection<ObjectId> ids) { throw new AssertionError("Responsável vem de usuarios"); }
+        @Override public Map<ObjectId, String> usuarios(Collection<ObjectId> ids) {
+            lotesNomes.add(Set.copyOf(ids));
+            if (nomesIndisponiveis) throw new IllegalStateException("Falha na leitura de nomes");
+            Map<ObjectId, String> encontrados = new HashMap<>();
+            for (ObjectId id : ids) if (nomesUsuarios.containsKey(id)) encontrados.put(id, nomesUsuarios.get(id));
+            return encontrados;
+        }
+    };
 
     private static Document dados() {
         return new Document("pacienteId", new ObjectId()).append("medicoId", new ObjectId())
@@ -201,6 +227,502 @@ class HistoricoTest {
         assertEquals(1, resultado.eventosProcessados());
         assertEquals(1, resultado.falhas());
         assertEquals(2, consultas.docs.get(id).getList("eventosPendentes", Document.class).getFirst().getInteger("sequencia"));
+    }
+
+    private HistoricoConsultaService leitor(ObjectId referencia, AtomicInteger leituras) {
+        Document consulta = consultas.docs.get(referencia);
+        var acesso = new AcessoConsulta(
+                login -> Optional.ofNullable(paciente.id().equals(login) ? consulta.getObjectId("pacienteId") : null),
+                login -> Optional.ofNullable(medico.id().equals(login) ? consulta.getObjectId("medicoId") : null));
+        return new HistoricoConsultaService(consultas, (id, apos, limite) -> {
+            leituras.incrementAndGet();
+            return eventos.values().stream().filter(e -> id.equals(e.getObjectId("consultaId")))
+                    .filter(e -> e.getInteger("sequencia") > apos)
+                    .sorted(Comparator.comparingInt(e -> e.getInteger("sequencia"))).limit(limite).toList();
+        }, acesso, nomes);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Perfil.class)
+    void leituraAutorizadaUsaVinculoEConverteEventosReaisEmDtos(Perfil perfil) {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        ObjectId outra = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var ator = switch (perfil) { case PACIENTE -> paciente; case MEDICO -> medico; case SECRETARIA_ADMIN -> secretaria; };
+        var resposta = leitor(id, leituras).listar(id, ator);
+        assertEquals(id.toHexString(), resposta.consultaId());
+        assertEquals(List.of("CRIACAO", "CONFIRMACAO"), resposta.eventos().stream().map(e -> e.evento()).toList());
+        assertEquals(List.of(1, 2), resposta.eventos().stream().map(e -> e.sequencia()).toList());
+        assertEquals(clock.instant().toString(), resposta.eventos().getFirst().ocorridoEm());
+        assertEquals("2026-12-01T12:00:00Z", resposta.eventos().getFirst().dataHoraConsulta());
+        assertEquals(secretaria.id(), resposta.eventos().getFirst().ator().id());
+        assertEquals(100, resposta.limite());
+        assertFalse(resposta.limiteAtingido());
+        assertFalse(resposta.atualizacaoPendente());
+        assertEquals(1, leituras.get());
+        assertNotEquals(outra.toHexString(), resposta.consultaId());
+        assertThrows(UnsupportedOperationException.class, () -> resposta.eventos().clear());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Perfil.class, names = {"PACIENTE", "MEDICO"})
+    void leituraNaoConsultaHistoricoDeOutroCadastroOuLoginSemVinculo(Perfil perfil) {
+        ObjectId propria = criar(), outra = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(propria, leituras);
+        var ator = perfil == Perfil.PACIENTE ? paciente : medico;
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(outra, ator)).status());
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(outra, 5, 1, ator)).status());
+        var semVinculo = new UsuarioLogado(new ObjectId().toHexString(), "Sem vínculo", perfil);
+        assertEquals(403, assertThrows(ApiException.class, () -> leitor.listar(propria, semVinculo)).status());
+        assertEquals(0, leituras.get());
+        assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void leituraDistingueAtorInvalidoIdAusenteEConsultaInexistenteAntesDeBuscarEventos() {
+        ObjectId id = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(id, leituras);
+        for (UsuarioLogado ator : Arrays.asList(null, new UsuarioLogado("inválido", "Teste", Perfil.SECRETARIA_ADMIN),
+                new UsuarioLogado(secretaria.id(), "Teste", null)))
+            assertEquals(401, assertThrows(ApiException.class, () -> leitor.listar(id, ator)).status());
+        assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(null, secretaria)).status());
+        assertEquals(404, assertThrows(ApiException.class, () -> leitor.listar(new ObjectId(), secretaria)).status());
+        assertEquals(0, leituras.get());
+    }
+
+    @Test void leituraVaziaNaoProcessaNemDescartaPendencias() {
+        indisponivel = true;
+        ObjectId id = criar();
+        Document antes = copia(consultas.docs.get(id));
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertTrue(resposta.eventos().isEmpty());
+        assertFalse(resposta.limiteAtingido());
+        assertTrue(resposta.atualizacaoPendente());
+        assertEquals(antes, consultas.docs.get(id));
+        assertEquals(1, consultas.docs.get(id).getList("eventosPendentes", Document.class).size());
+        assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void projecaoConcluidaDuranteALeituraAindaSinalizaPaginaPossivelmenteIncompleta() {
+        indisponivel = true;
+        ObjectId id = criar();
+        var acesso = new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            indisponivel = false;
+            processor.processarConsulta(consultaId);
+            return List.of(); // Snapshot obtido antes de outro processador concluir a projeção.
+        }, acesso, nomes);
+        var resposta = leitorConcorrente.listar(id, secretaria);
+        assertTrue(resposta.eventos().isEmpty());
+        assertTrue(resposta.atualizacaoPendente());
+        assertTrue(consultas.docs.get(id).getList("eventosPendentes", Document.class).isEmpty());
+        var atualizada = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(1, atualizada.eventos().size());
+        assertFalse(atualizada.atualizacaoPendente());
+    }
+
+    @Test void escritaJaProjetadaDuranteALeituraSinalizaMudancaDeVersaoSemInventarEvento() {
+        ObjectId id = criar();
+        var acesso = new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            var snapshot = List.copyOf(eventos.values());
+            service.alterar(consultaId, new Document("status", "CONFIRMADA"), secretaria);
+            return snapshot;
+        }, acesso, nomes);
+        var resposta = leitorConcorrente.listar(id, secretaria);
+        assertEquals(List.of("CRIACAO"), resposta.eventos().stream().map(e -> e.evento()).toList());
+        assertTrue(resposta.atualizacaoPendente());
+        assertTrue(consultas.docs.get(id).getList("eventosPendentes", Document.class).isEmpty());
+        var atualizada = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(List.of("CRIACAO", "CONFIRMACAO"), atualizada.eventos().stream().map(e -> e.evento()).toList());
+        assertFalse(atualizada.atualizacaoPendente());
+    }
+
+    @Test void revalidaAcessoSeAVinculacaoMudarDuranteALeitura() {
+        ObjectId id = criar();
+        ObjectId pacienteOriginal = consultas.docs.get(id).getObjectId("pacienteId");
+        var acesso = new AcessoConsulta(login -> Optional.of(pacienteOriginal), login -> Optional.empty());
+        var leitorConcorrente = new HistoricoConsultaService(consultas, (consultaId, apos, limite) -> {
+            var snapshot = List.copyOf(eventos.values());
+            service.alterar(consultaId, new Document("pacienteId", new ObjectId()), secretaria);
+            return snapshot;
+        }, acesso, nomes);
+        assertEquals(403, assertThrows(ApiException.class, () -> leitorConcorrente.listar(id, paciente)).status());
+    }
+
+    @Test void leituraNuncaSerializaDocumentoBrutoOuCredenciais() {
+        ObjectId id = criar();
+        Document evento = eventos.values().iterator().next();
+        evento.append("versao", 99).append("eventosPendentes", List.of(new Document("senha", "segredo")));
+        evento.get("ator", Document.class).append("token", "segredo");
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        String serializado = Json.toJson(resposta);
+        for (String proibido : List.of("versao", "eventosPendentes", "senha", "token", "segredo", "$oid", "$date"))
+            assertFalse(serializado.contains(proibido), serializado);
+        assertEquals(evento.getObjectId("_id").toHexString(), resposta.eventos().getFirst().id());
+        assertNull(resposta.eventos().getFirst().statusAnterior());
+    }
+
+    @Test void leituraIndicaTetoSemAfirmarQueExistemMaisEventos() {
+        ObjectId id = criar();
+        Document modelo = eventos.values().iterator().next();
+        for (int sequencia = 2; sequencia <= 100; sequencia++) {
+            ObjectId eventoId = new ObjectId();
+            eventos.put(eventoId, copia(modelo).append("_id", eventoId).append("sequencia", sequencia));
+        }
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(100, resposta.eventos().size());
+        assertTrue(resposta.limiteAtingido());
+        assertFalse(resposta.temMais());
+        assertNull(resposta.proximaSequencia());
+    }
+
+    @Test void leituraPaginaPorSequenciaSemRepetirEventosEReconheceUltimaPaginaCheia() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        service.alterar(id, new Document("medicoId", new ObjectId()), secretaria);
+        service.alterar(id, new Document("status", "CONCLUIDA"), secretaria);
+        var leitor = leitor(id, new AtomicInteger());
+
+        var primeira = leitor.listar(id, 0, 2, secretaria);
+        assertEquals(List.of(1, 2), primeira.eventos().stream().map(e -> e.sequencia()).toList());
+        assertEquals(0, primeira.aposSequencia());
+        assertEquals(2, primeira.limite());
+        assertTrue(primeira.temMais());
+        assertEquals(2, primeira.proximaSequencia());
+        var segunda = leitor.listar(id, primeira.proximaSequencia(), 2, secretaria);
+        assertEquals(List.of(3, 4), segunda.eventos().stream().map(e -> e.sequencia()).toList());
+        assertTrue(segunda.limiteAtingido());
+        assertFalse(segunda.temMais());
+        assertNull(segunda.proximaSequencia());
+        var vazia = leitor.listar(id, 4, 2, secretaria);
+        assertTrue(vazia.eventos().isEmpty());
+        assertFalse(vazia.temMais());
+        assertNull(vazia.proximaSequencia());
+    }
+
+    @Test void cursorToleraLacunasEOrdenaPorSequenciaEmVezDaDataDoEvento() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        service.alterar(id, new Document("status", "CANCELADA"), secretaria);
+        eventos.values().removeIf(e -> e.getInteger("sequencia") == 2);
+        for (Document evento : eventos.values())
+            evento.put("ocorridoEm", Date.from(Instant.parse(evento.getInteger("sequencia") == 1
+                    ? "2026-12-02T12:00:00Z" : "2026-11-01T12:00:00Z")));
+        var leitor = leitor(id, new AtomicInteger());
+        var primeira = leitor.listar(id, 0, 1, secretaria);
+        assertEquals(1, primeira.eventos().getFirst().sequencia());
+        assertEquals("2026-12-02T12:00:00Z", primeira.eventos().getFirst().ocorridoEm());
+        assertEquals("2026-12-01T12:00:00Z", primeira.eventos().getFirst().dataHoraConsulta());
+        var segunda = leitor.listar(id, primeira.proximaSequencia(), 1, secretaria);
+        assertEquals(3, segunda.eventos().getFirst().sequencia());
+        assertEquals("2026-11-01T12:00:00Z", segunda.eventos().getFirst().ocorridoEm());
+        assertFalse(segunda.temMais());
+    }
+
+    @Test void proximaPaginaIncluiNovosEventosProjetadosComSequenciaMaior() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+        var leitor = leitor(id, new AtomicInteger());
+        var primeira = leitor.listar(id, 0, 1, secretaria);
+        service.alterar(id, new Document("status", "CONCLUIDA"), secretaria);
+        var seguinte = leitor.listar(id, primeira.proximaSequencia(), 2, secretaria);
+        assertEquals(List.of(2, 3), seguinte.eventos().stream().map(e -> e.sequencia()).toList());
+        assertFalse(seguinte.temMais());
+    }
+
+    @Test void parametrosInvalidosNaoChegamAoRepositorioDoHistorico() {
+        ObjectId id = criar();
+        AtomicInteger leituras = new AtomicInteger();
+        var leitor = leitor(id, leituras);
+        for (int limite : List.of(-1, 0, 101, Integer.MAX_VALUE))
+            assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(id, 0, limite, secretaria)).status());
+        assertEquals(400, assertThrows(ApiException.class, () -> leitor.listar(id, -1, 10, secretaria)).status());
+        assertEquals(0, leituras.get());
+        assertTrue(leitor.listar(id, Integer.MAX_VALUE, 1, secretaria).eventos().isEmpty());
+    }
+
+    @Test void ultimaSequenciaInt32NaoProvocaOverflowNoCursor() {
+        ObjectId id = criar();
+        Document ultimo = copia(eventos.values().iterator().next()).append("_id", new ObjectId()).append("sequencia", Integer.MAX_VALUE);
+        eventos.put(ultimo.getObjectId("_id"), ultimo);
+        var pagina = leitor(id, new AtomicInteger()).listar(id, Integer.MAX_VALUE - 1, 1, secretaria);
+        assertEquals(Integer.MAX_VALUE, pagina.eventos().getFirst().sequencia());
+        assertFalse(pagina.temMais());
+        assertNull(pagina.proximaSequencia());
+    }
+
+    @Test void falhaAoConferirProximaPaginaNaoAnunciaFimDoHistorico() {
+        ObjectId id = criar();
+        Document evento = eventos.values().iterator().next();
+        var leitor = new HistoricoConsultaService(consultas, (consulta, apos, limite) -> {
+            if (apos == 0) return List.of(evento);
+            throw new IllegalStateException("Falha na continuação");
+        }, new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty()), nomes);
+        assertThrows(IllegalStateException.class, () -> leitor.listar(id, 0, 1, secretaria));
+    }
+
+    @Test void falhaDeLeituraNaoViraHistoricoVazio() {
+        ObjectId id = criar();
+        var leitor = new HistoricoConsultaService(consultas, (consulta, apos, limite) -> {
+            throw new IllegalStateException("Falha de leitura");
+        }, new AcessoConsulta(login -> Optional.empty(), login -> Optional.empty()), nomes);
+        assertThrows(IllegalStateException.class, () -> leitor.listar(id, secretaria));
+    }
+
+    private ObjectId criarEvento(EventoHistorico tipo) {
+        ObjectId id = criar();
+        switch (tipo) {
+            case CRIACAO -> { }
+            case CONFIRMACAO -> service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+            case ALTERACAO -> service.alterar(id, new Document("medicoId", new ObjectId()), secretaria);
+            case CANCELAMENTO, SINALIZACAO_FILA -> {
+                service.alterar(id, new Document("status", "CANCELADA").append("motivoCancelamento", "Viagem"), secretaria);
+                if (tipo == EventoHistorico.SINALIZACAO_FILA) projetarSinalizacao(id, 7);
+            }
+            case CONCLUSAO, FALTA -> {
+                service.alterar(id, new Document("status", "CONFIRMADA"), secretaria);
+                service.alterar(id, new Document("status", tipo == EventoHistorico.CONCLUSAO ? "CONCLUIDA" : "FALTA"), secretaria);
+            }
+        }
+        return id;
+    }
+
+    /** Payload da #32, transferido pelo mesmo processador real, sem executar o fluxo de notificações/fila. */
+    private void projetarSinalizacao(ObjectId id, int total) {
+        Document cancelamento = eventos.values().stream().filter(e -> id.equals(e.getObjectId("consultaId")))
+                .max(Comparator.comparingInt(e -> e.getInteger("sequencia"))).orElseThrow();
+        int versao = consultas.docs.get(id).getInteger("versao");
+        Document evento = copia(cancelamento).append("_id", new ObjectId()).append("sequencia", versao + 1)
+                .append("evento", "SINALIZACAO_FILA").append("statusAnterior", "CANCELADA").append("statusNovo", "CANCELADA")
+                .append("ator", new Document("perfil", "SISTEMA").append("id", null)).append("totalSinalizados", total);
+        evento.remove("motivo");
+        assertTrue(consultas.atualizarComEvento(id, versao, new Document(), evento));
+        processor.processarConsulta(id);
+    }
+
+    @ParameterizedTest
+    @EnumSource(EventoHistorico.class)
+    void leituraRetornaOsSeteTiposComDetalhesCondicionais(EventoHistorico tipo) {
+        ObjectId id = criarEvento(tipo);
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        var ultimo = resposta.eventos().getLast();
+        assertEquals(tipo.name(), ultimo.evento());
+        assertEquals(switch (tipo) {
+            case CRIACAO -> null;
+            case CONCLUSAO, FALTA -> "CONFIRMADA";
+            case SINALIZACAO_FILA -> "CANCELADA";
+            default -> "AGENDADA";
+        }, ultimo.statusAnterior());
+        assertEquals(switch (tipo) {
+            case CRIACAO, ALTERACAO -> "AGENDADA";
+            case CONFIRMACAO -> "CONFIRMADA";
+            case CANCELAMENTO, SINALIZACAO_FILA -> "CANCELADA";
+            case CONCLUSAO -> "CONCLUIDA";
+            case FALTA -> "FALTA";
+        }, ultimo.statusNovo());
+        JsonObject corpo = Json.fromJson(Json.toJson(resposta), JsonObject.class);
+        var eventosJson = corpo.getAsJsonArray("eventos");
+        JsonObject eventoJson = eventosJson.get(eventosJson.size() - 1).getAsJsonObject();
+        assertEquals(tipo == EventoHistorico.ALTERACAO, eventoJson.has("alteracoes"));
+        assertEquals(tipo == EventoHistorico.CANCELAMENTO, eventoJson.has("motivo"));
+        assertEquals(tipo == EventoHistorico.SINALIZACAO_FILA, eventoJson.has("totalSinalizados"));
+        if (tipo == EventoHistorico.ALTERACAO) assertEquals(1, ultimo.alteracoes().size());
+        if (tipo == EventoHistorico.CANCELAMENTO) assertEquals("Viagem", ultimo.motivo());
+        if (tipo == EventoHistorico.SINALIZACAO_FILA) {
+            assertEquals(7, ultimo.totalSinalizados());
+            assertEquals("SISTEMA", ultimo.ator().perfil());
+            assertNull(ultimo.ator().id());
+            assertTrue(eventoJson.getAsJsonObject("ator").get("id").isJsonNull());
+        }
+        assertFalse(corpo.has("proximaSequencia"), "A preservação de nulos é restrita aos DTOs anotados");
+    }
+
+    @Test void alteracoesConvertemIdsDatasENulosSemModificarOEventoPersistido() {
+        ObjectId id = new ObjectId(), especialidade = new ObjectId(), novoMedico = new ObjectId();
+        Document legado = dados().append("_id", id).append("status", "AGENDADA");
+        ObjectId medicoAnterior = legado.getObjectId("medicoId");
+        legado.remove("especialidadeId");
+        consultas.docs.put(id, legado);
+        service.alterar(id, new Document("especialidadeId", especialidade).append("medicoId", novoMedico)
+                .append("inicio", Date.from(Instant.parse("2026-12-02T13:00:00Z")))
+                .append("fim", Date.from(Instant.parse("2026-12-02T13:30:00Z"))), secretaria);
+        Document antes = copia(eventos.values().iterator().next());
+        var ultimo = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        Map<String, HistoricoAlteracaoResponse> mudancas = new HashMap<>();
+        ultimo.alteracoes().forEach(a -> mudancas.put(a.campo(), a));
+        assertEquals(medicoAnterior.toHexString(), mudancas.get("medicoId").valorAnterior());
+        assertEquals(novoMedico.toHexString(), mudancas.get("medicoId").valorNovo());
+        assertNull(mudancas.get("especialidadeId").valorAnterior());
+        assertEquals(especialidade.toHexString(), mudancas.get("especialidadeId").valorNovo());
+        assertEquals("2026-12-01T12:00:00Z", mudancas.get("inicio").valorAnterior());
+        assertEquals("2026-12-02T13:00:00Z", mudancas.get("inicio").valorNovo());
+        JsonObject json = Json.fromJson(Json.toJson(mudancas.get("especialidadeId")), JsonObject.class);
+        assertTrue(json.get("valorAnterior").isJsonNull());
+        assertEquals(especialidade.toHexString(), json.get("valorNovo").getAsString());
+        assertEquals(antes, eventos.values().iterator().next());
+        assertThrows(UnsupportedOperationException.class, () -> ultimo.alteracoes().clear());
+    }
+
+    @Test void alteracoesPublicamApenasCamposConhecidosEValoresEscalaresFinitos() {
+        ObjectId id = criarEvento(EventoHistorico.ALTERACAO);
+        Document evento = eventos.values().stream().filter(e -> "ALTERACAO".equals(e.getString("evento"))).findFirst().orElseThrow();
+        evento.put("alteracoes", List.of(
+                new Document("campo", "inicio").append("valorAnterior", 10L).append("valorNovo", new Decimal128(new BigDecimal("12.50"))),
+                new Document("campo", "status").append("valorAnterior", null).append("valorNovo", "AGENDADA"),
+                new Document("campo", "senha").append("valorAnterior", "segredo").append("valorNovo", "segredo"),
+                new Document("campo", "medicoId").append("valorAnterior", new Document("senha", "segredo")).append("valorNovo", new ObjectId()),
+                new Document("campo", "fim").append("valorAnterior", Double.NaN).append("valorNovo", 1),
+                new Document("campo", "fim").append("valorAnterior", Decimal128.NaN).append("valorNovo", 1),
+                new Document("campo", "inicio").append("valorAnterior", List.of("segredo")).append("valorNovo", 1)));
+        var ultimo = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        assertEquals(2, ultimo.alteracoes().size());
+        String serializado = Json.toJson(ultimo);
+        for (String proibido : List.of("senha", "segredo", "$oid", "$date", "$numberDecimal", "NaN"))
+            assertFalse(serializado.contains(proibido), serializado);
+        JsonObject json = Json.fromJson(serializado, JsonObject.class);
+        assertEquals(10L, json.getAsJsonArray("alteracoes").get(0).getAsJsonObject().get("valorAnterior").getAsLong());
+        assertEquals(new BigDecimal("12.50"), json.getAsJsonArray("alteracoes").get(0).getAsJsonObject().get("valorNovo").getAsBigDecimal());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 4})
+    void sinalizacaoPreservaTotalInclusiveZeroEAtorSistemaSemId(int total) {
+        ObjectId id = criarEvento(EventoHistorico.CANCELAMENTO);
+        projetarSinalizacao(id, total);
+        var sinalizacao = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getLast();
+        assertEquals(total, sinalizacao.totalSinalizados());
+        assertNull(sinalizacao.ator().id());
+        assertEquals("SISTEMA", sinalizacao.ator().perfil());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SECRETARIA", "ADMINISTRADOR"})
+    void leituraPreservaPerfilLegadoDoAtorSemConverterParaPerfilDeLogin(String perfil) {
+        ObjectId id = criar();
+        eventos.values().iterator().next().get("ator", Document.class).put("perfil", perfil);
+        var ator = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+        assertEquals(perfil, ator.perfil());
+        assertEquals(secretaria.id(), ator.id());
+    }
+
+    @Test void nomesDosResponsaveisSaoBuscadosUmaVezPorPaginaPeloIdDoUsuario() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), paciente);
+        service.alterar(id, new Document("inicio", Date.from(Instant.parse("2026-12-01T12:05:00Z"))), secretaria);
+        service.alterar(id, new Document("status", "CONCLUIDA"), medico);
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "  Sofia Atualizada  ");
+        nomesUsuarios.put(new ObjectId(paciente.id()), "Paulo");
+        nomesUsuarios.put(new ObjectId(medico.id()), "Ana");
+        Document antes = copia(eventos.values().iterator().next());
+        var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria);
+        assertEquals(List.of("Sofia Atualizada", "Paulo", "Sofia Atualizada", "Ana"),
+                resposta.eventos().stream().map(e -> e.ator().nome()).toList());
+        assertEquals(List.of(Set.of(new ObjectId(secretaria.id()), new ObjectId(paciente.id()), new ObjectId(medico.id()))), lotesNomes);
+        assertFalse(lotesNomes.getFirst().contains(consultas.docs.get(id).getObjectId("pacienteId")));
+        assertFalse(lotesNomes.getFirst().contains(consultas.docs.get(id).getObjectId("medicoId")));
+        assertEquals(antes, eventos.values().iterator().next());
+        assertEquals("PACIENTE", resposta.eventos().get(1).ator().perfil());
+        assertEquals(paciente.id(), resposta.eventos().get(1).ator().id());
+    }
+
+    @Test void nomesSaoResolvidosSomenteParaAPaginaRetornadaNaoParaOEventoDeContinuacao() {
+        ObjectId id = criar();
+        service.alterar(id, new Document("status", "CONFIRMADA"), paciente);
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "Sofia");
+        nomesUsuarios.put(new ObjectId(paciente.id()), "Paulo");
+        var resposta = leitor(id, new AtomicInteger()).listar(id, 0, 1, secretaria);
+        assertTrue(resposta.temMais());
+        assertEquals("Sofia", resposta.eventos().getFirst().ator().nome());
+        assertEquals(List.of(Set.of(new ObjectId(secretaria.id()))), lotesNomes);
+    }
+
+    @Test void usuarioRemovidoMantemIdentidadeHistoricaSemInventarNome() {
+        ObjectId id = criar();
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "Sofia");
+        var leitor = leitor(id, new AtomicInteger());
+        assertEquals("Sofia", leitor.listar(id, secretaria).eventos().getFirst().ator().nome());
+        nomesUsuarios.remove(new ObjectId(secretaria.id()));
+        var ator = leitor.listar(id, secretaria).eventos().getFirst().ator();
+        assertEquals("Usuário não encontrado", ator.nome());
+        assertEquals(secretaria.id(), ator.id());
+        assertEquals("SECRETARIA_ADMIN", ator.perfil());
+        assertNotEquals(secretaria.nome(), ator.nome());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void usuarioExistenteSemNomeNaoEhApresentadoComoRemovido(String nome) {
+        ObjectId id = criar();
+        nomesUsuarios.put(new ObjectId(secretaria.id()), nome);
+        assertEquals("Nome não disponível", leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator().nome());
+    }
+
+    @Test void usuarioExistenteComNomeNuloEhTratadoSemFalha() {
+        ObjectId id = criar();
+        nomesUsuarios.put(new ObjectId(secretaria.id()), null);
+        assertEquals("Nome não disponível", leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator().nome());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SECRETARIA", "ADMINISTRADOR"})
+    void nomeAtualDoUsuarioNaoSubstituiOPerfilLegadoDoEvento(String perfil) {
+        ObjectId id = criar();
+        eventos.values().iterator().next().get("ator", Document.class).put("perfil", perfil);
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "Sofia Atual");
+        var ator = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+        assertEquals("Sofia Atual", ator.nome());
+        assertEquals(perfil, ator.perfil());
+    }
+
+    @Test void sistemaNuncaConsultaUsuariosMesmoComIdLegadoInconsistente() {
+        ObjectId id = criarEvento(EventoHistorico.SINALIZACAO_FILA);
+        eventos.values().stream().filter(e -> "SINALIZACAO_FILA".equals(e.getString("evento"))).findFirst().orElseThrow()
+                .get("ator", Document.class).put("id", "referência legada inválida");
+        var ator = leitor(id, new AtomicInteger()).listar(id, 2, 10, secretaria).eventos().getFirst().ator();
+        assertEquals("Sistema", ator.nome());
+        assertNull(ator.id());
+        assertEquals("SISTEMA", ator.perfil());
+        assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void atoresSemReferenciaValidaNaoDisparamBuscaDeUsuario() {
+        ObjectId id = criar();
+        Document evento = eventos.values().iterator().next();
+        for (Document ator : Arrays.asList(null, new Document(), new Document("perfil", "MEDICO").append("id", "inválido"))) {
+            evento.put("ator", ator);
+            var resposta = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+            assertEquals("Responsável não identificado", resposta.nome());
+            assertNull(resposta.id());
+        }
+        assertTrue(lotesNomes.isEmpty());
+    }
+
+    @Test void idTextualLegadoValidoEhNormalizadoParaBuscarUsuarios() {
+        ObjectId id = criar();
+        eventos.values().iterator().next().get("ator", Document.class).put("id", secretaria.id().toUpperCase(Locale.ROOT));
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "Sofia");
+        var ator = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+        assertEquals(secretaria.id(), ator.id());
+        assertEquals("Sofia", ator.nome());
+    }
+
+    @Test void atorLegadoSemPerfilMantemIdEResolveNomeSemInventarPerfil() {
+        ObjectId id = criar();
+        eventos.values().iterator().next().get("ator", Document.class).remove("perfil");
+        nomesUsuarios.put(new ObjectId(secretaria.id()), "Sofia");
+        var ator = leitor(id, new AtomicInteger()).listar(id, secretaria).eventos().getFirst().ator();
+        assertNull(ator.perfil());
+        assertEquals(secretaria.id(), ator.id());
+        assertEquals("Sofia", ator.nome());
+    }
+
+    @Test void falhaNaBuscaDeNomesNaoApresentaUsuariosComoRemovidos() {
+        ObjectId id = criar();
+        nomesIndisponiveis = true;
+        assertThrows(IllegalStateException.class, () -> leitor(id, new AtomicInteger()).listar(id, secretaria));
     }
 
     private static final class Memoria implements PendenciasConsultaRepository {

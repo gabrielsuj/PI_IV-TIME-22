@@ -54,7 +54,7 @@ class RotasAutorizacaoTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", router);
         server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
-        server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO, ECO));
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO, ECO, ECO));
         server.createContext("/fila-espera", Rotas.filaEspera(cors, autz, ECO));
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
@@ -115,6 +115,12 @@ class RotasAutorizacaoTest {
         "POST,   /consultas/abc/status, SECRETARIA_ADMIN, 200",
         "GET,    /consultas/abc/status, SECRETARIA_ADMIN, 404",
         "POST,   /consultas/abc/status/extra, SECRETARIA_ADMIN, 404",
+        // Histórico (#46): o serviço aplica propriedade da consulta
+        "GET,    /consultas/abc/historico, PACIENTE,         200",
+        "GET,    /consultas/abc/historico, MEDICO,           200",
+        "GET,    /consultas/abc/historico, SECRETARIA_ADMIN, 200",
+        "POST,   /consultas/abc/historico, SECRETARIA_ADMIN, 404",
+        "GET,    /consultas/abc/historico/extra, SECRETARIA_ADMIN, 404",
         // Listagem e detalhe (#30): os três perfis; o serviço limita ao que cada um pode ver
         "GET,    /consultas/lista,            PACIENTE,         200",
         "GET,    /consultas/lista,            MEDICO,           200",
@@ -148,6 +154,7 @@ class RotasAutorizacaoTest {
         assertEquals(401, enviar("POST", "/consultas", null).statusCode());
         assertEquals(401, enviar("POST", "/consultas/abc/cancelamento", null).statusCode());
         assertEquals(401, enviar("POST", "/consultas/abc/status", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/abc/historico", null).statusCode());
         assertEquals(401, enviar("GET", "/consultas/lista", null).statusCode());
         assertEquals(401, enviar("GET", "/consultas/abc", null).statusCode());
         assertEquals(401, enviar("GET", "/fila-espera", null).statusCode());
@@ -159,6 +166,7 @@ class RotasAutorizacaoTest {
         assertEquals(200, enviar("POST", "/consultas", token(Perfil.PACIENTE)).statusCode());
         assertEquals(204, enviar("OPTIONS", "/consultas/abc/cancelamento", null).statusCode());
         assertEquals(204, enviar("OPTIONS", "/consultas/abc/status", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/consultas/abc/historico", null).statusCode());
     }
 
     @Test void tokenDepoisDoLogoutRetorna401() throws Exception {

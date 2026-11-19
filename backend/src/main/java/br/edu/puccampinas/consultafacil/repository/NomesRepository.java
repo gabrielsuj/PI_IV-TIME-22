@@ -18,6 +18,9 @@ public interface NomesRepository {
     /** Usado pela listagem e pelo detalhe de consultas (#30). Implementações antigas devolvem vazio. */
     default Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return Map.of(); }
 
+    /** Responsáveis do histórico (#46), sempre por usuarios._id, sem carregar dados de autenticação. */
+    default Map<ObjectId, String> usuarios(Collection<ObjectId> ids) { return Map.of(); }
+
     final class Mongo implements NomesRepository {
         private final MongoDatabase db;
 
@@ -26,6 +29,7 @@ public interface NomesRepository {
         @Override public Map<ObjectId, String> pacientes(Collection<ObjectId> ids) { return nomes("pacientes", ids); }
         @Override public Map<ObjectId, String> especialidades(Collection<ObjectId> ids) { return nomes("especialidades", ids); }
         @Override public Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return nomes("medicos", ids); }
+        @Override public Map<ObjectId, String> usuarios(Collection<ObjectId> ids) { return nomes("usuarios", ids); }
 
         private Map<ObjectId, String> nomes(String colecao, Collection<ObjectId> ids) {
             Map<ObjectId, String> mapa = new HashMap<>();

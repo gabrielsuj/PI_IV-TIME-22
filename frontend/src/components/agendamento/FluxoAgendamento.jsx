@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatarHorarioAgendamento } from '../../utils/horarioAgendamento';
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
@@ -29,7 +29,7 @@ const mesmoHorario = (a, b) => a?.inicio === b?.inicio && a?.fim === b?.fim;
 const mesmaHoraInicial = (a, iso) => Boolean(iso) && Date.parse(a?.inicio) === Date.parse(iso);
 
 // Contrato da API em docs/api/agendamento.md (GET /vagas e POST /consultas, #21).
-export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta,onConfirmado, vagaInicial }) {
+export default function FluxoAgendamento({ usuario, paciente, especialidade, medico, data, buscarVagas, confirmarAgendamento, onConfirmandoChange, onNovaConsulta, onConfirmado, vagaInicial }) {
   const [vagas, setVagas] = useState({ status: 'aguardando', horarios: [], fusoHorario: null, error: null });
   const [horario, setHorario] = useState(null);
   const [revisando, setRevisando] = useState(false);
@@ -43,7 +43,6 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
   const buscaAtual = useRef(null);
   const sequencia = useRef(0);
   const painel = useRef(null);
-  const autoBuscaFeita = useRef(false);
 
   useEffect(() => {
     if (revisando || confirmacao || resultadoIncerto) painel.current?.focus();
@@ -61,8 +60,10 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
   const pronto = permitido && (pessoal || Boolean(paciente?.id)) && especialidade?.ativa === true
     && medico?.ativo === true && medico.especialidadeIds?.includes(especialidade.id) && dataValida(data);
   const selecionado = vagas.status === 'sucesso' && horario && vagas.horarios.some((opcao) => mesmoHorario(opcao, horario));
+  const especialidadeId = especialidade?.id;
+  const medicoId = medico?.id;
 
-  async function buscar(preservarErro = false) {
+  const buscar = useCallback(async (preservarErro = false, preselecionar = false) => {
     if (!pronto || emConfirmacao.current || typeof buscarVagas !== 'function') return;
     buscaAtual.current?.abort();
     const controller = new AbortController();
@@ -72,27 +73,27 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
     setRevisando(false);
     if (!preservarErro) setErroConfirmacao(null);
     try {
-      const resposta = await buscarVagas({ especialidadeId: especialidade.id, medicoId: medico.id, data }, { signal: controller.signal });
+      const resposta = await buscarVagas({ especialidadeId, medicoId, data }, { signal: controller.signal });
       if (!montado.current || controller.signal.aborted || numero !== sequencia.current) return;
       const resultado = validarVagas(resposta, data);
       setVagas({ status: resultado.semAgenda ? 'sem-agenda' : 'sucesso', horarios: resultado.horarios, fusoHorario: resultado.fusoHorario, error: null });
       const oferta = vagaInicial ? resultado.horarios.find((opcao) => mesmaHoraInicial(opcao, vagaInicial)) : null;
       if (vagaInicial) setVagaSinalizadaOcupada(!oferta);
-      setHorario((current) => oferta || resultado.horarios.find((opcao) => mesmoHorario(opcao, current)) || null);
+      setHorario((current) => resultado.horarios.find((opcao) => mesmoHorario(opcao, current)) || (preselecionar ? oferta : null) || null);
     } catch (error) {
       if (montado.current && !controller.signal.aborted && numero === sequencia.current) {
         setVagas((current) => ({ ...current, status: 'erro', error }));
       }
     }
-  }
+  }, [pronto, buscarVagas, especialidadeId, medicoId, data, vagaInicial]);
 
-  // Ao entrar pela fila, verifica uma única vez se a vaga ainda existe.
+  // Ao entrar pela fila, verifica se a vaga ainda existe; a limpeza permite retomar uma busca abortada.
   // Não reserva nem altera o estado de uma inscrição no servidor.
   useEffect(() => {
-    if (!vagaInicial || !pronto || autoBuscaFeita.current) return;
-    autoBuscaFeita.current = true;
-    buscar();
-  }, [vagaInicial, pronto]);
+    if (!vagaInicial || !pronto) return;
+    buscar(false, true);
+    return () => buscaAtual.current?.abort();
+  }, [vagaInicial, pronto, buscar]);
 
   async function confirmar() {
     if (!pronto || !selecionado || !revisando || emConfirmacao.current || resultadoIncerto || typeof confirmarAgendamento !== 'function') return;

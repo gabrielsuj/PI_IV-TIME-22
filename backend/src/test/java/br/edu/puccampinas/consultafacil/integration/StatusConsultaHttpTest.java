@@ -87,7 +87,8 @@ class StatusConsultaHttpTest {
         servidor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         servidor.createContext("/consultas/", Rotas.consultaPorId(cors, autz,
                 ex -> Http.sendJson(ex, 200, Map.of("rota", "leitura")),
-                ex -> Http.sendJson(ex, 200, Map.of("rota", "cancelamento")), handler));
+                ex -> Http.sendJson(ex, 200, Map.of("rota", "cancelamento")), handler,
+                ex -> Http.sendJson(ex, 200, Map.of("rota", "historico"))));
         servidor.start();
         base = "http://127.0.0.1:" + servidor.getAddress().getPort();
         cliente = HttpClient.newHttpClient();

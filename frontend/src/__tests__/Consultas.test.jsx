@@ -25,7 +25,7 @@ const consulta = (id, extra = {}) => ({
  * Devolve o fetch simulado para conferir as chamadas.
  */
 function mockApi({ lista = [consulta('c1')], detalhes = { c1: consulta('c1') }, cancelar = () => json(consulta('c1', { status: 'CANCELADA' })),
-  alterarStatus = (_id, pedido) => json(consulta('c1', { status: pedido.status })) } = {}) {
+  alterarStatus = (_id, pedido) => json(consulta('c1', { status: pedido.status })), historico = [] } = {}) {
   const fetchMock = vi.fn(async (url, init = {}) => {
     const { pathname } = new URL(url);
     if (pathname === '/medicos') return json([{ id: 'm1', nome: 'Ana Martins', ativo: true }, { id: 'm2', nome: 'Bruno Lima', ativo: true }]);
@@ -34,6 +34,13 @@ function mockApi({ lista = [consulta('c1')], detalhes = { c1: consulta('c1') }, 
     if (cancelamento && init.method === 'POST') return cancelar(cancelamento[1], JSON.parse(init.body ?? '{}'));
     const transicao = pathname.match(/^\/consultas\/([^/]+)\/status$/);
     if (transicao && init.method === 'POST') return alterarStatus(transicao[1], JSON.parse(init.body ?? '{}'), init);
+    const historicoId = pathname.match(/^\/consultas\/([^/]+)\/historico$/);
+    if (historicoId && init.method === 'GET') {
+      const parametros = new URL(url).searchParams;
+      const resposta = await (typeof historico === 'function' ? historico(historicoId[1], parametros, init)
+        : paginaHistorico(historicoId[1], historico, parametros));
+      return resposta instanceof Response ? resposta : json(resposta);
+    }
     const detalhe = pathname.match(/^\/consultas\/([^/]+)$/);
     if (detalhe) {
       const resposta = await (typeof detalhes === 'function' ? detalhes(detalhe[1]) : detalhes[detalhe[1]]);
@@ -69,6 +76,417 @@ function pendente() {
   const promise = new Promise((resolve) => { resolver = resolve; });
   return { promise, resolver };
 }
+
+function paginaHistorico(consultaId, eventos, parametros = new URLSearchParams()) {
+  const aposSequencia = Number(parametros.get('aposSequencia') || 0);
+  const limite = Number(parametros.get('limite') || 20);
+  const restantes = eventos.filter((e) => e.sequencia > aposSequencia).sort((a, b) => a.sequencia - b.sequencia);
+  const pagina = restantes.slice(0, limite);
+  return { consultaId, eventos: pagina, aposSequencia, limite, limiteAtingido: pagina.length === limite,
+    atualizacaoPendente: false, temMais: restantes.length > limite,
+    ...(restantes.length > limite ? { proximaSequencia: pagina.at(-1).sequencia } : {}) };
+}
+
+const eventoHistorico = (sequencia, extra = {}) => ({ id: `h${sequencia}`, sequencia, evento: 'CRIACAO', statusAnterior: null,
+  statusNovo: 'AGENDADA', ocorridoEm: '2026-11-18T12:30:00Z', dataHoraConsulta: '2026-12-01T12:00:00Z',
+  ator: { id: 'u-secretaria', perfil: 'SECRETARIA_ADMIN', nome: 'Sofia Secretaria' }, ...extra });
+
+describe('histórico no detalhe da consulta (#46)', () => {
+  it.each([
+    ['CRIACAO', 'Consulta criada', {}],
+    ['CONFIRMACAO', 'Consulta confirmada', { statusAnterior: 'AGENDADA', statusNovo: 'CONFIRMADA' }],
+    ['ALTERACAO', 'Consulta alterada', { statusAnterior: 'CONFIRMADA', statusNovo: 'CONFIRMADA', alteracoes: [
+      { campo: 'inicio', valorAnterior: '2026-12-01T12:00:00Z', valorNovo: '2026-12-02T13:00:00Z' },
+      { campo: 'medicoId', valorAnterior: 'id-anterior', valorNovo: 'id-novo' },
+      { campo: 'especialidadeId', valorAnterior: null, valorNovo: 'e2' },
+    ] }],
+    ['CANCELAMENTO', 'Consulta cancelada', { statusAnterior: 'CONFIRMADA', statusNovo: 'CANCELADA', motivo: 'Viagem' }],
+    ['CONCLUSAO', 'Consulta concluída', { statusAnterior: 'CONFIRMADA', statusNovo: 'CONCLUIDA' }],
+    ['FALTA', 'Falta registrada', { statusAnterior: 'CONFIRMADA', statusNovo: 'FALTA' }],
+    ['SINALIZACAO_FILA', 'Fila de espera sinalizada', { statusAnterior: 'CANCELADA', statusNovo: 'CANCELADA', totalSinalizados: 0,
+      ator: { perfil: 'SISTEMA', id: null, nome: 'Sistema' } }],
+  ])('exibe %s com responsável, data do evento e detalhes próprios', async (evento, rotulo, extra) => {
+    entrarComo(PAULO);
+    const fetchMock = mockApi({ historico: [eventoHistorico(1, { evento, ...extra })] });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(await historico.findByRole('heading', { name: rotulo })).toBeInTheDocument();
+    expect(historico.getByText('18/11/2026, 09:30')).toHaveAttribute('dateTime', '2026-11-18T12:30:00Z');
+    expect(historico.getByText(evento === 'SINALIZACAO_FILA' ? 'Sistema' : 'Sofia Secretaria · Secretaria / Administrador')).toBeInTheDocument();
+    if (evento === 'ALTERACAO') {
+      expect(historico.getByText('Início da consulta: 01/12/2026, 09:00 → 02/12/2026, 10:00.')).toBeInTheDocument();
+      expect(historico.getByText('Médico alterado.')).toBeInTheDocument();
+      expect(historico.getByText('Especialidade alterada.')).toBeInTheDocument();
+      expect(historico.queryByText('id-anterior')).not.toBeInTheDocument();
+    }
+    if (evento === 'CANCELAMENTO') expect(historico.getByText('Viagem')).toBeInTheDocument();
+    if (evento === 'SINALIZACAO_FILA') expect(historico.getByText('Interessados sinalizados: 0.')).toBeInTheDocument();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(1);
+    expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+  });
+
+  it.each(['PACIENTE', 'MEDICO', 'SECRETARIA_ADMIN'])('%s lê o histórico da consulta autorizada sem comparar IDs de login e cadastro', async (perfil) => {
+    entrarComo({ id: 'login-diferente-do-cadastro', nome: 'Teste', perfil });
+    const fetchMock = mockApi({ historico: [eventoHistorico(1)] });
+    renderAt('/consultas/c1');
+    await within(await screen.findByRole('region', { name: 'Histórico' })).findByRole('heading', { name: 'Consulta criada' });
+    const [envio] = chamadas(fetchMock, '/consultas/c1/historico');
+    expect(envio.init.headers.Authorization).toBe('Bearer token-de-teste');
+    expect(Object.fromEntries(envio.url.searchParams)).toEqual({ aposSequencia: '0', limite: '20' });
+  });
+
+  it('carregamento e falha do histórico não escondem o resumo nem suas ações', async () => {
+    entrarComo(PAULO);
+    const leitura = pendente();
+    mockApi({ historico: () => leitura.promise });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(historico.getByText('Carregando histórico…')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar consulta' })).toBeEnabled();
+    expect(historico.queryByText('Nenhum evento disponível no momento.')).not.toBeInTheDocument();
+    await act(async () => { leitura.resolver(erro(500, 'Falha na leitura do histórico.')); });
+    expect(await historico.findByRole('alert')).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar consulta' })).toBeEnabled();
+  });
+
+  it('vazio não afirma inexistência de ações e permite atualizar com o teclado', async () => {
+    entrarComo(PAULO);
+    const eventos = [];
+    const fetchMock = mockApi({ historico: eventos });
+    const user = userEvent.setup();
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await historico.findByText('Nenhum evento disponível no momento.');
+    eventos.push(eventoHistorico(1));
+    historico.getByRole('button', { name: 'Atualizar histórico' }).focus();
+    await user.keyboard('{Enter}');
+    expect(await historico.findByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+  });
+
+  it.each([0, 500, 503])('falha %s permite repetir apenas a leitura do histórico', async (status) => {
+    entrarComo(PAULO);
+    let tentativa = 0;
+    const fetchMock = mockApi({ historico: (id, parametros) => {
+      if (tentativa++ === 0) {
+        if (status === 0) throw new TypeError('Failed to fetch');
+        return erro(status, 'Histórico temporariamente indisponível.');
+      }
+      return paginaHistorico(id, [eventoHistorico(1)], parametros);
+    } });
+    const user = userEvent.setup();
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(await historico.findByRole('alert')).toBeInTheDocument();
+    await user.click(historico.getByRole('button', { name: 'Tentar novamente' }));
+    expect(await historico.findByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+    expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+  });
+
+  it.each([400, 403, 404])('histórico com erro %s permanece isolado e não oferece tentativa cega', async (status) => {
+    entrarComo(PAULO);
+    mockApi({ historico: () => erro(status, 'Recusado.') });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await historico.findByRole('alert');
+    expect(historico.queryByRole('button', { name: 'Tentar novamente' })).not.toBeInTheDocument();
+    expect(historico.queryByRole('button', { name: 'Atualizar histórico' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+  });
+
+  it('timeout do histórico apresenta erro sem fingir que a lista está vazia', async () => {
+    entrarComo(PAULO);
+    const relogios = [];
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      relogios.push(controller);
+      return controller.signal;
+    });
+    mockApi({ historico: () => {
+      const falha = new DOMException('Tempo esgotado', 'TimeoutError');
+      relogios.at(-1).abort(falha);
+      throw falha;
+    } });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(await historico.findByRole('alert')).toHaveTextContent('A API demorou para responder.');
+    expect(historico.queryByText('Nenhum evento disponível no momento.')).not.toBeInTheDocument();
+  });
+
+  it('401 no histórico encerra a sessão sem repetir a leitura nem enviar ações', async () => {
+    entrarComo(PAULO);
+    const fetchMock = mockApi({ historico: () => erro(401, 'Sessão expirada.') });
+    renderAt('/consultas/c1');
+    await screen.findByRole('heading', { name: 'Acesse sua conta' });
+    expect(screen.queryByRole('region', { name: 'Histórico' })).not.toBeInTheDocument();
+    expect(sessionStorage.length).toBe(0);
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(1);
+    expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+  });
+
+  it('403 após atualização retira os eventos antigos e mantém a recusa isolada no card', async () => {
+    entrarComo(PAULO);
+    let recusado = false;
+    mockApi({ historico: (id, parametros) => recusado ? erro(403, 'Acesso recusado.') : paginaHistorico(id, [eventoHistorico(1)], parametros) });
+    const user = userEvent.setup();
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await historico.findByRole('heading', { name: 'Consulta criada' });
+    recusado = true;
+    await user.click(historico.getByRole('button', { name: 'Atualizar histórico' }));
+    await historico.findByRole('alert');
+    expect(historico.queryByRole('list', { name: 'Eventos do histórico' })).not.toBeInTheDocument();
+    expect(historico.queryByRole('button', { name: 'Tentar novamente' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+  });
+
+  it('pagina sem duplicar chamadas e leva o foco ao primeiro evento acrescentado', async () => {
+    entrarComo(PAULO);
+    const eventos = Array.from({ length: 21 }, (_, indice) => eventoHistorico(indice + 1));
+    const segunda = pendente();
+    const fetchMock = mockApi({ historico: (id, parametros) => Number(parametros.get('aposSequencia')) === 20
+      ? segunda.promise : paginaHistorico(id, eventos, parametros) });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    const mais = await historico.findByRole('button', { name: 'Carregar mais eventos' });
+    expect(historico.getAllByRole('listitem')).toHaveLength(20);
+    act(() => { fireEvent.click(mais); fireEvent.click(mais); });
+    expect(mais).toBeDisabled();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+    await act(async () => { segunda.resolver(paginaHistorico('c1', eventos, new URLSearchParams({ aposSequencia: '20', limite: '20' }))); });
+    const itens = historico.getAllByRole('listitem');
+    expect(itens).toHaveLength(21);
+    expect(within(itens.at(-1)).getByRole('heading')).toHaveFocus();
+    expect(historico.queryByRole('button', { name: 'Carregar mais eventos' })).not.toBeInTheDocument();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')[1].url.searchParams.get('aposSequencia')).toBe('20');
+  });
+
+  it('falha na próxima página mantém os eventos e a nova tentativa usa o mesmo cursor', async () => {
+    entrarComo(PAULO);
+    const eventos = Array.from({ length: 21 }, (_, indice) => eventoHistorico(indice + 1));
+    let falhar = true;
+    const fetchMock = mockApi({ historico: (id, parametros) => {
+      if (Number(parametros.get('aposSequencia')) === 20 && falhar) { falhar = false; return erro(500, 'Falha na próxima página.'); }
+      return paginaHistorico(id, eventos, parametros);
+    } });
+    const user = userEvent.setup();
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await user.click(await historico.findByRole('button', { name: 'Carregar mais eventos' }));
+    expect(await historico.findByRole('alert')).toHaveTextContent('Os eventos já exibidos foram mantidos');
+    expect(historico.getAllByRole('listitem')).toHaveLength(20);
+    await user.click(historico.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(historico.getAllByRole('listitem')).toHaveLength(21));
+    expect(chamadas(fetchMock, '/consultas/c1/historico').map(({ url }) => url.searchParams.get('aposSequencia'))).toEqual(['0', '20', '20']);
+  });
+
+  it.each(['confirmar', 'concluir', 'falta', 'cancelar'])('atualiza o histórico após %s sem repetir a escrita', async (acao) => {
+    entrarComo(ANA);
+    const destinos = { confirmar: ['CONFIRMADA', 'CONFIRMACAO', 'Confirmar consulta', 'Consulta confirmada'],
+      concluir: ['CONCLUIDA', 'CONCLUSAO', 'Concluir consulta', 'Consulta concluída'],
+      falta: ['FALTA', 'FALTA', 'Registrar falta', 'Falta registrada'], cancelar: ['CANCELADA', 'CANCELAMENTO', 'Cancelar consulta', 'Consulta cancelada'] };
+    const [destino, evento, botao, titulo] = destinos[acao];
+    let atual = consulta('c1', { status: acao === 'concluir' ? 'CONFIRMADA' : 'AGENDADA' });
+    const eventos = [eventoHistorico(1)];
+    const salvar = () => { atual = { ...atual, status: destino, podeCancelar: false }; eventos.push(eventoHistorico(2, { evento, statusAnterior: 'AGENDADA', statusNovo: destino })); return json(atual); };
+    const fetchMock = mockApi({ detalhes: () => atual, alterarStatus: salvar, cancelar: salvar, historico: eventos });
+    const user = userEvent.setup();
+    renderAt('/consultas/c1');
+    await within(await screen.findByRole('region', { name: 'Histórico' })).findByRole('heading', { name: 'Consulta criada' });
+    await user.click(screen.getByRole('button', { name: botao }));
+    if (acao === 'cancelar') await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cancelamento' }));
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(await historico.findByRole('heading', { name: titulo })).toBeInTheDocument();
+    expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+  });
+
+  it('descarta leitura antiga ao navegar para outra consulta', async () => {
+    entrarComo(PAULO);
+    const antiga = pendente();
+    const fetchMock = mockApi({ detalhes: { c1: consulta('c1'), c2: consulta('c2') },
+      historico: (id, parametros) => id === 'c1' ? antiga.promise : paginaHistorico(id, [eventoHistorico(1, { evento: 'CONCLUSAO' })], parametros) });
+    const router = renderAt('/consultas/c1');
+    await screen.findByRole('region', { name: 'Histórico' });
+    const sinal = chamadas(fetchMock, '/consultas/c1/historico')[0].init.signal;
+    await act(async () => { await router.navigate('/consultas/c2'); });
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await historico.findByRole('heading', { name: 'Consulta concluída' });
+    expect(sinal.aborted).toBe(true);
+    await act(async () => { antiga.resolver(paginaHistorico('c1', [eventoHistorico(1)])); });
+    expect(historico.queryByRole('heading', { name: 'Consulta criada' })).not.toBeInTheDocument();
+  });
+
+  it('pendência sem eventos mostra aviso e uma nova leitura exibe somente eventos recebidos', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let primeira = true;
+      const leitura = pendente();
+      const fetchMock = mockApi({ historico: (id, parametros) => {
+        if (!primeira) return leitura.promise;
+        primeira = false;
+        return { ...paginaHistorico(id, [], parametros), atualizacaoPendente: true };
+      } });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      expect(historico.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      expect(historico.queryByText('Nenhum evento disponível no momento.')).not.toBeInTheDocument();
+      expect(historico.queryByRole('list')).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.getByRole('button', { name: 'Atualizar histórico' })).toBeDisabled();
+      await act(async () => { leitura.resolver(paginaHistorico('c1', [eventoHistorico(1)])); });
+      expect(historico.getByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+      expect(historico.queryByText(/Há atualizações recentes/)).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+      expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('limita a três atualizações automáticas e permite reiniciar pela atualização manual', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true,
+      }) });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+        expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(tentativa + 2);
+      }
+      expect(historico.getByText(/atualização automática foi pausada/)).toBeInTheDocument();
+      expect(historico.getAllByRole('listitem')).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(4);
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(5);
+      expect(historico.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(6);
+      expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('falha na atualização automática preserva eventos e interrompe novas tentativas', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let leituras = 0;
+      const fetchMock = mockApi({ historico: (id, parametros) => ++leituras === 1
+        ? { ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true }
+        : erro(500, 'Falha temporária no histórico.') });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.getByText(/Falha temporária no histórico/)).toBeInTheDocument();
+      expect(historico.getByRole('heading', { name: 'Consulta criada' })).toBeInTheDocument();
+      expect(historico.getByText(/Falha temporária no histórico/)).not.toHaveFocus();
+      expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('sair da consulta cancela a atualização automática agendada', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, [eventoHistorico(1)], parametros), atualizacaoPendente: true,
+      }) });
+      let router;
+      await act(async () => { router = renderAt('/consultas/c1'); });
+      expect(screen.getByText(/Há atualizações recentes/)).toBeInTheDocument();
+      await act(async () => { await router.navigate('/consultas'); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('paginação pausa as leituras automáticas e mantém aviso até conferir o início', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      const eventos = Array.from({ length: 21 }, (_, indice) => eventoHistorico(indice + 1));
+      let leituras = 0;
+      const fetchMock = mockApi({ historico: (id, parametros) => ({
+        ...paginaHistorico(id, eventos, parametros), atualizacaoPendente: ++leituras === 1,
+      }) });
+      await act(async () => { renderAt('/consultas/c1'); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Carregar mais eventos' })); });
+      expect(historico.getAllByRole('listitem')).toHaveLength(21);
+      expect(historico.getByText(/atualização automática foi pausada/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(2);
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(historico.getAllByRole('listitem')).toHaveLength(20);
+      expect(historico.queryByText(/histórico ainda pode estar incompleto/)).not.toBeInTheDocument();
+      expect(chamadas(fetchMock, '/consultas/c1/historico').map(({ url }) => url.searchParams.get('aposSequencia'))).toEqual(['0', '20', '0']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('ação salva continua confirmada enquanto só a leitura do histórico é repetida', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      entrarComo(PAULO);
+      let atual = consulta('c1');
+      const eventos = [eventoHistorico(1)];
+      const fetchMock = mockApi({ detalhes: () => atual,
+        alterarStatus: () => { atual = { ...atual, status: 'CONFIRMADA', podeCancelar: false }; return json(atual); },
+        historico: (id, parametros) => ({ ...paginaHistorico(id, eventos, parametros), atualizacaoPendente: atual.status === 'CONFIRMADA' && eventos.length === 1 }),
+      });
+      await act(async () => { renderAt('/consultas/c1'); });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirmar consulta' })); });
+      const historico = within(screen.getByRole('region', { name: 'Histórico' }));
+      expect(screen.getByText('Consulta confirmada.')).toBeInTheDocument();
+      expect(historico.getByText(/Ações já confirmadas não precisam ser repetidas/)).toBeInTheDocument();
+      for (let tentativa = 0; tentativa < 3; tentativa++) await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(historico.queryByRole('heading', { name: 'Consulta confirmada' })).not.toBeInTheDocument();
+      expect(screen.getByText('Consulta confirmada.')).toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+      expect(chamadas(fetchMock, '/consultas/c1/historico')).toHaveLength(5);
+      eventos.push(eventoHistorico(2, { evento: 'CONFIRMACAO', statusAnterior: 'AGENDADA', statusNovo: 'CONFIRMADA' }));
+      await act(async () => { fireEvent.click(historico.getByRole('button', { name: 'Atualizar histórico' })); });
+      expect(historico.getByRole('heading', { name: 'Consulta confirmada' })).toBeInTheDocument();
+      expect(historico.queryByText(/histórico ainda pode estar incompleto/)).not.toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['outro-id', 'cursor-invalido', 'sequencia-repetida', 'pendencia-ausente', 'pendencia-invalida'])('resposta inválida (%s) vira erro isolado', async (caso) => {
+    entrarComo(PAULO);
+    mockApi({ historico: (id, parametros) => {
+      const pagina = paginaHistorico(id, [eventoHistorico(1)], parametros);
+      if (caso === 'outro-id') pagina.consultaId = 'c2';
+      if (caso === 'cursor-invalido') { pagina.temMais = true; pagina.proximaSequencia = 0; }
+      if (caso === 'sequencia-repetida') pagina.eventos.push(eventoHistorico(1, { id: 'duplicado' }));
+      if (caso === 'pendencia-ausente') delete pagina.atualizacaoPendente;
+      if (caso === 'pendencia-invalida') pagina.atualizacaoPendente = 'true';
+      return pagina;
+    } });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    expect(await historico.findByRole('alert')).toHaveTextContent('Não foi possível ler o histórico recebido.');
+    expect(screen.getByRole('region', { name: 'Resumo da reserva' })).toBeInTheDocument();
+  });
+
+  it('campos legados ausentes e tipo desconhecido não derrubam o detalhe', async () => {
+    entrarComo(PAULO);
+    mockApi({ historico: [eventoHistorico(1, { evento: 'toString', ator: null, ocorridoEm: null, statusNovo: null })] });
+    renderAt('/consultas/c1');
+    const historico = within(await screen.findByRole('region', { name: 'Histórico' }));
+    await historico.findByRole('heading', { name: 'Evento do histórico' });
+    expect(historico.getByText('Responsável não identificado')).toBeInTheDocument();
+    expect(historico.getByText('Data não informada')).toBeInTheDocument();
+  });
+});
 
 describe('ações de status da consulta (#28)', () => {
   it.each([

@@ -19,16 +19,16 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-describe('sessÃ£o e rotas protegidas', () => {
-  it('manda para o login quando ninguÃ©m entrou', async () => {
+describe('sessão e rotas protegidas', () => {
+  it('manda para o login quando ninguém entrou', async () => {
     const router = renderAt('/pacientes');
 
     expect(await screen.findByRole('heading', { name: 'Acesse sua conta' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
-    expect(screen.queryByRole('navigation', { name: 'NavegaÃ§Ã£o principal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Navegação principal' })).not.toBeInTheDocument();
   });
 
-  it('depois do login volta para a pÃ¡gina que pediu o acesso', async () => {
+  it('depois do login volta para a página que pediu o acesso', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ token: 'abc', expiraEm: '2026-11-12T00:00:00Z', usuario: SECRETARIA_TESTE })));
     const user = userEvent.setup();
     const router = renderAt('/perfis');
@@ -42,7 +42,7 @@ describe('sessÃ£o e rotas protegidas', () => {
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe('abc');
   });
 
-  it('mostra o usuÃ¡rio no cabeÃ§alho no lugar de "Acessar conta" e permite sair', async () => {
+  it('mostra o usuário no cabeçalho no lugar de "Acessar conta" e permite sair', async () => {
     entrarComo();
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -61,43 +61,43 @@ describe('sessÃ£o e rotas protegidas', () => {
 
   it('volta para o login quando a API recusa o token', async () => {
     entrarComo();
-    vi.stubGlobal('fetch', vi.fn(async () => json({ status: 401, erro: 'SessÃ£o expirada.' }, 401)));
+    vi.stubGlobal('fetch', vi.fn(async () => json({ status: 401, erro: 'Sessão expirada.' }, 401)));
     const router = renderAt('/pacientes');
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
-    expect(await screen.findByText('Sua sessÃ£o expirou. Entre novamente para continuar.')).toBeInTheDocument();
+    expect(await screen.findByText('Sua sessão expirou. Entre novamente para continuar.')).toBeInTheDocument();
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 });
 
 describe('menu e telas por perfil', () => {
-  const menu = () => within(screen.getByRole('navigation', { name: 'NavegaÃ§Ã£o principal' }))
+  const menu = () => within(screen.getByRole('navigation', { name: 'Navegação principal' }))
     .getAllByRole('link').map((link) => link.textContent);
 
-  it('secretaria vÃª todos os itens', () => {
+  it('secretaria vê todos os itens', () => {
     entrarComo();
     renderAt('/perfis');
-    expect(menu()).toEqual(['InÃ­cio', 'Nova consulta', 'Consultas', 'Fila de espera', 'Pacientes', 'MÃ©dicos', 'Especialidades', 'Agenda', 'CalendÃ¡rio', 'Perfis de acesso', 'Status do sistema']);
+    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Fila de espera', 'Pacientes', 'Médicos', 'Especialidades', 'Agenda', 'Calendário', 'Perfis de acesso', 'Status do sistema']);
   });
 
-  it('mÃ©dico vÃª pacientes e agenda, sem cadastros-base nem status', () => {
+  it('médico vê pacientes e agenda, sem cadastros-base nem status', () => {
     entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['InÃ­cio', 'Consultas', 'Pacientes', 'Agenda', 'CalendÃ¡rio', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Consultas', 'Pacientes', 'Agenda', 'Calendário', 'Perfis de acesso']);
   });
 
-  it('paciente vÃª inÃ­cio, nova consulta e perfis', () => {
+  it('paciente vê início, nova consulta e perfis', () => {
     entrarComo({ id: 'u-paciente', nome: 'Paulo Paciente', perfil: 'PACIENTE' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['InÃ­cio', 'Nova consulta', 'Consultas', 'Fila de espera', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Fila de espera', 'Perfis de acesso']);
   });
 
-  it('bloqueia a tela aberta pelo endereÃ§o quando o perfil nÃ£o tem acesso', () => {
+  it('bloqueia a tela aberta pelo endereço quando o perfil não tem acesso', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });
     renderAt('/medicos');
-    expect(screen.getByRole('heading', { name: 'Acesso nÃ£o permitido' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Acesso não permitido' })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
