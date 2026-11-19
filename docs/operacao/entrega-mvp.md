@@ -27,6 +27,25 @@ Ao recriar a carga, o seed 09 simula a entrega de um lembrete para uma consulta 
 
 A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato de `database/init/09-esquema-notificacoes.js`. A geração e o envio periódico são da #34. A leitura usa `GET /notificacoes` e as ações usam `POST /notificacoes/lida` ou `POST /notificacoes/confirmar` com o campo `notificacaoId`. O servidor determina o destinatário pela sessão.
 
+## Validação local da integração (#45)
+
+Em 19/11/2026, a revisão testada na branch `integracao/mvp-45` foi `0e1ab172a609505fe99b3e0f0d3a8c5243909943`.
+
+| Verificação | Resultado observado nessa revisão |
+|---|---|
+| Backend | 523 testes JUnit passaram com MongoDB 7 descartável, incluindo as suítes opcionais. Zero falhas, erros ou testes ignorados. |
+| Frontend | 307 testes Vitest passaram em 21 arquivos. ESLint e build de produção concluídos com sucesso. |
+| Backup da demonstração | O verificador de coerência aprovou a carga. O backup de 76 KiB restaurou as dez coleções em um banco temporário, incluindo 857 consultas, 1.946 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
+| Concorrência e falhas na restauração | Dois backups do mesmo banco no mesmo segundo produziram arquivos distintos, ambos restauráveis. Um arquivo inválido e um arquivo de outra origem foram recusados com o destino preservado. Após uma falha de escrita parcial, o retorno automático recuperou o registro, o índice único e o validador anteriores. Quando o retorno automático também falhou, a cópia preservada permitiu a recuperação manual. |
+
+As quantidades acima identificam a carga utilizada nessa execução. Para repetir a comparação, use a origem e a cópia restaurada da mesma carga. [Procedimento de backup e recuperação](backup-recuperacao.md)
+
+## Conferências após a integração dos lembretes e do painel
+
+- [ ] **Lembretes (#34).** Agende uma consulta dentro da janela configurada e acompanhe dois ciclos do agendador. Confira que o paciente recebe um único lembrete na central. Confirme a presença por ele e verifique o estado da consulta, a leitura do aviso e um único evento de confirmação no histórico.
+- [ ] **Indicadores e painel (#36 e #37).** Escolha um médico e um período da carga de demonstração. Compare a agenda do dia, as próximas consultas, a ocupação e as taxas de falta, cancelamento, confirmação e preenchimento pela fila com os dados desse mesmo recorte. Valide os filtros com a secretaria e o acesso do médico à própria agenda.
+- [ ] **Evidência final da #45.** No commit que reunir as entregas, repita as suítes, o lint, o build, os cenários de aceite e a recuperação do backup. Registre o novo SHA, a data, os resultados e o link da CI correspondente quando disponível.
+
 ## Versão final (#45)
 
 1. Com todas as funcionalidades integradas no `develop`, confira que o workflow de CI está verde no último commit.
