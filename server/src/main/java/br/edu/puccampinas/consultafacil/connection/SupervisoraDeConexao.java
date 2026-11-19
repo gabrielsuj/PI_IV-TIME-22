@@ -47,9 +47,7 @@ public class SupervisoraDeConexao extends Thread {
         } catch (Exception ignored) {} // sei que passei os parametros corretos
 
         try {
-            synchronized(this.usuarios) {
-                this.usuarios.add (this.usuario);
-            }
+            synchronized(this.usuarios) { this.usuarios.add(this.usuario); }
 
             for(;;) {
                 Comunicado comunicado = this.usuario.envie();
@@ -60,18 +58,15 @@ public class SupervisoraDeConexao extends Thread {
 
                     this.usuario.receba(ValidarCPFHandler.ValidateCPF(request));
                 } else if(comunicado instanceof PedidoParaSair) {
-                    synchronized(this.usuarios) {
-                        this.usuarios.remove(this.usuario);
-                    }
-                    this.usuario.adeus();
+                    break;
                 }
             }
-        }
-        catch(Exception erro) {
-            try {
-                transmissor.close();
-                receptor.close();
-            } catch(Exception ignored) {} // so tentando fechar antes de acabar a thread
+        } catch(Exception ignored) { // cliente caiu ou erro de comunicação: também cai no finally
+        } finally {
+            synchronized (this.usuarios) {
+                this.usuarios.remove(this.usuario);
+            }
+            try { this.usuario.adeus(); } catch(Exception ignored) {}
         }
     }
 }
