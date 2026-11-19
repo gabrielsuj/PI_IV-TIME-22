@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { registrationSchemas } from '../data/registrationSchemas';
 import { useRecords } from '../hooks/useRecords';
 import { useAuth } from '../hooks/useAuth';
@@ -13,7 +13,7 @@ import DataTable from '../components/ui/DataTable';
 import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
 
-export default function RegistrationPage({ resource }) {
+export default function RegistrationPage({ resource, searchState }) {
   const { usuario } = useAuth();
   const canEdit = usuario?.perfil === 'SECRETARIA_ADMIN';
   const location = useLocation();
@@ -22,13 +22,20 @@ export default function RegistrationPage({ resource }) {
   const draftContext = resource === 'pacientes' ? { usuarioId: usuario?.id, rota } : null;
   const schema = registrationSchemas[resource];
   const { records, loading, error, refresh } = useRecords(resource);
-  const [search, setSearch] = useState('');
+  const localSearch = useState('');
+  const [search, setSearch] = searchState ?? localSearch;
   const [editor, setEditor] = useState(() => canEdit && resource === 'pacientes' ? recuperarRascunho(usuario.id, rota) : null);
   const [notice, setNotice] = useState('');
   const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const visible = records.filter((record) => schema.searchKeys.some((key) => normalize(record[key]).includes(normalize(search))));
   const editAction = (record) => canEdit && <Button variant="ghost" size="sm" aria-label={`Editar ${record.nome}`} onClick={() => setEditor({ record })}>Editar</Button>;
-  const columns = schema.columns?.map(({ badge, ...column }) => ({ ...column, ...(badge ? { render: (record) => <Badge tone="info">{record[column.key] || '—'}</Badge> } : {}) }));
+  const columns = schema.columns?.map(({ badge, ...column }) => {
+    if (resource === 'pacientes' && column.key === 'nome') {
+      return { ...column, render: (record) => <Link to={encodeURIComponent(record.id || record._id)}>{record.nome}</Link> };
+    }
+    if (badge) return { ...column, render: (record) => <Badge tone="info">{record[column.key] || '—'}</Badge> };
+    return column;
+  });
 
   function saved(message) {
     if (draftContext) removerRascunho(usuario.id, rota);

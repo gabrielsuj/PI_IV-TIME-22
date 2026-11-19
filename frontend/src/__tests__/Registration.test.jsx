@@ -42,6 +42,53 @@ describe('cadastros padronizados', () => {
     expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
   });
 
+  it('permite ao médico abrir o detalhe e voltar à lista mantendo a busca', async () => {
+    entrarComo({ id: 'm1', nome: 'Dra. Maria', perfil: 'MEDICO' });
+    const outro = { id: 'p2', nome: 'Bruno Lima', cpf: '11144477735', email: 'bruno@example.com' };
+    vi.stubGlobal('fetch', vi.fn(async (url) =>
+      response(url.endsWith('/pacientes/p1') ? patient : [patient, outro])));
+    const user = userEvent.setup();
+    renderAt('/pacientes');
+    await screen.findByText(outro.nome);
+    await user.type(screen.getByRole('searchbox'), 'Souza');
+    await user.click(screen.getByRole('link', { name: patient.nome }));
+    expect(await screen.findByRole('heading', { name: patient.nome })).toBeInTheDocument();
+    expect(screen.getByText(patient.email)).toBeInTheDocument();
+    expect(screen.getByText(patient.cpf)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Editar/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Voltar à lista' }));
+    expect(await screen.findByRole('link', { name: patient.nome })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toHaveValue('Souza');
+    expect(screen.queryByText(outro.nome)).not.toBeInTheDocument();
+  });
+
+  it('informa quando o paciente não existe e permite voltar à lista', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => url.endsWith('/pacientes/p2')
+      ? response({ mensagem: 'Paciente não encontrado.' }, 404) : response([patient])));
+    const user = userEvent.setup();
+    renderAt('/pacientes/p2');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Paciente não encontrado.');
+    expect(screen.queryByRole('button', { name: /Editar/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Voltar à lista' }));
+    expect(await screen.findByRole('link', { name: patient.nome })).toBeInTheDocument();
+  });
+
+  it('permite à secretaria editar pelo detalhe e mostra os dados salvos', async () => {
+    const fetchMock = vi.fn(async (_url, options) => response(options.method === 'PUT'
+      ? { id: patient.id, ...JSON.parse(options.body) } : patient));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAt('/pacientes/p1');
+    await user.click(await screen.findByRole('button', { name: 'Editar paciente' }));
+    const dialog = within(screen.getByRole('dialog'));
+    await user.clear(dialog.getByLabelText(/Nome/));
+    await user.type(dialog.getByLabelText(/Nome/), 'Ana Lima');
+    await user.click(dialog.getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByRole('heading', { name: 'Ana Lima' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('http://api.teste/pacientes/p1', expect.objectContaining({ method: 'PUT' }));
+  });
+
   it('exibe a mensagem de CPF duplicado devolvida pelo CRUD', async () => {
     vi.stubGlobal('fetch', vi.fn(async (_url, options) => options.method === 'POST'
       ? response({ mensagem: 'CPF já cadastrado para outro paciente.' }, 400)
