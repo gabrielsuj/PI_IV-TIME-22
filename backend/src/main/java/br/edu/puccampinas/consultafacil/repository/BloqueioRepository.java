@@ -10,6 +10,7 @@ import org.bson.types.ObjectId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 public class BloqueioRepository {
     private final MongoCollection<Document> col;
@@ -42,7 +43,9 @@ public class BloqueioRepository {
         });
     }
 
-    public boolean remover(ObjectId id) {
-        return col.deleteOne(Filters.eq("_id", id)).getDeletedCount() > 0;
+    public boolean remover(ObjectId id, Optional<ObjectId> medicoAutorizado) {
+        var filtro = new Document("_id", id);
+        medicoAutorizado.ifPresent(medico -> filtro.append("medicoId", medico));
+        return col.deleteOne(filtro).getDeletedCount() > 0;
     }
 }

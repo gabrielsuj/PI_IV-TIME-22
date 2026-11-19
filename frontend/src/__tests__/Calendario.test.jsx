@@ -190,6 +190,43 @@ describe('tela do calendário', () => {
     expect(screen.getByText('Remarcar (1)')).toBeInTheDocument();
   });
 
+  it('mantém na semana e no dia as consultas que ficaram fora da nova jornada', async () => {
+    const c = (id, pacienteNome, inicio, fim, status = 'AGENDADA') => ({
+      id, pacienteNome, inicio, fim, status, especialidadeNome: 'Clínica Geral',
+    });
+    mockApi({
+      agenda: { ...AGENDA, jornadas: [{ diaSemana: 1, faixas: [{ inicioMinuto: 540, fimMinuto: 600 }] }] },
+      consultas: [
+        c('c1', 'Ana Souza', '2099-11-09T08:00', '2099-11-09T08:30'),
+        c('c2', 'Bruno Silva', '2099-11-09T09:00', '2099-11-09T09:20'),
+        c('c3', 'Carla Lima', '2099-11-09T09:30', '2099-11-09T10:10', 'CONFIRMADA'),
+        c('c4', 'Diego Santos', '2099-11-11T08:00', '2099-11-11T08:30'),
+        c('c5', 'Eva Castro', '2099-11-11T09:00', '2099-11-11T09:30', 'CANCELADA'),
+      ],
+    });
+    const user = userEvent.setup();
+    renderAt('/calendario?medicoId=m1&data=2099-11-09');
+
+    const tabela = await screen.findByRole('table');
+    for (const nome of ['Ana Souza', 'Carla Lima', 'Diego Santos']) {
+      expect(within(tabela).getByText(`Remarcar · ${nome}`).closest('td')).toHaveClass('cal-celula--conflito');
+    }
+    expect(within(tabela).getByText('Bruno Silva').closest('td')).toHaveClass('cal-celula--ocupado');
+    expect(screen.getByText('Remarcar (3)')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Ver o dia Segunda-feira, 09/11/2099' }));
+    const remarcacoes = await screen.findAllByText('Consulta fora da jornada', { exact: false });
+    expect(remarcacoes.map((item) => item.closest('li').querySelector('.cal-lista__hora').textContent))
+      .toEqual(['08:00 – 08:30', '09:30 – 10:10']);
+    for (const item of remarcacoes) expect(within(item.closest('li')).getByText('Remarcar')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Semana' }));
+    await user.click(await screen.findByRole('button', { name: 'Ver o dia Quarta-feira, 11/11/2099' }));
+    const consultaEmDiaRemovido = await screen.findByText(/Diego Santos · Clínica Geral/);
+    expect(within(consultaEmDiaRemovido.closest('li')).getByText('Remarcar')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Canceladas neste dia' })).toBeInTheDocument();
+  });
+
   it('horários que já passaram aparecem como indisponíveis', async () => {
     mockApi({ consultas: [{ id: 'c1', medicoId: 'm1', pacienteId: 'p1', pacienteNome: 'Paulo Paciente', especialidadeId: 'e1',
       especialidadeNome: 'Clínica Geral', inicio: '2020-11-09T08:00', fim: '2020-11-09T08:30', status: 'CONCLUIDA' }] });

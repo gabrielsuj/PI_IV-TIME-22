@@ -22,7 +22,7 @@ Os validadores (`$jsonSchema`) e índices ficam em [`database/init/`](../databas
 | [historico.md](modelagem/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
 | [historico-implementacao.md](modelagem/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
 | [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
-| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos simulados; hoje a API gera o aviso de vaga liberada da fila) |
+| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos simulados; hoje: avisos de vaga gerados pela fila e exibidos ao paciente, #57) |
 | [carga-demonstracao.md](modelagem/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
 
 ## API REST
@@ -33,9 +33,9 @@ Todas as rotas, com os perfis autorizados, estão resumidas em `backend/.../api/
 |---|---|
 | [medicos-especialidades.md](api/medicos-especialidades.md) | `/medicos`, `/especialidades` (cadastro, edição, desativação) |
 | [agendamento.md](api/agendamento.md) | `GET /vagas` (disponibilidade) e `POST /consultas` (agendamento) |
-| [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as telas `/consultas` |
+| [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as rotas de alteração de status e histórico |
 | [cancelamento.md](api/cancelamento.md) | `POST /consultas/{id}/cancelamento` (cancelamento por paciente, médico ou secretaria) |
-| [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` (inscrição na fila de espera) |
+| [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` e `GET/POST /avisos-vaga` |
 | [alteracoes-agenda.md](api/alteracoes-agenda.md) | `PUT /agendas` e `POST /bloqueios` quando atingem consultas marcadas (409 + `?confirmar=true`) |
 
 Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/me`, `/pacientes`, `GET /agendas`, `GET/DELETE /bloqueios` e `GET /consultas` (calendário). O formato de cada uma está nos testes de integração correspondentes ([testes](testes/estrategia-de-testes.md)).
@@ -44,6 +44,7 @@ Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/m
 
 | Documento | Conteúdo |
 |---|---|
+| [Entrega do MVP](operacao/entrega-mvp.md) | Demonstração da fila, critérios de aceite e publicação da versão entregue |
 | [backup-recuperacao.md](operacao/backup-recuperacao.md) | Backup, restauração e teste de recuperação dos bancos, com um comando cada |
 
 ## Testes

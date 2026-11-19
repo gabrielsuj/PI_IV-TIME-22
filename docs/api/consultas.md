@@ -68,10 +68,7 @@ A lista traz no máximo **100** consultas (`ConsultaLeituraService.LIMITE`). A t
 | `/consultas` | `ConsultasPage` | Abas Próximas/Anteriores, filtros de status e de médico (exceto para o perfil médico), tabela com "Ver detalhes". Os filtros ficam no endereço (`?periodo=anteriores&status=…`), então dá para voltar e compartilhar o link |
 | `/consultas/:id` | `ConsultaDetalhePage` | Resumo da reserva, status e motivo do cancelamento. O botão "Cancelar consulta" abre uma confirmação com motivo opcional (até 255 caracteres). No 409, o modal fecha e a tela mostra a mensagem do servidor e recarrega a consulta |
 
-Espaços reservados na tela de detalhe, marcados com comentário no código:
-
-- **#28:** botões de confirmar, concluir e registrar falta, ao lado do "Cancelar consulta". Depois da ação, chamar `recarregar()`.
-- **#46:** card "Histórico" com a linha do tempo, abaixo do resumo.
+O detalhe permite confirmar presença, registrar conclusão ou falta conforme as permissões e o horário da consulta. A tela envia apenas o campo `status` a `POST /consultas/{id}/status`. A linha do tempo usa `GET /consultas/{id}/historico` e aceita o cursor exclusivo `aposSequencia` e um `limite` de 1 a 100 eventos por página.
 
 ## 6. Testes
 

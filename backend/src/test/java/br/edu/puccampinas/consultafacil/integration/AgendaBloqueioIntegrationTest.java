@@ -148,7 +148,7 @@ class AgendaBloqueioIntegrationTest {
     @Test
     void deveRemoverBloqueio() {
         ObjectId id = new ObjectId(bloqueios.criar(bloqueio("2026-11-09T14:00", "2026-11-09T15:00")).id());
-        bloqueios.remover(id);
-        assertStatus(404, () -> bloqueios.remover(id));
+        bloqueios.remover(id, java.util.Optional.empty());
+        assertStatus(404, () -> bloqueios.remover(id, java.util.Optional.empty()));
     }
 }

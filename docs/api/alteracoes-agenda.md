@@ -2,6 +2,12 @@
 
 Criar um bloqueio ou mudar a jornada de um médico pode atingir consultas já marcadas. A API não grava a mudança sem que a secretaria veja quais consultas serão afetadas.
 
+## Permissões
+
+O médico abre sua jornada e seu calendário diretamente. A API resolve `medicoId=meu` pelo vínculo entre o login e o cadastro de médico. Também aceita o ID explícito do próprio médico. A secretaria informa o ID do profissional escolhido. A criação de bloqueio usa o mesmo campo no corpo JSON.
+
+A API responde 403 para consultas ou mudanças em outra agenda e para médicos sem vínculo. Na remoção por ID, retorna 404 se o bloqueio estiver fora da agenda autorizada ou não existir. A verificação precede a resposta de conflito com os dados das consultas afetadas.
+
 ## Quando acontece
 
 | Operação | Consultas consideradas afetadas |

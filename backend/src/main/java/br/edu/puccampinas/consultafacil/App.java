@@ -63,8 +63,10 @@ public class App {
         var consultaRepo = new ConsultaRepository(db);
         // Consultas atingidas por mudança de jornada ou bloqueio (#44)
         var consultasAfetadas = new ConsultasAfetadas(consultaRepo, new NomesRepository.Mongo(db));
+        var medicoDoUsuario = new MedicoDoUsuarioRepository(db);
+        var acessoAgenda = new AcessoAgenda(medicoDoUsuario);
         var agendaHandler = new AgendaHandler(
-            new AgendaService(agendaRepo, medicos, consultasAfetadas, Clock.systemUTC())
+            new AgendaService(agendaRepo, medicos, consultasAfetadas, Clock.systemUTC()), acessoAgenda
         );
 
         // Bloqueios (develop)
@@ -75,7 +77,7 @@ public class App {
                 agendaRepo,
                 medicos,
                 consultasAfetadas
-            )
+            ), acessoAgenda
         );
 
         var relogio = Clock.systemUTC();
@@ -100,7 +102,7 @@ public class App {
         // Cancelamento (#27). A fila é avisada pelo RegistroConsultaService (#32); o AposCancelamento não é usado.
         // Quem vê/mexe em qual consulta: paciente as próprias, médico as dele, secretaria todas (#27, #30)
         var acessoConsulta = new AcessoConsulta(
-            pacienteDoUsuario::buscar, new MedicoDoUsuarioRepository(db)::buscar);
+            pacienteDoUsuario::buscar, medicoDoUsuario::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
             acessoConsulta, registroConsultas, AposCancelamento.NENHUM, relogio));
         var statusConsultaHandler = new StatusConsultaHandler(new StatusConsultaService(consultaRepo,
@@ -116,7 +118,7 @@ public class App {
 
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
-            consultaRepo, agendaRepo, medicos, nomes));
+            consultaRepo, agendaRepo, medicos, nomes), acessoAgenda);
 
         // Login e sessão (#9)
         var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));

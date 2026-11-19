@@ -59,7 +59,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 
 **Fora do MVP:** WhatsApp e SMS reais, teleconsulta, prontuário eletrônico, pagamentos e convênios, relatórios avançados, previsão de faltas por inteligência artificial e aplicativo móvel.
 
-### Situação atual (13/11/2026)
+### Situação atual (19/11/2026)
 
 | Funcionalidade | Situação |
 |---|---|
@@ -68,13 +68,16 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Agenda: jornada semanal, duração e bloqueios, com aviso quando a mudança atinge consultas marcadas | ✅ |
 | Calendário operacional por médico (semana e dia) | ✅ |
 | Busca de vagas e agendamento (secretaria e paciente) | ✅ |
-| Registro de histórico das consultas | ✅ |
+| Registro e consulta do histórico no detalhe da consulta | ✅ #29, #46 |
 | Listagem, detalhe e cancelamento de consultas | ✅ |
 | Fila de espera na API: inscrição, sinalização da vaga após cancelamento e atualização quando a vaga é ocupada | ✅ #31, #32 |
-| Tela da fila de espera e avisos de vaga para o paciente | 🚧 #57 |
-| Alteração de status (conclusão, falta) pela interface | 🚧 #28 |
-| Sobreposição do mesmo paciente em horários diferentes | 🚧 #25 |
-| Lembretes simulados e painel de indicadores | 🚧 #33 a #37 |
+| Avisos de vaga para o paciente, com agendamento e expiração | ✅ #57 |
+| Telas da fila de espera (paciente e secretaria) | ✅ #33 |
+| Confirmação, conclusão e falta pela interface | ✅ #28 |
+| Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
+| Lembretes simulados e painel de indicadores | 🚧 #34 a #37 |
+
+O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne o cenário de demonstração da fila e o passo a passo para publicar a versão final.
 
 ---
 
@@ -208,7 +211,7 @@ Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes
 | Perfil | O que mostrar |
 |---|---|
 | Secretaria | Cadastros de pacientes, médicos e especialidades; **Agenda** (jornada semanal e bloqueios, com aviso quando a mudança atinge consultas marcadas); **Calendário** por médico; **Nova consulta** para qualquer paciente; **Consultas** (todas, com detalhe e cancelamento) |
-| Médico (Ana) | **Agenda** e **Calendário** (selecione Ana ou abra `/agenda?medicoId=100000000000000000000001`); **Consultas** que atende; leitura de pacientes |
+| Médico (Ana) | **Agenda** e **Calendário** abrem diretamente o cadastro vinculado ao login; **Consultas** que atende; leitura de pacientes |
 | Paciente (Paulo) | **Nova consulta** para si mesmo; **Consultas** próprias, com cancelamento |
 
 Em **Nova consulta** (`/nova-consulta`), os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
@@ -261,6 +264,8 @@ cd frontend && npm test                            # Vitest + Testing Library
 ```
 
 A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md).
+
+Em cada pull request, o [workflow de CI](.github/workflows/ci.yml) roda o JUnit com MongoDB 7 e os checks do frontend com `npm test`, `npm run lint` e `npm run build`.
 
 ### 7. Backup e recuperação
 
