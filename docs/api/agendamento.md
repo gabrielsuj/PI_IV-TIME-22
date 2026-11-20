@@ -102,7 +102,7 @@ Formato: `{ "status": 409, "erro": "mensagem" }`.
 | Arquivo | Precisa do MongoDB? | O que cobre |
 |---|---|---|
 | `unit/CalculadoraDisponibilidadeTest` | não | Jornada × duração, bloqueio (cenário de referência), consulta ativa, sobreposição parcial, dia sem jornada, horário passado, horário que não cabe na faixa |
-| `integration/AgendamentoIntegrationTest` | sim (`consultafacil_test`) | Busca por dia e por intervalo, médico sem agenda, especialidade errada, agendamento pela secretaria e pelo paciente, `deveImpedirReservaEmPeriodoBloqueado` (Quadro 4), fora da jornada, horário passado, 409 para horário já reservado |
+| `integration/AgendamentoIntegrationTest` | sim (`consultafacil_test`) | Busca por dia e por intervalo, médico sem agenda, especialidade errada, agendamento pela secretaria e pelo paciente, `deveImpedirReservaEmPeriodoBloqueado` (Quadro 4), fora da jornada, horário passado, 409 para horário já reservado e revalidação de duração e bloqueio parcial entre busca e confirmação |
 | `integration/ReservasConcorrenciaIntegrationTest` | sim (`consultafacil_test`) | Sobreposição do mesmo paciente entre médicos diferentes e pedidos simultâneos com inícios diferentes |
 | `integration/RotasAutorizacaoTest` | não | Perfis de `/vagas` e `/consultas` |
 | `frontend/src/__tests__/agendamentoService.test.js` | não | Chamadas do front para `/vagas` e `/consultas` |

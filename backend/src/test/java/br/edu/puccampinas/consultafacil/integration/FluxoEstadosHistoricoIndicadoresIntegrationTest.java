@@ -112,11 +112,13 @@ class FluxoEstadosHistoricoIndicadoresIntegrationTest {
         var nomes = new NomesRepository.Mongo(db);
         var pacienteDoUsuario = new PacienteDoUsuarioRepository(db);
         var medicoDoUsuario = new MedicoDoUsuarioRepository(db);
-        var sinalizacao = new SinalizacaoFilaService(filaRepo, new NotificacaoRepository(db), consultas, nomes, processor, relogio);
+        var disponibilidade = new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio);
+        var sinalizacao = new SinalizacaoFilaService(filaRepo, new NotificacaoRepository(db),
+                consultas, nomes, processor, relogio, disponibilidade);
         var registro = new RegistroConsultaService(consultas, processor, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
         var acesso = new AcessoConsulta(pacienteDoUsuario::buscar, medicoDoUsuario::buscar);
         agendamento = new AgendamentoService(
-                new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio),
+                disponibilidade,
                 new MedicoRepository(db), new EspecialidadeRepository.Mongo(db), new PacienteRepository.Mongo(db),
                 pacienteDoUsuario, registro);
         status = new StatusConsultaService(consultas, acesso, registro, relogio);
