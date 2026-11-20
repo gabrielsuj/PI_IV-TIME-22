@@ -46,10 +46,34 @@ describe('roteamento', () => {
     mockHealth(healthy);
     renderAt('/');
 
-    expect(screen.getByRole('heading', { level: 1, name: 'ConsultaFácil' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Painel operacional' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Navegação principal' });
     expect(within(nav).getByRole('link', { name: 'Início' })).toHaveClass('active');
     expect(await screen.findByText('API disponível')).toBeInTheDocument();
+  });
+
+  it.each(['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'])('a entrada inicial e os acessos respeitam o perfil %s', async (perfil) => {
+    entrarComo({ id: 'u-inicio', nome: 'Teste', perfil });
+    const fetchMock = mockHealth(healthy);
+    renderAt('/');
+    expect(await screen.findByText('API disponível')).toBeInTheDocument();
+    const main = within(screen.getByRole('main'));
+    const paciente = perfil === 'PACIENTE';
+    expect(main.getByRole('heading', { level: 1, name: paciente ? 'Minha área' : 'Painel operacional' })).toBeInTheDocument();
+    if (paciente) {
+      expect(main.getByRole('link', { name: 'Ver minhas consultas' })).toHaveAttribute('href', '/consultas');
+      expect(main.getByRole('link', { name: 'Ver avisos de vaga' })).toHaveAttribute('href', '/avisos-vaga');
+      expect(main.getByRole('link', { name: 'Ver notificações' })).toHaveAttribute('href', '/notificacoes');
+      expect(main.queryByRole('link', { name: 'Abrir calendário' })).not.toBeInTheDocument();
+      expect(main.queryByRole('heading', { name: /indicadores|painel operacional/i })).not.toBeInTheDocument();
+    } else {
+      expect(main.getByRole('link', { name: 'Abrir calendário' })).toHaveAttribute('href', '/calendario');
+      expect(main.getByRole('link', { name: 'Ver consultas' })).toHaveAttribute('href', '/consultas');
+      expect(main.queryByRole('link', { name: 'Ver avisos de vaga' })).not.toBeInTheDocument();
+    }
+    if (perfil === 'MEDICO') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+    else expect(main.getByRole('link', { name: 'Nova consulta' })).toHaveAttribute('href', '/nova-consulta');
+    expect(fetchMock.mock.calls.every(([url]) => url === 'http://api.teste/health')).toBe(true);
   });
 
   it('navega para a página de status pelo menu', async () => {

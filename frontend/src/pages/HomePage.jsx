@@ -11,14 +11,39 @@ const SHORTCUTS = [
   { to: '/especialidades', title: 'Especialidades', description: 'Áreas de atendimento da clínica.', resource: 'especialidades' },
 ];
 
+const OPERATIONAL_SHORTCUTS = [
+  { to: '/calendario', title: 'Calendário', description: 'Visualize os horários e os atendimentos agendados.', label: 'Abrir calendário' },
+  { to: '/consultas', title: 'Consultas', description: 'Acompanhe as consultas e abra os detalhes dos atendimentos.', label: 'Ver consultas' },
+];
+
+const PATIENT_SHORTCUTS = [
+  { to: '/consultas', title: 'Minhas consultas', description: 'Acompanhe seus agendamentos e os detalhes de cada consulta.', label: 'Ver minhas consultas' },
+  { to: '/avisos-vaga', title: 'Avisos de vaga', description: 'Confira as vagas disponíveis para suas inscrições na fila de espera.', label: 'Ver avisos de vaga' },
+  { to: '/notificacoes', title: 'Notificações', description: 'Consulte os avisos sobre seus atendimentos.', label: 'Ver notificações' },
+];
+
 export default function HomePage() {
   const { usuario } = useAuth();
-  const shortcuts = SHORTCUTS.filter(({ to }) => podeAbrir(to, usuario?.perfil));
-  const action = usuario?.perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
+  const perfil = usuario?.perfil;
+  const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
+  const acessos = (operacional ? OPERATIONAL_SHORTCUTS : PATIENT_SHORTCUTS).filter(({ to }) => podeAbrir(to, perfil));
+  const shortcuts = SHORTCUTS.filter(({ to }) => podeAbrir(to, perfil));
+  const action = perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
+  const description = operacional
+    ? perfil === 'MEDICO'
+      ? 'Consulte sua agenda e acompanhe seus atendimentos.'
+      : 'Organize a agenda e acompanhe os atendimentos da clínica.'
+    : 'Agende consultas e acompanhe seus atendimentos e avisos de vaga.';
+
   return (
     <div className="page">
-      <PageHeader title="ConsultaFácil" description="Centralize os cadastros e organize a rotina de atendimento da clínica."
-        action={podeAbrir('/nova-consulta', usuario?.perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
+      <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
+        action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
+      <div className="record-grid">
+        {acessos.map(({ to, title, description, label }) => (
+          <Card key={to} title={title} description={description}><Button to={to} variant="outline">{label}</Button></Card>
+        ))}
+      </div>
       {shortcuts.length > 0 && <div className="record-grid">
         {shortcuts.map(({ to, title, description, resource }) => (
           <Card key={to} title={title} description={description}><Button to={to} variant="outline">{action} {resource}</Button></Card>
@@ -27,7 +52,7 @@ export default function HomePage() {
 
       <ApiStatus />
 
-      {podeAbrir('/status', usuario?.perfil) && <div><Button to="/status" variant="ghost">Ver detalhes da conexão</Button></div>}
+      {podeAbrir('/status', perfil) && <div><Button to="/status" variant="ghost">Ver detalhes da conexão</Button></div>}
     </div>
   );
 }
