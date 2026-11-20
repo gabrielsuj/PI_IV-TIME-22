@@ -145,7 +145,9 @@ e especialidade preservados. Não confundir quantidade de eventos de confirmaç�
 de consultas atualmente confirmadas. Ocupação depende também de jornadas e bloqueios;
 ocupação histórica exata exige preservar a capacidade da agenda de cada período.
 Fila ativa e vagas preenchidas vêm de filaEspera (status AGUARDANDO/SINALIZADA e ATENDIDA com
-atendidaEm, índice idx_fila_atendidas). O painel de indicadores e as fórmulas de taxas não foram criados.
+atendidaEm, índice idx_fila_atendidas).
+
+O painel já consome a API `GET /indicadores`. A taxa de confirmação conta uma vez cada consulta do período com evento `CONFIRMACAO` projetado no histórico. A capacidade usada na ocupação é estimada pela agenda atual. Mudanças antigas de jornada, duração e bloqueios ficam fora desse cálculo. [Contrato e fórmulas da API de indicadores](../api/indicadores.md)
 
 ## Testes
 
