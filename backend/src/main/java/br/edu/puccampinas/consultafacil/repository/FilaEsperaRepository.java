@@ -125,6 +125,12 @@ public class FilaEsperaRepository {
                 .into(new ArrayList<>());
     }
 
+    public List<ObjectId> origensSinalizadasDoMedico(ObjectId medicoId) {
+        return col.distinct("ultimaSinalizacao.consultaOrigemId",
+                Filters.and(Filters.eq("status", "SINALIZADA"), Filters.eq("ultimaSinalizacao.medicoId", medicoId)),
+                ObjectId.class).into(new ArrayList<>());
+    }
+
     /** SINALIZADA -> ATENDIDA: o próprio interessado agendou a vaga. */
     public boolean marcarAtendida(ObjectId id, ObjectId notificacaoId, ObjectId consultaId, Date agora) {
         return col.updateOne(
