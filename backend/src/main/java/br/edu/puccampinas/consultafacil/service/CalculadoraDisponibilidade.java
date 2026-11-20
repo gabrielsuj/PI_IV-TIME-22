@@ -25,7 +25,7 @@ import java.util.List;
 public final class CalculadoraDisponibilidade {
     private CalculadoraDisponibilidade() {}
 
-    /** Um horário livre, em instantes UTC. */
+    /** Um horário da jornada, em instantes UTC; a disponibilidade filtra os que estão livres. */
     public record Vaga(Instant inicio, Instant fim) {}
 
     /**
@@ -37,8 +37,21 @@ public final class CalculadoraDisponibilidade {
      */
     public static List<Vaga> calcular(Document agenda, LocalDate data,
                                       List<Document> bloqueios, List<Document> consultas, Instant agora) {
+        List<Vaga> vagas = capacidadeDoDia(agenda, data, bloqueios);
+        vagas.removeIf(vaga -> vaga.inicio().isBefore(agora) || sobrepoe(vaga.inicio(), vaga.fim(), consultas));
+        return vagas;
+    }
+
+    /**
+     * Capacidade da jornada atual em um dia no fuso da agenda, descontando somente os bloqueios.
+     * Não depende do relógio ou das reservas: horários passados/ocupados continuam na capacidade.
+     * Reutilizada pela disponibilidade e pelos indicadores (#36), sem reconstruir agendas antigas.
+     */
+    public static List<Vaga> capacidadeDoDia(Document agenda, LocalDate data, List<Document> bloqueios) {
         ZoneId fuso = ZoneId.of(agenda.getString("fusoHorario"));
-        int duracao = agenda.getInteger("duracaoMinutos");
+        Integer duracao = agenda.getInteger("duracaoMinutos");
+        if (duracao == null || duracao < 5 || duracao > 240)
+            throw new IllegalArgumentException("A duração da agenda deve estar entre 5 e 240 minutos");
         int diaSemana = data.getDayOfWeek().getValue();   // ISO 8601: 1 = segunda ... 7 = domingo
 
         List<Vaga> vagas = new ArrayList<>();
@@ -54,9 +67,7 @@ public final class CalculadoraDisponibilidade {
                     Instant inicio = data.atStartOfDay().plusMinutes(minuto).atZone(fuso).toInstant();
                     Instant fim = inicio.plusSeconds(duracao * 60L);
 
-                    if (inicio.isBefore(agora)) continue;
                     if (sobrepoe(inicio, fim, bloqueios)) continue;
-                    if (sobrepoe(inicio, fim, consultas)) continue;
                     vagas.add(new Vaga(inicio, fim));
                 }
             }
