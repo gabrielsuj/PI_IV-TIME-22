@@ -1,3 +1,4 @@
+import { FUSO_CLINICA } from './consulta';
 import { DIAS_SEMANA, minutosParaHora } from './horario';
 
 /*
@@ -8,6 +9,7 @@ import { DIAS_SEMANA, minutosParaHora } from './horario';
  */
 
 const ABREVIADOS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+const MILIS_POR_DIA = 86400000;
 const comoData = (data) => new Date(`${data}T00:00:00Z`);
 
 export function somarDias(data, dias) {
@@ -26,6 +28,41 @@ export function diaIso(data) {
 export function diasDaSemana(data) {
   const segunda = somarDias(data, 1 - diaIso(data));
   return Array.from({ length: 7 }, (_, i) => somarDias(segunda, i));
+}
+
+function formatadorDaData(timeZone) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', era: 'short' });
+}
+
+function dataCivilEmUtc(instante, formato) {
+  const { year, month, day, era } = Object.fromEntries(formato.formatToParts(instante).map(({ type, value }) => [type, value]));
+  return new Date(0).setUTCFullYear(era === 'BC' ? 1 - Number(year) : Number(year), Number(month) - 1, Number(day));
+}
+
+function inicioDoDia(diaUtc, formato) {
+  let inicio = diaUtc - MILIS_POR_DIA;
+  let fim = diaUtc + MILIS_POR_DIA;
+  // Encontra o primeiro instante dessa data, inclusive quando a mudança de fuso pula a meia-noite.
+  while (inicio < fim) {
+    const meio = Math.floor((inicio + fim) / 2);
+    if (dataCivilEmUtc(meio, formato) < diaUtc) inicio = meio + 1;
+    else fim = meio;
+  }
+  return inicio;
+}
+
+/** Dias do calendário no fuso do médico que tocam o dia escolhido no painel. */
+export function diasDaAgendaNoDiaClinica(dia, fusoAgenda) {
+  if (fusoAgenda === FUSO_CLINICA) return [dia];
+  const clinica = formatadorDaData(FUSO_CLINICA);
+  const agenda = formatadorDaData(fusoAgenda);
+  const diaUtc = comoData(dia).getTime();
+  const primeiro = dataCivilEmUtc(inicioDoDia(diaUtc, clinica), agenda);
+  const ultimo = dataCivilEmUtc(inicioDoDia(diaUtc + MILIS_POR_DIA, clinica) - 1, agenda);
+  return Array.from({ length: (ultimo - primeiro) / MILIS_POR_DIA + 1 }, (_, i) => {
+    const data = new Date(primeiro + i * MILIS_POR_DIA).toISOString();
+    return data.split('T')[0];
+  });
 }
 
 /** "2026-11-12" → "qui 12/11" */

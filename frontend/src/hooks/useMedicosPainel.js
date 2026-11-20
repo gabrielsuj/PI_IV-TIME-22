@@ -4,6 +4,6 @@ import { useLeituraPainel } from './useLeituraPainel';
 
 export function useMedicosPainel() {
   const { usuario } = useAuth();
-  const { dados, carregando, erro, atualizar } = useLeituraPainel(buscarMedicosPainel, {}, usuario?.perfil === 'SECRETARIA_ADMIN');
-  return { records: dados ?? [], loading: carregando, error: erro, refresh: atualizar };
+  const { dados, carregando, carregamentoInicial, erro, atualizar } = useLeituraPainel(buscarMedicosPainel, {}, usuario?.perfil === 'SECRETARIA_ADMIN');
+  return { records: dados ?? [], loading: carregando, carregamentoInicial, error: erro, refresh: atualizar };
 }

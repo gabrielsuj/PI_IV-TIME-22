@@ -13,7 +13,10 @@ const BUSCA = `?de=2026-11-20&ate=2026-11-23&dia=2026-11-23&medicoId=${MEDICO_PA
 const MEDICO = { id: 'login-do-medico', nome: 'Ana Médica', perfil: 'MEDICO' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-function mockApi() {
+function mockApi({
+  agenda = (medicoId) => ({ ...agendaPainel(medicoId), jornadas: [{ diaSemana: 1, faixas: [{ inicioMinuto: 480, fimMinuto: 780 }] }] }),
+  consultas = (_url, medicoId) => [consultaDia({ medicoId })],
+} = {}) {
   const fetchMock = vi.fn(async (caminho, options) => {
     if (options.method !== 'GET') throw new Error('A navegação não deve escrever dados.');
     const url = new URL(caminho);
@@ -24,10 +27,10 @@ function mockApi() {
       case '/medicos': return json([{ id: MEDICO_PAINEL, nome: 'Ana Médica', ativo: true, especialidadeIds: ['especialidade'], crmNumero: '123', crmUf: 'SP' }]);
       case '/especialidades': return json([{ id: 'especialidade', nome: 'Clínica Geral', ativa: true }]);
       case '/pacientes': return json([]);
-      case '/agendas': return json({ ...agendaPainel(medicoId), jornadas: [{ diaSemana: 1, faixas: [{ inicioMinuto: 480, fimMinuto: 780 }] }] });
+      case '/agendas': return json(agenda(medicoId));
       case '/bloqueios': return json([]);
       case '/indicadores': return json(indicadoresDaUrl(caminho));
-      case '/consultas': return json([consultaDia({ medicoId })]);
+      case '/consultas': return json(consultas(url, medicoId));
       case '/consultas/lista': return json([consultaProxima({ medicoId, podeCancelar: true })]);
       default: {
         const historico = url.pathname.match(/^\/consultas\/([^/]+)\/historico$/);
@@ -84,12 +87,60 @@ it('atalho do calendário leva médico e dia e preserva o retorno após trocar a
   await screen.findByText('Paula da Agenda');
   await user.click(screen.getByRole('link', { name: 'Abrir calendário' }));
   expect(router.state.location.pathname).toBe('/calendario');
-  expect(Object.fromEntries(new URLSearchParams(router.state.location.search))).toEqual({ medicoId: MEDICO_PAINEL, visao: 'dia', data: '2026-11-23' });
+  expect(Object.fromEntries(new URLSearchParams(router.state.location.search))).toEqual({
+    medicoId: MEDICO_PAINEL, visao: 'dia', data: '2026-11-23', diaClinica: '1',
+  });
   expect(await screen.findByText('Horários no fuso da agenda: America/Sao_Paulo.')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Próximo ›' }));
   await waitFor(() => expect(router.state.location.search).toContain('data=2026-11-24'));
   await user.click(screen.getByRole('link', { name: '‹ Voltar ao painel' }));
   expect(await screen.findByText('Paula da Agenda')).toBeInTheDocument();
+  conferirFiltros();
+});
+
+it('leva as consultas do dia da clínica ao calendário quando a agenda está em UTC', async () => {
+  const fetchMock = mockApi({
+    agenda: (medicoId) => ({ ...agendaPainel(medicoId, 'UTC'), jornadas: [
+      { diaSemana: 1, faixas: [{ inicioMinuto: 780, fimMinuto: 810 }] },
+      { diaSemana: 2, faixas: [{ inicioMinuto: 30, fimMinuto: 60 }] },
+    ] }),
+    consultas: (url, medicoId) => {
+      const clinica = url.searchParams.get('fusoHorario') === 'America/Sao_Paulo';
+      const registros = [
+        consultaDia({ medicoId, inicio: clinica ? '2026-11-23T10:00' : '2026-11-23T13:00',
+          fim: clinica ? '2026-11-23T10:30' : '2026-11-23T13:30' }),
+        consultaDia({ id: 'dia-seguinte-utc', medicoId, pacienteNome: 'Bruna às 21h30',
+          inicio: clinica ? '2026-11-23T21:30' : '2026-11-24T00:30', fim: clinica ? '2026-11-23T22:00' : '2026-11-24T01:00' }),
+      ];
+      return registros.filter(({ inicio }) => inicio.slice(0, 10) >= url.searchParams.get('de')
+        && inicio.slice(0, 10) <= url.searchParams.get('ate'));
+    },
+  });
+  const user = userEvent.setup();
+  const router = abrir();
+  expect(await screen.findByText('Bruna às 21h30')).toBeInTheDocument();
+  await user.click(screen.getByRole('link', { name: 'Abrir calendário' }));
+  expect(await screen.findByText('Horários no fuso da agenda: UTC.')).toBeInTheDocument();
+  expect(screen.getByText('O dia 23/11/2026 no fuso da clínica abrange os dias abaixo no fuso da agenda.')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Segunda-feira, 23/11/2026' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Terça-feira, 24/11/2026' })).toBeInTheDocument();
+  expect(screen.getByText(/Paula da Agenda ·/)).toBeInTheDocument();
+  expect(screen.getByText(/Bruna às 21h30 ·/)).toBeInTheDocument();
+  const requisicoes = fetchMock.mock.calls.map(([url]) => new URL(url));
+  for (const rota of ['/consultas', '/bloqueios']) {
+    const consultaLocal = requisicoes.findLast((url) => url.pathname === rota);
+    expect(Object.fromEntries(consultaLocal.searchParams)).toEqual({
+      medicoId: MEDICO_PAINEL, de: '2026-11-23', ate: '2026-11-24',
+    });
+  }
+
+  await user.click(screen.getByRole('button', { name: 'Semana' }));
+  expect(router.state.location.search).not.toContain('diaClinica');
+  await user.click(await screen.findByRole('button', { name: 'Ver o dia Segunda-feira, 23/11/2026' }));
+  expect(await screen.findByText(/Paula da Agenda ·/)).toBeInTheDocument();
+  expect(screen.queryByText(/Bruna às 21h30 ·/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole('link', { name: '‹ Voltar ao painel' }));
+  expect(await screen.findByText('Bruna às 21h30')).toBeInTheDocument();
   conferirFiltros();
 });
 

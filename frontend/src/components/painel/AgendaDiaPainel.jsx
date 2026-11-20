@@ -12,13 +12,17 @@ import DataTable from '../ui/DataTable';
 const dataBr = (data) => data.split('-').reverse().join('/');
 const horario = (valor, dia) => `${valor.slice(11)}${valor.slice(0, 10) === dia ? '' : ` (${dataBr(valor.slice(0, 10))})`}`;
 
-export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
+export default function AgendaDiaPainel({ dia, medicoId: filtro, medicoInativo, verificandoMedico }) {
   const { usuario } = useAuth();
   const location = useLocation();
   const origem = origemPainel(location, usuario);
   const propria = usuario?.perfil === 'MEDICO';
   const medicoId = propria ? 'meu' : filtro;
-  const { permitido, carregando, dados, erro, atualizar } = useAgendaDoDia(medicoId, dia);
+  const podeConsultar = medicoId && !medicoInativo;
+  const { permitido, carregando: buscandoAgenda, dados, erro, atualizar } = useAgendaDoDia(
+    podeConsultar && !verificandoMedico ? medicoId : undefined, dia
+  );
+  const carregando = buscandoAgenda || verificandoMedico;
   if (!permitido) return null;
 
   const colunas = [
@@ -34,9 +38,10 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
 
   return (
     <Card className="painel-consultas" title="Agenda do dia" aria-busy={carregando} description={`Atendimentos que ocorrem em ${dataBr(dia)} · ${FUSO_CLINICA}.`}
-      action={medicoId && <Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar agenda do dia</Button>}>
+      action={podeConsultar && <Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar agenda do dia</Button>}>
       {!medicoId && <p role="status">Selecione um médico no filtro do painel para consultar a agenda do dia.</p>}
-      {medicoId && <>
+      {medicoInativo && <p role="status">O médico selecionado está inativo. Selecione um médico ativo para consultar a agenda do dia.</p>}
+      {podeConsultar && <>
         {dados && <p className="page__lead">Horários exibidos em {dados.fusoHorario}.</p>}
         {dados?.semAgenda && <Alert tone="info">Este médico ainda não tem agenda configurada. As consultas existentes continuam listadas.</Alert>}
         {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar agenda novamente</Button>}>{erro.message}</Alert>

@@ -7,11 +7,14 @@ const ouNada = (valor) => valor || undefined;
 
 /**
  * Consultas que o usuário logado pode ver (GET /consultas/lista, #30).
- * periodo: "proximas" (padrão) ou "anteriores"; status e medicoId são opcionais.
+ * periodo: "proximas" (padrão) ou "anteriores". status, medicoId e somenteAtivas são opcionais.
  * Paciente recebe só as próprias e médico só as que atende; quem filtra é o servidor.
  */
-export function listarConsultas({ periodo, status, medicoId } = {}, { signal } = {}) {
-  return api.get('/consultas/lista', { params: { periodo: ouNada(periodo), status: ouNada(status), medicoId: ouNada(medicoId) }, signal });
+export function listarConsultas({ periodo, status, medicoId, somenteAtivas } = {}, { signal } = {}) {
+  return api.get('/consultas/lista', {
+    params: { periodo: ouNada(periodo), status: ouNada(status), medicoId: ouNada(medicoId), somenteAtivas: ouNada(somenteAtivas) },
+    signal,
+  });
 }
 
 /** Detalhe de uma consulta (GET /consultas/{id}, #30), com nomes e a flag podeCancelar. */

@@ -36,7 +36,7 @@ export function useLeituraPainel(ler, parametros, habilitado = true) {
     setRevisao((valor) => valor + 1);
   };
 
-  return { permitido, carregando, atualizar,
+  return { permitido, carregando, carregamentoInicial: carregando && revisao === 0, atualizar,
     dados: ativo && !carregando ? estado.dados : null,
     erro: ativo && !carregando ? estado.erro : null };
 }

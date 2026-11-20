@@ -42,6 +42,7 @@ export function atalhosPainel(busca, perfil, hoje) {
   const calendario = new URLSearchParams(filtro);
   calendario.set('visao', 'dia');
   calendario.set('data', dia);
+  calendario.set('diaClinica', '1');
   return {
     consultas: valido ? `/consultas${filtro.size ? `?${filtro}` : ''}` : null,
     calendario: valido && dataPainelValida(dia) ? `/calendario?${calendario}` : null,

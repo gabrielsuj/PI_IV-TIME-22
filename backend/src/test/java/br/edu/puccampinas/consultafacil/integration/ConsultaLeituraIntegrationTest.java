@@ -1,16 +1,24 @@
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaDetalheResponse;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaLeituraHandler;
+import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.*;
+import br.edu.puccampinas.consultafacil.security.Autenticador;
+import br.edu.puccampinas.consultafacil.security.Autorizacao;
+import br.edu.puccampinas.consultafacil.security.Sessoes;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
 import br.edu.puccampinas.consultafacil.service.AcessoConsulta;
 import br.edu.puccampinas.consultafacil.service.ConsultaLeituraService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import com.sun.net.httpserver.HttpServer;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
@@ -18,10 +26,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -150,6 +164,47 @@ class ConsultaLeituraIntegrationTest {
         assertEquals(List.of(PAULO_BRUNO_SEMANA.toHexString()), ids(service.listar("proximas", "CONFIRMADA", null, PAULO_LOGADO)));
         assertEquals(List.of(PAULO_ANA_AMANHA.toHexString()),
                 ids(service.listar("proximas", null, DRA_ANA.toHexString(), PAULO_LOGADO)));
+    }
+
+    @Test
+    void listagemHttpFiltraAtivasAntesDoLimiteEPreservaFiltroDeCanceladas() throws Exception {
+        List<Document> canceladas = new ArrayList<>();
+        for (int i = 0; i < ConsultaLeituraService.LIMITE; i++) {
+            canceladas.add(consulta(new ObjectId(), CARLA, DRA_ANA, AGORA.plusSeconds(3600L + 60L * i), "CANCELADA"));
+        }
+        db.getCollection("consultas").insertMany(canceladas);
+        var sessoes = new Sessoes(Duration.ofMinutes(5));
+        var auth = new Autorizacao(new Autenticador(sessoes));
+        var servidor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        servidor.createContext("/consultas/", Rotas.consultaPorId(new Cors(List.of()), auth,
+                new ConsultaLeituraHandler(service), null, null, null));
+        servidor.start();
+        try (var cliente = HttpClient.newHttpClient()) {
+            String base = "http://127.0.0.1:" + servidor.getAddress().getPort() + "/consultas/lista?periodo=proximas";
+            String token = sessoes.criar(SECRETARIA).token();
+            var json = new ObjectMapper();
+
+            var ativas = buscarLista(cliente, base + "&somenteAtivas=true", token);
+            assertEquals(200, ativas.statusCode(), ativas.body());
+            var lista = json.readTree(ativas.body());
+            assertEquals(2, lista.size());
+            assertEquals(PAULO_ANA_AMANHA.toHexString(), lista.get(0).get("id").asText());
+            assertEquals(PAULO_BRUNO_SEMANA.toHexString(), lista.get(1).get("id").asText());
+
+            var selecionadas = buscarLista(cliente, base + "&somenteAtivas=false&status=CANCELADA", token);
+            assertEquals(200, selecionadas.statusCode(), selecionadas.body());
+            assertEquals(ConsultaLeituraService.LIMITE, json.readTree(selecionadas.body()).size());
+            assertEquals(400, buscarLista(cliente, base + "&somenteAtivas=sim", token).statusCode());
+        } finally {
+            servidor.stop(0);
+        }
+    }
+
+    private static HttpResponse<String> buscarLista(HttpClient cliente, String url, String token)
+            throws Exception {
+        var pedido = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(5))
+                .header("Authorization", "Bearer " + token).GET().build();
+        return cliente.send(pedido, HttpResponse.BodyHandlers.ofString());
     }
 
     @Test

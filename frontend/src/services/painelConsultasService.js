@@ -1,7 +1,7 @@
 import { buscarAgenda } from './agendaService';
 import { listarConsultas as listarCalendario } from './calendarioService';
 import { LIMITE_LISTAGEM, listarConsultas } from './consultasService';
-import { FUSO_CLINICA, STATUS_CONSULTA } from '../utils/consulta';
+import { FUSO_CLINICA, STATUS_ATIVOS, STATUS_CONSULTA } from '../utils/consulta';
 
 export const LIMITE_PROXIMAS_PAINEL = 5;
 const texto = (valor) => typeof valor === 'string' && valor.trim().length > 0;
@@ -46,9 +46,10 @@ export async function buscarAgendaDoDia({ medicoId, dia }, { signal } = {}) {
 }
 
 export async function buscarProximasConsultas({ medicoId } = {}, { signal } = {}) {
-  const consultas = await listarConsultas({ periodo: 'proximas', medicoId }, { signal });
+  const consultas = await listarConsultas({ periodo: 'proximas', medicoId, somenteAtivas: true }, { signal });
   validarConsultas(consultas);
-  if (consultas.length > LIMITE_LISTAGEM || medicoId && consultas.some((consulta) => consulta.medicoId !== medicoId))
+  if (consultas.length > LIMITE_LISTAGEM || consultas.some((consulta) =>
+    !STATUS_ATIVOS.includes(consulta.status) || medicoId && consulta.medicoId !== medicoId))
     throw new Error('A listagem de próximas consultas recebida é inválida. Tente novamente.');
   const ordenadas = [...consultas].sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio) || a.id.localeCompare(b.id));
   return { consultas: ordenadas.slice(0, LIMITE_PROXIMAS_PAINEL), totalRecebido: consultas.length,

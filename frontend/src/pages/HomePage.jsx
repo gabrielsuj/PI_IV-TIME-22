@@ -7,6 +7,7 @@ import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
+import { useMedicosPainel } from '../hooks/useMedicosPainel';
 import { agoraNoFuso } from '../utils/calendario';
 import { atalhosPainel, origemPainel } from '../utils/painel';
 
@@ -33,6 +34,11 @@ export default function HomePage() {
   const [hoje] = useState(() => agoraNoFuso().slice(0, 10));
   const perfil = usuario?.perfil;
   const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
+  const medicos = useMedicosPainel();
+  const medicoId = perfil === 'SECRETARIA_ADMIN' && new URLSearchParams(location.search).get('medicoId')?.toLowerCase();
+  const medicoSelecionado = medicos.records.find((medico) => (medico.id || medico._id)?.toLowerCase() === medicoId);
+  const verificandoMedico = Boolean(medicoId && medicos.carregamentoInicial);
+  const medicoInativo = medicoSelecionado?.ativo === false;
   const destinos = atalhosPainel(location.search, perfil, hoje);
   const origem = origemPainel(location, usuario);
   const acessos = (operacional ? OPERATIONAL_SHORTCUTS : PATIENT_SHORTCUTS).filter(({ to }) => podeAbrir(to, perfil));
@@ -48,15 +54,16 @@ export default function HomePage() {
     <div className="page home-page">
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
         action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>} />
-      {operacional && <PainelOperacional hoje={hoje} />}
+      {operacional && <PainelOperacional hoje={hoje} medicos={medicos} medicoSelecionado={medicoSelecionado} verificandoMedico={verificandoMedico} />}
       <div className="record-grid">
-        {acessos.map(({ to, title, description, label }) => (
-          <Card key={to} title={title} description={description}>
-            <Button to={operacional ? destinos[to === '/calendario' ? 'calendario' : 'consultas'] : to}
-              disabled={operacional && !destinos[to === '/calendario' ? 'calendario' : 'consultas']}
-              state={origem} variant="outline">{label}</Button>
+        {acessos.map(({ to, title, description, label }) => {
+          const calendario = to === '/calendario';
+          const destino = operacional ? destinos[calendario ? 'calendario' : 'consultas'] : to;
+          const bloqueado = !destino || (calendario && (medicoInativo || verificandoMedico));
+          return <Card key={to} title={title} description={description}>
+            <Button to={bloqueado ? undefined : destino} disabled={bloqueado} state={origem} variant="outline">{label}</Button>
           </Card>
-        ))}
+        })}
       </div>
       {shortcuts.length > 0 && <div className="record-grid">
         {shortcuts.map(({ to, title, description, resource }) => (
