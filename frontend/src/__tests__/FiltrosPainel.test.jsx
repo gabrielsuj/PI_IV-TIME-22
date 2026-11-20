@@ -13,18 +13,24 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 const chamadas = (fetchMock, caminho) => fetchMock.mock.calls.map(([url]) => new URL(url)).filter((url) => url.pathname === caminho);
 const parametros = (fetchMock, caminho) => Object.fromEntries(chamadas(fetchMock, caminho).at(-1).searchParams);
 
-function mockApi({ semVinculo = false } = {}) {
+function mockApi({ semVinculo = false, catalogoPendente } = {}) {
   const fetchMock = vi.fn(async (caminho) => {
     const url = new URL(caminho);
     const filtro = url.searchParams.get('medicoId');
     const cadastro = filtro && filtro !== 'meu' ? filtro : MEDICO_PAINEL;
     if (url.pathname === '/health') return json({ status: 'ok' });
-    if (url.pathname === '/medicos') return json([
-      { id: MEDICO_PAINEL, nome: 'Ana Médica', ativo: true },
-      { id: OUTRO_MEDICO_PAINEL, nome: 'Bruno Médico', ativo: false },
-    ]);
+    if (url.pathname === '/medicos') {
+      await catalogoPendente;
+      return json([
+        { id: MEDICO_PAINEL, nome: 'Ana Médica', ativo: true },
+        { id: OUTRO_MEDICO_PAINEL, nome: 'Bruno Médico', ativo: false },
+      ]);
+    }
     if (semVinculo) return json({ erro: 'Seu login não está ligado a um cadastro de médico.' }, 403);
     if (![MEDICO_PAINEL, OUTRO_MEDICO_PAINEL].includes(cadastro)) return json({ erro: 'Médico não encontrado.' }, 404);
+    if (cadastro === OUTRO_MEDICO_PAINEL && ['/agendas', '/consultas'].includes(url.pathname)) {
+      return json({ erro: 'Médico não encontrado ou inativo.' }, 404);
+    }
     if (url.pathname === '/indicadores') return json(indicadoresDaUrl(caminho));
     if (url.pathname === '/agendas') return json(agendaPainel(cadastro, 'UTC'));
     if (url.pathname === '/consultas') return json([consultaDia({ medicoId: cadastro })]);
@@ -52,28 +58,46 @@ it('aplica o mesmo médico às três seções com datas e significados explícit
   expect(screen.getByText('Escopo do painel: Ana Médica.')).toBeInTheDocument();
   expect(parametros(fetchMock, '/indicadores')).toEqual({ de: '2026-11-20', ate: '2026-11-23', medicoId: MEDICO_PAINEL });
   expect(parametros(fetchMock, '/consultas')).toEqual({ de: '2026-11-22', ate: '2026-11-22', medicoId: MEDICO_PAINEL, fusoHorario: 'America/Sao_Paulo' });
-  expect(parametros(fetchMock, '/consultas/lista')).toEqual({ periodo: 'proximas', medicoId: MEDICO_PAINEL });
+  expect(parametros(fetchMock, '/consultas/lista')).toEqual({ periodo: 'proximas', medicoId: MEDICO_PAINEL, somenteAtivas: 'true' });
   expect(screen.getByText(/consultas em andamento ou futuras a partir de agora/)).toBeInTheDocument();
   expect(screen.getByText('Horários exibidos em America/Sao_Paulo.')).toBeInTheDocument();
 });
 
-it('troca o filtro compartilhado preservando todas as datas', async () => {
+it('mantém indicadores e consultas da seleção inativa, sem pedir a agenda indisponível', async () => {
   const fetchMock = mockApi();
   const user = userEvent.setup();
   const router = abrir();
   await screen.findByRole('option', { name: 'Bruno Médico (inativo)' });
   await user.selectOptions(screen.getByLabelText('Médico do painel'), OUTRO_MEDICO_PAINEL);
-  await waitFor(() => expect(parametros(fetchMock, '/consultas').medicoId).toBe(OUTRO_MEDICO_PAINEL));
-  for (const rota of ['/indicadores', '/consultas/lista', '/agendas']) expect(parametros(fetchMock, rota).medicoId).toBe(OUTRO_MEDICO_PAINEL);
+  expect(await screen.findByText(/O médico selecionado está inativo/)).toBeInTheDocument();
+  for (const rota of ['/indicadores', '/consultas/lista']) expect(parametros(fetchMock, rota).medicoId).toBe(OUTRO_MEDICO_PAINEL);
+  for (const rota of ['/agendas', '/consultas']) expect(chamadas(fetchMock, rota)).toHaveLength(0);
+  expect(screen.getByRole('button', { name: 'Abrir calendário' })).toBeDisabled();
   expect(screen.getByLabelText('Início dos indicadores')).toHaveValue('2026-11-20');
   expect(screen.getByLabelText('Fim dos indicadores')).toHaveValue('2026-11-23');
   expect(screen.getByLabelText('Dia da agenda')).toHaveValue('2026-11-22');
   expect(router.state.location.search).toContain(`medicoId=${OUTRO_MEDICO_PAINEL}`);
+  await user.selectOptions(screen.getByLabelText('Médico do painel'), MEDICO_PAINEL);
+  expect(await screen.findByText('Paula da Agenda')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Abrir calendário' })).toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText('Médico do painel'), '');
   await waitFor(() => expect(parametros(fetchMock, '/indicadores').medicoId).toBeUndefined());
   expect(parametros(fetchMock, '/consultas/lista').medicoId).toBeUndefined();
   expect(screen.queryByText('Paula da Agenda')).not.toBeInTheDocument();
   expect(screen.getByText('Selecione um médico no filtro do painel para consultar a agenda do dia.')).toBeInTheDocument();
+});
+
+it('aguarda o catálogo ao abrir o painel direto com um médico inativo', async () => {
+  let liberarCatalogo;
+  const catalogoPendente = new Promise((resolve) => { liberarCatalogo = resolve; });
+  const fetchMock = mockApi({ catalogoPendente });
+  abrir(`&medicoId=${OUTRO_MEDICO_PAINEL}`);
+  expect(await screen.findByText('Carregando agenda do dia…')).toBeInTheDocument();
+  expect(chamadas(fetchMock, '/agendas')).toHaveLength(0);
+  await act(async () => { liberarCatalogo(); });
+  expect(await screen.findByText(/O médico selecionado está inativo/)).toBeInTheDocument();
+  expect(chamadas(fetchMock, '/agendas')).toHaveLength(0);
+  expect(chamadas(fetchMock, '/consultas')).toHaveLength(0);
 });
 
 it('datas distintas renovam somente as seções que declaram esses períodos', async () => {

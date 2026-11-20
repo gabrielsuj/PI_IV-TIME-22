@@ -1,6 +1,5 @@
 import { useSearchParams } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
-import { useMedicosPainel } from '../../hooks/useMedicosPainel';
 import { FUSO_CLINICA } from '../../utils/consulta';
 import { dataPainelValida, erroPeriodoPainel } from '../../utils/painel';
 import Alert from '../ui/Alert';
@@ -11,12 +10,11 @@ import AgendaDiaPainel from './AgendaDiaPainel';
 import IndicadoresPainel from './IndicadoresPainel';
 import ProximasConsultasPainel from './ProximasConsultasPainel';
 
-export default function PainelOperacional({ hoje }) {
+export default function PainelOperacional({ hoje, medicos, medicoSelecionado, verificandoMedico }) {
   const { usuario } = useAuth();
   const secretaria = usuario?.perfil === 'SECRETARIA_ADMIN';
   const permitido = secretaria || usuario?.perfil === 'MEDICO';
   const [params, setParams] = useSearchParams();
-  const medicos = useMedicosPainel();
   if (!permitido) return null;
 
   const selecionado = secretaria ? (params.get('medicoId') ?? '').toLowerCase() : '';
@@ -27,8 +25,7 @@ export default function PainelOperacional({ hoje }) {
   const dia = params.get('dia') ?? hoje;
   const erroPeriodo = erroPeriodoPainel(de, ate);
   const erroDia = !dataPainelValida(dia) ? 'Informe uma data válida para a agenda.' : null;
-  const cadastroSelecionado = medicos.records.find((medico) => (medico.id || medico._id)?.toLowerCase() === medicoId);
-  const escopo = secretaria ? medicoId ? cadastroSelecionado?.nome || 'Médico selecionado' : 'Todos os médicos' : 'Seus atendimentos';
+  const escopo = secretaria ? medicoId ? medicoSelecionado?.nome || 'Médico selecionado' : 'Todos os médicos' : 'Seus atendimentos';
 
   const filtrar = (campo, valor) => {
     const proximos = new URLSearchParams(params);
@@ -45,7 +42,7 @@ export default function PainelOperacional({ hoje }) {
           disabled={medicos.loading} error={!medicoValido ? 'Informe um médico válido.' : undefined}
           onChange={(event) => filtrar('medicoId', event.target.value)}>
           <option value="">{medicos.loading ? 'Carregando médicos…' : 'Todos os médicos'}</option>
-          {selecionado && !cadastroSelecionado && <option value={selecionado}>Médico selecionado</option>}
+          {selecionado && !medicoSelecionado && <option value={selecionado}>Médico selecionado</option>}
           {medicos.records.map((medico) => <option key={medico.id || medico._id} value={medico.id || medico._id}>
             {medico.nome}{medico.ativo === false ? ' (inativo)' : ''}
           </option>)}
@@ -66,7 +63,7 @@ export default function PainelOperacional({ hoje }) {
     </Card>
     {!medicoValido ? <Alert>O filtro de médico é inválido. Selecione um médico ou todos os médicos.</Alert> : <>
       {!erroPeriodo && <IndicadoresPainel de={de} ate={ate} medicoId={medicoId} />}
-      {!erroDia && <AgendaDiaPainel dia={dia} medicoId={medicoId} />}
+      {!erroDia && <AgendaDiaPainel dia={dia} medicoId={medicoId} medicoInativo={medicoSelecionado?.ativo === false} verificandoMedico={verificandoMedico} />}
       <ProximasConsultasPainel medicoId={medicoId} />
     </>}
   </>;

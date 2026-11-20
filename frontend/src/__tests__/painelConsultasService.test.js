@@ -71,7 +71,7 @@ it.each([0, 1, 5, 6, 99, 100])('ordena e resume %s próximas consultas, preserva
   expect(resultado.totalRecebido).toBe(quantidade);
   expect(resultado.limiteAtingido).toBe(quantidade === 100);
   if (quantidade) expect(resultado.consultas[0].id).toBe('consulta-000');
-  expect(fetchMock.mock.calls[0][0]).toBe('http://api.teste/consultas/lista?periodo=proximas');
+  expect(fetchMock.mock.calls[0][0]).toBe('http://api.teste/consultas/lista?periodo=proximas&somenteAtivas=true');
 });
 
 it('o filtro das próximas é opcional e nunca usa a lista como calendário ou indicador', async () => {
@@ -79,7 +79,7 @@ it('o filtro das próximas é opcional e nunca usa a lista como calendário ou i
   vi.stubGlobal('fetch', fetchMock);
   await buscarProximasConsultas({ medicoId: MEDICO_PAINEL });
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  expect(fetchMock.mock.calls[0][0]).toBe(`http://api.teste/consultas/lista?periodo=proximas&medicoId=${MEDICO_PAINEL}`);
+  expect(fetchMock.mock.calls[0][0]).toBe(`http://api.teste/consultas/lista?periodo=proximas&medicoId=${MEDICO_PAINEL}&somenteAtivas=true`);
 });
 
 it('recusa próximas consultas de outro médico quando existe filtro explícito', async () => {
@@ -91,6 +91,7 @@ it.each([
   ['corpo ausente', null], ['objeto', {}], ['linha nula', [null]],
   ['ID repetido', [consultaProxima(), consultaProxima()]],
   ['status desconhecido', [consultaProxima({ status: 'INDEFINIDA' })]],
+  ['consulta cancelada apesar do filtro', [consultaProxima({ status: 'CANCELADA' })]],
   ['nome inválido', [consultaProxima({ pacienteNome: {} })]],
   ['data local em vez de instante', [consultaProxima({ inicio: '2026-11-23T10:00' })]],
   ['fim antes do início', [consultaProxima({ fim: '2026-11-23T10:00:00Z' })]],
