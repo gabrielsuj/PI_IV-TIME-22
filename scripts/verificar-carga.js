@@ -74,6 +74,16 @@ confere("histórico completo: sequência 1..n, começa em CRIACAO, termina no st
     || ev[ev.length - 1].statusNovo !== c.status || (c.eventosPendentes || []).length > 0;
 }).map((c) => c._id.toHexString()));
 
+// Mesmas transições que a API aceita (RegistroConsultaService e StatusConsultaService): só conclui
+// consulta CONFIRMADA. Uma carga fora dessa regra deixa a taxa de confirmação sem base histórica (#48).
+const TRANSICOES = {
+  CONFIRMACAO: ["AGENDADA"], CONCLUSAO: ["CONFIRMADA"], FALTA: ["AGENDADA", "CONFIRMADA"],
+  CANCELAMENTO: ["AGENDADA", "CONFIRMADA"],
+};
+confere("histórico só com transições aceitas pela API (ex.: CONCLUIDA passa por CONFIRMADA)", consultas.filter((c) =>
+  (eventosPorConsulta.get(c._id.toHexString()) || []).some((e) => TRANSICOES[e.evento]
+    && !TRANSICOES[e.evento].includes(e.statusAnterior))).map((c) => c._id.toHexString()));
+
 confere("histórico sem eventos de consultas inexistentes", [...eventosPorConsulta.keys()]
   .filter((k) => !consultas.some((c) => c._id.toHexString() === k)));
 
