@@ -80,8 +80,13 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
             if (agendas.putIfAbsent(id, agenda) != null) throw new IllegalStateException("Mais de uma agenda para o mesmo médico");
         }
         long capacidade = 0, ocupadas = 0, semAgenda = 0;
+        Set<ObjectId> medicosComConsulta = new HashSet<>();
+        for (Document consulta : consultas) medicosComConsulta.add(consulta.getObjectId("medicoId"));
         for (ObjectId id : medicos) {
             Document agenda = agendas.get(id);
+            // Sem agenda e sem consulta no período (ex.: médico inativo), o médico não tem capacidade nem
+            // ocupação a medir: não deixa a ocupação da clínica incompleta (#48, carga de demonstração).
+            if (agenda == null && !medicosComConsulta.contains(id)) continue;
             if (agenda == null) { semAgenda++; continue; }
             var grade = CalculadoraCapacidade.slotsNoPeriodo(agenda, periodo, List.of());
             if (grade.isEmpty()) continue;

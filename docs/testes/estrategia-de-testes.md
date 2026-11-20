@@ -4,6 +4,7 @@
 |---|---|
 | `./mvnw test` | Testes unitários e de integração com MongoDB. |
 | `./mvnw test -DmongoTests=true` com `HISTORICO_MONGO_URI` (ver [Como executar](#como-executar)) | Inclui também as suítes de cadastro e persistência do histórico, como no workflow de CI. |
+| `DEMO_MONGO_DB=consultafacil_demo ./mvnw test` (ver [Como executar](#como-executar)) | Inclui a conferência dos indicadores com a carga de demonstração, como no workflow de CI. |
 
 ## Como os testes são organizados
 
@@ -64,6 +65,8 @@ Os testes de integração usam bancos exclusivos, que são limpos a cada teste e
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
 | `SinalizacaoFilaIntegrationTest` | Cancelamento com o banco real: vaga liberada, histórico `CANCELAMENTO` + `SINALIZACAO_FILA`, só interessados compatíveis sinalizados (turno, especialidade, médico, validade, janela, sobreposição), um aviso por paciente, vaga no passado sem aviso; vaga sinalizada ocupada (`ATENDIDA` para quem agendou, `AGUARDANDO` para os demais) e sinalização vencida voltando a concorrer |
 | `FilaEsperaIntegrationTest` | Fila pela API (#31): inscrição do paciente e pela secretaria, validações, inscrição duplicada (409), saída da fila, expiração e a vaga sinalizada vista pelo paciente |
+| `FluxoEstadosHistoricoIndicadoresIntegrationTest` | Um dia de atendimento integrado (#48): agendamento pelo paciente e pela secretaria, confirmação, conclusão e falta, transições recusadas por estado e por perfil (sem evento no histórico), cancelamento sinalizando a fila e a vaga agendada pelo interessado, leitura do histórico com atores e motivo, e os cinco indicadores do dia com valores calculados à mão |
+| `IndicadoresDemonstracaoIntegrationTest` | Indicadores conferidos com a carga de demonstração (#48): para a clínica e para cada médico, as contagens e taxas de `GET /indicadores` batem com contagens independentes nas coleções, e nenhuma taxa fica incompleta. Opt-in por `DEMO_MONGO_DB` |
 | `CancelamentoIntegrationTest` | Cancelamento com o banco real: vaga liberada para a busca e para nova reserva, histórico com motivo e ator, consulta que já começou |
 | `ConsultaLeituraIntegrationTest` | Listagem e detalhe de consultas por perfil (#30): filtros, nomes e `podeCancelar` |
 | `ReservasConcorrenciaIntegrationTest` | Pedidos simultâneos pela API (servidor com 16 threads): vaga única, mesmo paciente, vagas diferentes, sobreposição e cancelamento. Ver [garantias de reserva](garantias-de-reserva.md) |
@@ -102,12 +105,15 @@ HISTORICO_MONGO_URI="mongodb://localhost:27017/?serverSelectionTimeoutMS=3000" \
   ./mvnw test -DmongoTests=true
 ```
 
-Conferência da carga de demonstração:
+Conferência da carga de demonstração e dos indicadores calculados sobre ela (#48):
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_demo
 docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+(cd backend && DEMO_MONGO_DB=consultafacil_demo ./mvnw test -Dtest=IndicadoresDemonstracaoIntegrationTest)
 ```
+
+O verificador também exige que o histórico da carga use só transições aceitas pela API (por exemplo, toda consulta concluída passa por `CONFIRMACAO`). Sem isso, a taxa de confirmação do painel ficaria sem percentual.
 
 ## Acesso à agenda
 
