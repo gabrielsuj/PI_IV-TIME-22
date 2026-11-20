@@ -1,14 +1,20 @@
+// Davi José Bertuolo Vitoreti - 25004168
+
 package br.edu.puccampinas.consultafacil.handler;
 
 import br.edu.puccampinas.consultafacil.protocol.Comunicado;
 
+import java.util.regex.Pattern;
+
 public class ValidarCPFHandler extends Comunicado {
     public static ValidarCPFResponse ValidateCPF(ValidarCPFRequest request) throws Exception {
+        Pattern regExCPF = Pattern.compile("[0-9]{11}");
+
         String cpf = request.getCPF();
 
-        if(cpf == null) return new ValidarCPFResponse(null, false, "CPF não fornecido");
-        if(cpf.chars().distinct().count() == 1)
-            return new ValidarCPFResponse(cpf, false, "CPF com digitos repetidos são invalidos");
+        if(cpf == null) return new ValidarCPFResponse(null, false, "CPF não foi fornecido.");
+        if(!regExCPF.matcher(cpf).matches()) return new ValidarCPFResponse(cpf, false, "CPF não foi formatado corretamente.");
+        if(cpf.chars().distinct().count() == 1) return new ValidarCPFResponse(cpf, false, "CPF com digitos repetidos são invalidos");
 
         int sum, peso, resto;
         char digito10, digito11;
