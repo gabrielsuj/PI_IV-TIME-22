@@ -15,7 +15,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -25,6 +27,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,6 +67,9 @@ class RotasAutorizacaoTest {
         server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
         server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO, ECO, ECO));
         server.createContext("/fila-espera", Rotas.filaEspera(cors, autz, ECO));
+        // Catálogos, como no App.java (#40: antes ficavam fora da matriz).
+        server.createContext("/medicos", Rotas.catalogo(cors, autz, ECO));
+        server.createContext("/especialidades", Rotas.catalogo(cors, autz, ECO));
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
         client = HttpClient.newHttpClient();
@@ -167,6 +174,73 @@ class RotasAutorizacaoTest {
         var r = enviar(metodo, rota, token(perfil));
         assertEquals(esperado, r.statusCode(), r.body());
         if (esperado == 200) assertEquals(perfil.name(), json.readTree(r.body()).get("perfil").asText());
+    }
+
+    private record Regra(String metodo, String rota, Set<Perfil> permitidos) {}
+
+    /**
+     * Quem pode cada operação da API (#10), uma linha por rota. É a matriz de permissões do projeto:
+     * o teste abaixo cruza cada linha com os três perfis, então nenhuma combinação fica sem teste.
+     * Quando a rota é aceita, o serviço ainda confere se o registro pertence a quem chamou.
+     */
+    private static final List<Regra> PERMISSOES;
+    static {
+        Set<Perfil> todos = Set.of(Perfil.values());
+        Set<Perfil> equipe = Set.of(Perfil.MEDICO, Perfil.SECRETARIA_ADMIN);
+        Set<Perfil> pacienteESecretaria = Set.of(Perfil.PACIENTE, Perfil.SECRETARIA_ADMIN);
+        Set<Perfil> pacienteEMedico = Set.of(Perfil.PACIENTE, Perfil.MEDICO);
+        Set<Perfil> paciente = Set.of(Perfil.PACIENTE);
+        Set<Perfil> secretaria = Set.of(Perfil.SECRETARIA_ADMIN);
+        PERMISSOES = List.of(
+            // Agenda, bloqueios, calendário e indicadores: equipe da clínica
+            new Regra("GET", "/agendas", equipe), new Regra("PUT", "/agendas", equipe),
+            new Regra("GET", "/bloqueios", equipe), new Regra("POST", "/bloqueios", equipe),
+            new Regra("DELETE", "/bloqueios", equipe),
+            new Regra("GET", "/consultas", equipe), new Regra("GET", "/indicadores", equipe),
+            // Catálogos: todos leem, só a secretaria mantém
+            new Regra("GET", "/medicos", todos), new Regra("GET", "/medicos/abc", todos),
+            new Regra("POST", "/medicos", secretaria), new Regra("PUT", "/medicos/abc", secretaria),
+            new Regra("DELETE", "/medicos/abc", secretaria),
+            new Regra("GET", "/especialidades", todos), new Regra("POST", "/especialidades", secretaria),
+            new Regra("PUT", "/especialidades/abc", secretaria),
+            // Pacientes: equipe lê, só a secretaria cadastra e edita
+            new Regra("GET", "/pacientes", equipe), new Regra("GET", "/pacientes/abc", equipe),
+            new Regra("POST", "/pacientes", secretaria), new Regra("PUT", "/pacientes/abc", secretaria),
+            // Vagas e agendamento
+            new Regra("GET", "/vagas", todos), new Regra("POST", "/consultas", pacienteESecretaria),
+            // Consulta: os três perfis; o serviço limita a consulta de quem chama
+            new Regra("GET", "/consultas/lista", todos), new Regra("GET", "/consultas/abc", todos),
+            new Regra("POST", "/consultas/abc/cancelamento", todos), new Regra("POST", "/consultas/abc/status", todos),
+            new Regra("GET", "/consultas/abc/historico", todos),
+            // Fila de espera: paciente e secretaria
+            new Regra("POST", "/fila-espera", pacienteESecretaria), new Regra("GET", "/fila-espera", pacienteESecretaria),
+            new Regra("DELETE", "/fila-espera/abc", pacienteESecretaria),
+            // Notificações (#34, #35): paciente e médico; confirmar presença só o paciente
+            new Regra("GET", "/notificacoes", pacienteEMedico), new Regra("POST", "/notificacoes/lida", pacienteEMedico),
+            new Regra("POST", "/notificacoes/confirmar", paciente),
+            // Avisos de vaga (#57): só o paciente
+            new Regra("GET", "/avisos-vaga", paciente), new Regra("POST", "/avisos-vaga", paciente));
+    }
+
+    static Stream<Arguments> matrizCompleta() {
+        return PERMISSOES.stream().flatMap(r -> Stream.of(Perfil.values())
+                .map(p -> Arguments.of(r.metodo(), r.rota(), p, r.permitidos().contains(p) ? 200 : 403)));
+    }
+
+    @ParameterizedTest(name = "{0} {1} como {2} → {3}")
+    @MethodSource("matrizCompleta")
+    void matrizCompletaDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
+        matrizDePermissoes(metodo, rota, perfil, esperado);
+    }
+
+    @ParameterizedTest(name = "{0} {1} sem login → 401")
+    @MethodSource("rotasProtegidas")
+    void todaRotaDaMatrizExigeLogin(String metodo, String rota) throws Exception {
+        assertEquals(401, enviar(metodo, rota, null).statusCode());
+    }
+
+    static Stream<Arguments> rotasProtegidas() {
+        return PERMISSOES.stream().map(r -> Arguments.of(r.metodo(), r.rota()));
     }
 
     @Test void semLoginRetorna401EmRotaProtegida() throws Exception {
