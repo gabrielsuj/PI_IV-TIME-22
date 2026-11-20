@@ -4,7 +4,7 @@ import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
-import { classificarHorario, diasDaSemana, horariosDoDia, rotuloDia, somarDias } from '../utils/calendario';
+import { classificarHorario, diasDaAgendaNoDiaClinica, diasDaSemana, horariosDoDia, rotuloDia, somarDias } from '../utils/calendario';
 import { entrarComo } from './sessaoTeste';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -25,7 +25,10 @@ function mockApi({
   const fetchMock = vi.fn(async (url) => {
     const { pathname } = new URL(url);
     if (pathname === '/medicos') return medicos();
-    if (pathname === '/agendas') return agenda ? json(agenda) : json({ status: 404, erro: 'Agenda não configurada' }, 404);
+    if (pathname === '/agendas') {
+      if (typeof agenda === 'function') return agenda();
+      return agenda ? json(agenda) : json({ status: 404, erro: 'Agenda não configurada' }, 404);
+    }
     if (pathname === '/bloqueios') return json(bloqueios);
     if (pathname === '/consultas') return json(consultas);
     return json({}, 404);
@@ -53,6 +56,13 @@ describe('utilitários do calendário', () => {
     expect(diasDaSemana('2026-11-12')).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']);
     expect(somarDias('2026-11-30', 1)).toBe('2026-12-01');
     expect(rotuloDia('2026-11-12')).toBe('qui 12/11');
+  });
+
+  it('encontra as datas da agenda que tocam o dia da clínica em fusos diferentes', () => {
+    expect(diasDaAgendaNoDiaClinica('2026-11-23', 'America/Sao_Paulo')).toEqual(['2026-11-23']);
+    expect(diasDaAgendaNoDiaClinica('2026-11-23', 'UTC')).toEqual(['2026-11-23', '2026-11-24']);
+    expect(diasDaAgendaNoDiaClinica('2026-11-23', 'America/Manaus')).toEqual(['2026-11-22', '2026-11-23']);
+    expect(diasDaAgendaNoDiaClinica('2018-11-04', 'America/Noronha')).toEqual(['2018-11-04']);
   });
 
   it('gera os horários do dia pela jornada e pela duração', () => {
@@ -262,11 +272,28 @@ describe('tela do calendário', () => {
     expect(screen.getAllByText('Indisponível')).toHaveLength(1); // 08:30 vazio
   });
 
-  it('avisa quando o médico não tem agenda configurada', async () => {
+  it.each(['', '&visao=dia&diaClinica=1'])('avisa quando o médico não tem agenda configurada (%s)', async (opcoes) => {
     mockApi({ agenda: null });
-    renderAt('/calendario?medicoId=m1&data=2026-11-12');
+    renderAt(`/calendario?medicoId=m1&data=2026-11-12${opcoes}`);
 
     expect(await screen.findByText(/ainda não tem agenda configurada/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Configurar agenda' })).toHaveAttribute('href', '/agenda?medicoId=m1');
+  });
+
+  it('tenta ler novamente a agenda sem perder o dia da clínica', async () => {
+    const agenda = vi.fn().mockImplementationOnce(() => json({ erro: 'Serviço indisponível' }, 503))
+      .mockImplementation(() => json({ ...AGENDA, fusoHorario: 'UTC' }));
+    const fetchMock = mockApi({ agenda });
+    const user = userEvent.setup();
+    const router = renderAt('/calendario?medicoId=m1&visao=dia&data=2026-11-09&diaClinica=1');
+    const erro = await screen.findByRole('alert');
+    expect(erro).toHaveTextContent('Não foi possível carregar o calendário. Serviço indisponível');
+    expect(chamadasPara(fetchMock, '/consultas')).toHaveLength(0);
+    await user.click(within(erro).getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByText('Horários no fuso da agenda: UTC.')).toBeInTheDocument();
+    expect(router.state.location.search).toContain('data=2026-11-09&diaClinica=1');
+    const [consulta] = chamadasPara(fetchMock, '/consultas');
+    expect(consulta.searchParams.get('de')).toBe('2026-11-09');
+    expect(consulta.searchParams.get('ate')).toBe('2026-11-10');
   });
 });
