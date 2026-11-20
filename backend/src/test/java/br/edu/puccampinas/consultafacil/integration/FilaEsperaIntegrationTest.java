@@ -6,6 +6,12 @@ import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.handler.AvisoVagaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
+import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.BloqueioHandler;
+import br.edu.puccampinas.consultafacil.service.AcessoAgenda;
+import br.edu.puccampinas.consultafacil.service.AgendaService;
+import br.edu.puccampinas.consultafacil.service.BloqueioService;
+import br.edu.puccampinas.consultafacil.service.ConsultasAfetadas;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
@@ -111,6 +117,7 @@ class FilaEsperaIntegrationTest {
         db.getCollection("filaEspera").deleteMany(Filters.in("pacienteId", pacientes));
         db.getCollection("notificacoes").deleteMany(Filters.in("destinatarioId", pacientes));
         db.getCollection("consultas").deleteMany(Filters.eq("medicoId", MEDICO));
+        db.getCollection("bloqueios").deleteMany(Filters.eq("medicoId", MEDICO));
         db.getCollection("historico").deleteMany(Filters.eq("medicoId", MEDICO));
         salvar("especialidades", new Document("_id", ESPECIALIDADE).append("codigo", "teste-fila-api-1")
                 .append("nome", "Cardiologia Fila").append("ativa", true));
@@ -142,13 +149,14 @@ class FilaEsperaIntegrationTest {
         var service = new FilaEsperaService(fila, especialidades, medicos, pacienteRepo, pacienteDoUsuario, nomes, relogio);
         var consultas = new ConsultaRepository(db);
         var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
-        var sinalizacao = new SinalizacaoFilaService(fila, notificacoes, consultas, nomes, historico, relogio);
-        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
         var agendas = new AgendaRepository(db);
+        var bloqueios = new BloqueioRepository(db);
         agendas.salvar(MEDICO, new Document("fusoHorario", "America/Sao_Paulo").append("duracaoMinutos", 30)
                 .append("jornadas", List.of(new Document("diaSemana", 1).append("faixas",
                         List.of(new Document("inicioMinuto", 600).append("fimMinuto", 660))))));
-        var disponibilidade = new DisponibilidadeService(agendas, new BloqueioRepository(db), consultas, relogio);
+        var disponibilidade = new DisponibilidadeService(agendas, bloqueios, consultas, relogio);
+        var sinalizacao = new SinalizacaoFilaService(fila, notificacoes, consultas, nomes, historico, relogio, disponibilidade);
+        registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades, pacienteRepo, pacienteDoUsuario, registro) {
             @Override public ConsultaResponse agendar(AgendamentoRequest pedido, UsuarioLogado ator) {
                 var barreira = barreiraDeReserva;
@@ -176,7 +184,14 @@ class FilaEsperaIntegrationTest {
                 registro, relogio);
         var central = new CentralNotificacoesHandler(new CentralNotificacoesService(notificacoes, consultas,
                 pacienteDoUsuario::buscar, medicosDoUsuario::buscar, status, relogio));
-        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos, central, null));
+        var acessoAgenda = new AcessoAgenda(medicosDoUsuario);
+        var afetadas = new ConsultasAfetadas(consultas, nomes);
+        var agendaHandler = new AgendaHandler(
+                new AgendaService(agendas, medicos, afetadas, relogio, sinalizacao::revisarAgenda), acessoAgenda);
+        var bloqueioHandler = new BloqueioHandler(
+                new BloqueioService(bloqueios, agendas, medicos, afetadas, sinalizacao::revisarAgenda), acessoAgenda);
+        var router = Rotas.router(cors, autorizacao,
+                new Rotas.Handlers(null, null, agendaHandler, bloqueioHandler, null, null, null, null, avisos, central, null));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsHttp = Executors.newFixedThreadPool(4);
         server.setExecutor(threadsHttp);
@@ -369,6 +384,64 @@ class FilaEsperaIntegrationTest {
         assertEquals("CANCELADA", db.getCollection("notificacoes").find(Filters.eq("_id",
                 new ObjectId(perdedor.get("id").asText()))).first().getString("status"));
         assertEquals(1, db.getCollection("consultas").countDocuments(Filters.and(
+                Filters.eq("medicoId", MEDICO), Filters.eq("inicio", Date.from(VAGA)), Filters.eq("status", "AGENDADA"))));
+    }
+
+    @Test void bloqueioParcialExpiraAvisoEDevolvePacienteParaFila() throws Exception {
+        String token = paciente(U1);
+        JsonNode aviso = prepararAviso(token);
+        var adjacente = enviar("POST", "/bloqueios", secretaria(), Map.of("medicoId", MEDICO.toHexString(),
+                "inicio", "2026-10-26T09:30", "fim", "2026-10-26T10:00"));
+        assertEquals(201, adjacente.statusCode(), adjacente.body());
+        assertEquals("DISPONIVEL", unicoAviso(token).get("status").asText());
+
+        // Começa dentro da consulta oferecida. Comparar apenas o início da vaga não detectaria o bloqueio.
+        var bloqueio = enviar("POST", "/bloqueios", secretaria(), Map.of("medicoId", MEDICO.toHexString(),
+                "inicio", "2026-10-26T10:15", "fim", "2026-10-26T10:45"));
+        assertEquals(201, bloqueio.statusCode(), bloqueio.body());
+
+        conferirAvisoExpiradoEInscricaoAguardando(token, aviso);
+    }
+
+    @Test void reducaoDaJornadaExpiraAvisoEDevolvePacienteParaFila() throws Exception {
+        String token = paciente(U1);
+        JsonNode aviso = prepararAviso(token);
+        // A nova jornada começa às 10:30, depois do início da vaga oferecida às 10:00.
+        var agenda = enviar("PUT", "/agendas?medicoId=" + MEDICO.toHexString(), secretaria(), Map.of(
+                "fusoHorario", "America/Sao_Paulo", "duracaoMinutos", 30,
+                "jornadas", List.of(Map.of("diaSemana", 1, "faixas",
+                        List.of(Map.of("inicioMinuto", 630, "fimMinuto", 660))))));
+        assertEquals(200, agenda.statusCode(), agenda.body());
+
+        conferirAvisoExpiradoEInscricaoAguardando(token, aviso);
+    }
+
+    private JsonNode prepararAviso(String token) throws Exception {
+        assertEquals(201, inscrever(U1, ESPECIALIDADE, null).statusCode());
+        liberarVaga(P3);
+        JsonNode aviso = unicoAviso(token);
+        assertEquals("DISPONIVEL", aviso.get("status").asText());
+        return aviso;
+    }
+
+    private void conferirAvisoExpiradoEInscricaoAguardando(String token, JsonNode aviso) throws Exception {
+        String idAviso = aviso.get("id").asText();
+        var notificacao = db.getCollection("notificacoes").find(Filters.eq("_id", new ObjectId(idAviso))).first();
+        String idInscricao = notificacao.getObjectId("filaEsperaId").toHexString();
+        // A fila já fica disponível para outra oferta, mesmo sem abrir a lista de avisos.
+        var respostaFila = enviar("GET", "/fila-espera", token, null);
+        assertEquals(200, respostaFila.statusCode(), respostaFila.body());
+        JsonNode inscricao = json.readTree(respostaFila.body()).get(0);
+        assertEquals(idInscricao, inscricao.get("id").asText());
+        assertEquals("AGUARDANDO", inscricao.get("status").asText());
+        assertTrue(semValor(inscricao, "ultimaSinalizacao"));
+
+        JsonNode expirado = unicoAviso(token);
+        assertEquals(idAviso, expirado.get("id").asText());
+        assertEquals("EXPIRADO", expirado.get("status").asText());
+        assertEquals("CANCELADA", notificacao.getString("status"));
+        assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", idAviso)).statusCode());
+        assertEquals(0, db.getCollection("consultas").countDocuments(Filters.and(
                 Filters.eq("medicoId", MEDICO), Filters.eq("inicio", Date.from(VAGA)), Filters.eq("status", "AGENDADA"))));
     }
 
