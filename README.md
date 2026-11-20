@@ -60,7 +60,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 
 **Fora do MVP:** WhatsApp e SMS reais, teleconsulta, prontuário eletrônico, pagamentos e convênios, relatórios avançados, previsão de faltas por inteligência artificial e aplicativo móvel.
 
-### Situação atual (19/11/2026)
+### Situação atual (20/11/2026)
 
 | Funcionalidade | Situação |
 |---|---|
@@ -79,9 +79,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
 | Central de notificações, leitura e confirmação de presença pelo lembrete | ✅ #35 |
 | Confirmação de agendamento, aviso de cancelamento e lembretes com envio periódico (e-mail de teste opcional) | ✅ #34 |
-| Indicadores e painel operacional | 🚧 #36 e #37 |
+| API de indicadores, conferida com a carga de demonstração | ✅ Validada (#36 e #48) |
+| Painel web de indicadores | 🚧 Pendente (#37 e #47) |
+| Aceite ponta a ponta do MVP | 🚧 Pendente após a integração do painel (#38) |
 
-O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne os cenários de demonstração e o passo a passo para publicar a versão final.
+A validação local do commit `866c2fc` aprovou 861 testes do backend com MongoDB 7 e 320 testes do frontend. O lint e o build do frontend passaram, o backend e o módulo `server/` geraram seus JARs com Java 21 e o backup restaurou as 10 coleções da demonstração. Os resultados detalhados e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
 
 ---
 

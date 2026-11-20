@@ -1,6 +1,6 @@
 # Entrega do ConsultaFácil
 
-Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4); a situação de cada funcionalidade está no [README](../../README.md#situação-atual-19112026).
+Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4). A situação de cada funcionalidade está no [README](../../README.md#situação-atual-20112026).
 
 ## Cadastro e agendamento por perfil
 
@@ -36,17 +36,17 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 
 ## Validação local da integração (#45)
 
-Em 20/11/2026, a revisão combinada `47df28608c54bbaec99a5ad2cc99087cf80fc549` reunia a `develop` `0b5fb2a` com as correções de avisos da fila, sessão, agenda e CI de backup. A tabela registra os resultados daquela validação local. A revisão final será conferida novamente após a integração do painel.
+Em 20/11/2026, a validação local foi executada no commit `866c2fc0566fb3bdf574a90535267deb291e9649` da branch `integracao/prs-mvp`. A revisão reúne, a partir da `develop` em `0b5fb2a`, a correção do Java 21 para o `server/`, a agenda e os avisos da fila (#53), os estados de falha da interface (#41) e o workflow de recuperação (#45). A revisão de entrega será conferida após a integração do painel.
 
 | Verificação | Resultado observado |
 |---|---|
-| Backend | Compilação limpa com Java 21 e 861 testes JUnit aprovados com MongoDB 7 descartável, incluindo os testes opcionais e as verificações dos indicadores sobre a carga de demonstração. Zero falhas, erros ou testes ignorados. |
-| Frontend | 308 testes Vitest aprovados em 21 arquivos com Node 24. ESLint e build de produção concluídos com sucesso. |
-| Módulo `server/` | O compilador Maven passou a usar a mesma versão do Java declarada pelo projeto. A compilação limpa do módulo separado aprovou as 13 fontes em Java 21. |
-| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 834 consultas, 1.939 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
+| Backend | 861 testes JUnit aprovados com MongoDB 7 descartável, incluindo os testes opcionais e a verificação da API de indicadores sobre a carga de demonstração. Zero falhas, erros ou testes ignorados. O empacotamento Maven com Java 21 gerou o JAR. |
+| Frontend | 320 testes Vitest aprovados em 21 arquivos com Node 24. ESLint e build de produção concluídos com sucesso. |
+| Módulo `server/` | `mvn clean verify` com Java 21 compilou 13 arquivos e gerou o JAR. O módulo não tem testes próprios. |
+| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 834 consultas, 1.945 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
 | Teste do workflow de backup | O comando executado localmente aprovou os backups simultâneos e a rejeição de arquivo inválido ou de outra origem com o destino preservado. Após a falha parcial, o retorno automático recuperou dados, índice único e validador. A cópia preservada também permitiu o retorno manual quando a recuperação automática falhou. |
 
-As contagens correspondem à carga gerada nessa execução. A compilação do módulo `server/` e os checks do frontend foram executados em `8cf6cb1`, com os mesmos arquivos dessas áreas na revisão validada. [Procedimento de backup e recuperação](backup-recuperacao.md) · [Workflow de backup](../../.github/workflows/backup-recuperacao.yml)
+As contagens correspondem à carga gerada nessa execução. [Procedimento de backup e recuperação](backup-recuperacao.md) · [Workflow de backup](../../.github/workflows/backup-recuperacao.yml)
 
 ### Agenda e disponibilidade (#53)
 
@@ -55,7 +55,7 @@ O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de dur
 ## Conferências antes da entrega
 
 - [x] **Lembretes (#34).** A geração, o envio sem duplicidade em dois ciclos e o descarte no cancelamento passaram na suíte integrada. A confirmação pela central foi coberta com registro no histórico.
-- [x] **API de indicadores (#36 e #48).** Os testes aprovaram os cálculos sobre a carga de demonstração.
+- [x] **API de indicadores (#36 e #48).** Os testes do serviço usado em `GET /indicadores` validaram as contagens e taxas da clínica e de cada médico com a carga de demonstração.
 - [ ] **Painel web (#37 e #47).** Integrar a interface ao `GET /indicadores`. Comparar agenda do dia, próximas consultas e taxas com os dados do mesmo médico e período. Validar os filtros da secretaria e a visualização do médico.
 - [ ] **Homologação ponta a ponta (#38).** Com o painel disponível, percorrer cadastro, agenda, disputa de vaga, cancelamento, fila, lembrete, histórico e painel pelos perfis previstos.
 - [ ] **Evidência final da #45.** Na revisão com todas as entregas, repetir as suítes, lint, build, aceite e recuperação. Registrar o SHA, a data, os resultados e o link da CI correspondente.
