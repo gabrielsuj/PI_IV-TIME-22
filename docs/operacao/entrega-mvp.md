@@ -34,19 +34,46 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 3. Entre com a secretaria e cancele uma consulta de Paulo. Paulo e o médico recebem "Consulta cancelada"; o lembrete pendente dessa consulta é descartado.
 4. Opcional: com `NOTIFICACOES_EMAIL_TESTE=true` no `.env`, reinicie a API e repita o passo 1. O terminal da API mostra `[e-mail de teste] para p***@...` com a mesma mensagem, sem CPF ou dado de saúde.
 
+## Demonstração do painel operacional (#37)
+
+1. Entre como secretaria e abra o painel com a carga de demonstração. Selecione um médico e confira a agenda do dia, as próximas consultas e os indicadores com os dados das consultas e de `GET /indicadores` para o mesmo recorte. Troque de médico e confira a atualização das três seções.
+2. Entre com o login de um médico. Confira se o painel mostra seus próprios atendimentos e indicadores. Abra o detalhe de uma consulta pelo painel e volte para conferir se os filtros foram preservados.
+3. No aceite da #38, confira também a mensagem da agenda ao selecionar um médico inativo, o efeito de consultas canceladas nas próximas consultas e o dia que o atalho abre no calendário quando o fuso da agenda difere do fuso do painel.
+
+## Resultado do aceite manual (#38)
+
+Em 20/11/2026, o aceite rodou no navegador e foi repetido após as três correções do painel, sobre a `develop` em `89f8fb0` com as alterações locais. O ambiente usou a API local, MongoDB 7 descartável e a carga fictícia de demonstração. Secretaria, médica e pacientes usaram sessões separadas.
+
+| Cenário | Resultado observado |
+|---|---|
+| Cadastro e acesso por perfil | A secretaria criou e editou um paciente. O e-mail atualizado apareceu no detalhe e na lista, com a busca preservada ao voltar. A médica consultou o mesmo cadastro em modo de leitura. |
+| Jornada, bloqueio e calendário | A terça-feira sem atendimento passou a oferecer horários após salvar a jornada. O bloqueio de 08h a 08h30 retirou só esse intervalo da busca e apareceu como **Bloqueado** no calendário. Um segundo bloqueio sobre a consulta das 09h exigiu confirmação da secretaria e deixou a consulta como **Remarcar**. |
+| Disputa por horário | Paulo e a secretaria abriram o resumo das 08h30 antes da confirmação. Paulo reservou primeiro. A secretaria manteve paciente, médico e data, escolheu 09h e concluiu a segunda reserva. |
+| Cancelamento, histórico e fila | A secretaria cancelou a consulta indicada pelo verificador da carga. O histórico mostrou o motivo e a sinalização. Carla e Diego receberam a mesma vaga. Carla agendou e sua inscrição ficou **Atendido**. Diego viu o aviso **Expirado** e voltou a **Aguardando**. |
+| Lembretes e notificação de cancelamento | Paulo confirmou a presença na central e viu **Consulta confirmada** no histórico. Para uma reserva nova nas próximas 24 horas, chegou um único lembrete mesmo após novos ciclos do agendador. O cancelamento de outra reserva gerou aviso para Paulo e para a médica. |
+| Painel por perfil | No recorte de Ana em 23/11, a agenda mostrou 11 consultas, o resumo mostrou cinco próximas e os indicadores conferiram com a API. A médica viu o mesmo recorte de seus atendimentos e voltou do detalhe com as datas preservadas. O paciente viu **Minha área**. A API recusou a consulta a outro médico pela sessão médica e a leitura de indicadores pelo paciente. |
+
+### Revalidação dos três pontos do painel
+
+- **Médica inativa.** Ao selecionar Helena Castro, o painel orientou a escolha de um médico ativo para ver a agenda do dia e desabilitou o atalho do calendário. Indicadores e próximas consultas mantiveram o filtro selecionado.
+- **Canceladas nas próximas consultas.** A consulta cancelada permaneceu no histórico e na agenda do dia. O resumo exibiu cinco consultas ativas nos dois perfis, com o filtro aplicado na API antes da ordenação e do limite.
+- **Atalho para o calendário com outro fuso.** Uma consulta fictícia preparada pela API apareceu no painel em 20/11 às 21h30 em São Paulo. O atalho abriu os dois dias locais que abrangem essa data e mostrou a mesma consulta em 21/11 às 00h30 UTC, sem precisar avançar o dia. O retorno preservou o médico e a data do painel.
+
+A repetição local do aceite da #38 passou. A revisão final ainda precisa reunir as alterações de entrega e registrar a validação no commit escolhido.
+
 ## Validação local da integração (#45)
 
-Em 20/11/2026, a validação local foi executada no commit `866c2fc0566fb3bdf574a90535267deb291e9649` da branch `integracao/prs-mvp`. A revisão reúne, a partir da `develop` em `0b5fb2a`, a correção do Java 21 para o `server/`, a agenda e os avisos da fila (#53), os estados de falha da interface (#41) e o workflow de recuperação (#45). A revisão de entrega será conferida após a integração do painel.
+Em 20/11/2026, a validação local rodou sobre a `develop` em `89f8fb0ecf85c8071e4b0c21b681590bd7463f21`, com as correções locais da #38. O commit-base já inclui o painel do PR #117 e a resolução do PR #115. A revisão `866c2fc` registra a execução anterior à integração do painel.
 
 | Verificação | Resultado observado |
 |---|---|
-| Backend | 861 testes JUnit aprovados com MongoDB 7 descartável, incluindo os testes opcionais e a verificação da API de indicadores sobre a carga de demonstração. Zero falhas, erros ou testes ignorados. O empacotamento Maven com Java 21 gerou o JAR. |
-| Frontend | 320 testes Vitest aprovados em 21 arquivos com Node 24. ESLint e build de produção concluídos com sucesso. |
-| Módulo `server/` | `mvn clean verify` com Java 21 compilou 13 arquivos e gerou o JAR. O módulo não tem testes próprios. |
-| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 834 consultas, 1.945 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
+| Backend | `./mvnw -DmongoTests=true clean verify` com Java 21 e MongoDB 7 descartável. O JAR foi gerado e 874 testes JUnit passaram, incluindo a regressão em que cem consultas canceladas precedem as consultas ativas. Zero falhas, erros ou testes ignorados. |
+| Frontend | 481 testes Vitest passaram em 31 arquivos com Node 24, incluindo as regressões para perfil inativo, filtro de próximas consultas e navegação entre fusos. ESLint e build de produção passaram. |
+| Módulo `server/` | `mvn clean verify` com Java 21 compilou 13 arquivos, aprovou o `ClienteTest` e gerou o JAR. |
+| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 835 consultas, 1.949 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
 | Teste do workflow de backup | O comando executado localmente aprovou os backups simultâneos e a rejeição de arquivo inválido ou de outra origem com o destino preservado. Após a falha parcial, o retorno automático recuperou dados, índice único e validador. A cópia preservada também permitiu o retorno manual quando a recuperação automática falhou. |
 
-As contagens correspondem à carga gerada nessa execução. [Procedimento de backup e recuperação](backup-recuperacao.md) · [Workflow de backup](../../.github/workflows/backup-recuperacao.yml)
+As contagens correspondem à carga gerada nessa execução. Os links da CI são das revisões anteriores às correções locais da #38. [CI do PR #115](https://github.com/gabrielsuj/PI_IV-TIME-22/actions/runs/44795697693) · [Workflow de backup no PR #116](https://github.com/gabrielsuj/PI_IV-TIME-22/actions/runs/44788728570) · [Procedimento de backup e recuperação](backup-recuperacao.md)
 
 ### Agenda e disponibilidade (#53)
 
@@ -56,8 +83,9 @@ O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de dur
 
 - [x] **Lembretes (#34).** A geração, o envio sem duplicidade em dois ciclos e o descarte no cancelamento passaram na suíte integrada. A confirmação pela central foi coberta com registro no histórico.
 - [x] **API de indicadores (#36 e #48).** Os testes do serviço usado em `GET /indicadores` validaram as contagens e taxas da clínica e de cada médico com a carga de demonstração.
-- [ ] **Painel web (#37 e #47).** Integrar a interface ao `GET /indicadores`. Comparar agenda do dia, próximas consultas e taxas com os dados do mesmo médico e período. Validar os filtros da secretaria e a visualização do médico.
-- [ ] **Homologação ponta a ponta (#38).** Com o painel disponível, percorrer cadastro, agenda, disputa de vaga, cancelamento, fila, lembrete, histórico e painel pelos perfis previstos.
+- [x] **Painel operacional (#37).** O painel já está integrado ao `GET /indicadores` e aos serviços de agenda e consultas. Os testes automatizados cobrem filtros, navegação e estados da tela.
+- [ ] **Refinamento do painel (#47).** Conferir a hierarquia visual, os filtros e a consistência com o protótipo e com as demais telas.
+- [x] **Aceite manual local (#38).** Os fluxos operacionais e os três casos do painel passaram na repetição com as correções locais aplicadas sobre `89f8fb0`.
 - [ ] **Evidência final da #45.** Na revisão com todas as entregas, repetir as suítes, lint, build, aceite e recuperação. Registrar o SHA, a data, os resultados e o link da CI correspondente.
 
 ## Versão final (#45)
