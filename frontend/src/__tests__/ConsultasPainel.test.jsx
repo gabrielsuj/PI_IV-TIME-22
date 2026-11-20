@@ -36,19 +36,15 @@ function mockApi({ calendario = [consultaDia()], proximas = [consultaProxima()],
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
-it('secretaria seleciona um médico para a agenda e os horários locais não são deslocados', async () => {
+it('agenda usa o médico recebido do painel e os horários locais não são deslocados', async () => {
   const fetchMock = mockApi();
-  const user = userEvent.setup();
-  render(contexto(<AgendaDiaPainel dia={dia} />));
-  expect(await screen.findByRole('option', { name: 'Ana Médica' })).toBeInTheDocument();
-  expect(screen.queryByRole('option', { name: 'Médico Inativo' })).not.toBeInTheDocument();
-  expect(chamadas(fetchMock, '/consultas')).toHaveLength(0);
-  await user.selectOptions(screen.getByLabelText('Médico da agenda do dia'), MEDICO_PAINEL);
+  render(contexto(<AgendaDiaPainel dia={dia} medicoId={MEDICO_PAINEL} />));
   expect(await screen.findByText('Paula da Agenda')).toBeInTheDocument();
   expect(screen.getByText('09:00 às 09:30')).toBeInTheDocument();
-  expect(screen.getByText('Fuso da agenda: America/Sao_Paulo.')).toBeInTheDocument();
+  expect(screen.getByText('Horários exibidos em America/Sao_Paulo.')).toBeInTheDocument();
   const url = new URL(chamadas(fetchMock, '/consultas')[0][0]);
-  expect(Object.fromEntries(url.searchParams)).toEqual({ medicoId: MEDICO_PAINEL, de: dia, ate: dia });
+  expect(Object.fromEntries(url.searchParams)).toEqual({ medicoId: MEDICO_PAINEL, de: dia, ate: dia, fusoHorario: 'America/Sao_Paulo' });
+  expect(chamadas(fetchMock, '/medicos')).toHaveLength(0);
   expect(chamadas(fetchMock, '/consultas/lista')).toHaveLength(0);
 });
 

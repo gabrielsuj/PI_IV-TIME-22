@@ -38,7 +38,7 @@ it('exibe os cinco percentuais e as contagens da API', async () => {
     expect(card.getByText(valor)).toBeInTheDocument();
     expect(card.getByText(apoio)).toBeInTheDocument();
   }
-  expect(screen.getByText(/Consultas de 23\/11\/2026 · America\/Sao_Paulo/)).toBeInTheDocument();
+  expect(screen.getByText(/Consultas iniciadas de 23\/11\/2026 · America\/Sao_Paulo/)).toBeInTheDocument();
   expect(screen.getByText(/Capacidade calculada pela agenda atual/)).toBeInTheDocument();
 });
 

@@ -39,6 +39,12 @@ public class ConsultaCalendarioService {
 
     /** de e ate no formato AAAA-MM-DD, inclusivos, no fuso da agenda do médico. */
     public List<ConsultaCalendarioResponse> listar(ObjectId medicoId, String de, String ate) {
+        return listar(medicoId, de, ate, null);
+    }
+
+    public List<ConsultaCalendarioResponse> listar(ObjectId medicoId, String de, String ate, String fusoHorario) {
+        if (fusoHorario != null && !AgendaService.FUSO_PADRAO.equals(fusoHorario))
+            throw ApiException.badRequest("fusoHorario deve ser " + AgendaService.FUSO_PADRAO);
         LocalDate inicio = data(de, "de");
         LocalDate fim = data(ate, "ate");
         if (fim.isBefore(inicio)) throw ApiException.badRequest("ate deve ser igual ou posterior a de");
@@ -46,7 +52,7 @@ public class ConsultaCalendarioService {
             throw ApiException.badRequest("Período máximo de " + MAXIMO_DIAS + " dias");
         if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
 
-        ZoneId fuso = agendas.buscarPorMedico(medicoId)
+        ZoneId fuso = fusoHorario != null ? ZoneId.of(fusoHorario) : agendas.buscarPorMedico(medicoId)
                 .map(a -> ZoneId.of(a.getString("fusoHorario")))
                 .orElse(ZoneId.of(AgendaService.FUSO_PADRAO));
         List<Document> docs = consultas.doMedicoNoPeriodo(medicoId,

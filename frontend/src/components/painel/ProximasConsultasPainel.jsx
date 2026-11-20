@@ -25,7 +25,7 @@ export default function ProximasConsultasPainel({ medicoId }) {
 
   return (
     <Card className="painel-consultas" title="Próximas consultas"
-      description={`Até ${LIMITE_PROXIMAS_PAINEL} consultas que ainda não terminaram, em ordem de início · ${FUSO_CLINICA}.`}
+      description={`Até ${LIMITE_PROXIMAS_PAINEL} consultas em andamento ou futuras a partir de agora, em ordem de início · ${FUSO_CLINICA}.`}
       action={<Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar próximas consultas</Button>}>
       {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar próximas consultas novamente</Button>}>{erro.message}</Alert>
         : <DataTable caption="Resumo das próximas consultas" columns={colunas} rows={dados?.consultas ?? []}

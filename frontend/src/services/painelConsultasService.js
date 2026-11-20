@@ -36,13 +36,13 @@ export async function buscarAgendaDoDia({ medicoId, dia }, { signal } = {}) {
   if (!texto(fusoHorario)) throw new Error('Não foi possível ler a agenda recebida. Tente novamente.');
   try { new Intl.DateTimeFormat('pt-BR', { timeZone: fusoHorario }); }
   catch { throw new Error('Não foi possível ler o fuso da agenda recebida. Tente novamente.'); }
-  const consultas = await listarCalendario(medicoId, { de: dia, ate: dia, signal });
+  const consultas = await listarCalendario(medicoId, { de: dia, ate: dia, fusoHorario: FUSO_CLINICA, signal });
   validarConsultas(consultas, true);
   const cadastroId = medicoId === 'meu' ? agenda?.medicoId : medicoId;
   if (cadastroId && consultas.some((consulta) => consulta.medicoId !== cadastroId))
     throw new Error('As consultas recebidas não correspondem ao médico selecionado. Tente novamente.');
   return { consultas: [...consultas].sort((a, b) => a.inicio.localeCompare(b.inicio) || a.id.localeCompare(b.id)),
-    fusoHorario, semAgenda: agenda === null };
+    fusoHorario: FUSO_CLINICA, semAgenda: agenda === null };
 }
 
 export async function buscarProximasConsultas({ medicoId } = {}, { signal } = {}) {

@@ -16,7 +16,7 @@ it('busca a agenda e as consultas do calendário com sessão, médico e dia exat
   expect(resultado).toEqual({ consultas: [consulta], fusoHorario: 'America/Sao_Paulo', semAgenda: false });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
     `http://api.teste/agendas?medicoId=${MEDICO_PAINEL}`,
-    `http://api.teste/consultas?medicoId=${MEDICO_PAINEL}&de=${dia}&ate=${dia}`,
+    `http://api.teste/consultas?medicoId=${MEDICO_PAINEL}&de=${dia}&ate=${dia}&fusoHorario=America%2FSao_Paulo`,
   ]);
   expect(fetchMock.mock.calls.every(([, options]) => options.method === 'GET'
     && options.headers.Authorization === 'Bearer token-de-teste')).toBe(true);
@@ -32,11 +32,11 @@ it('não limita a agenda do dia aos cem registros da outra listagem', async () =
   expect(JSON.stringify(consultas)).toBe(antes);
 });
 
-it('preserva o fuso e as datas locais do calendário, inclusive uma consulta que cruza meia-noite', async () => {
+it('pede os horários no fuso da clínica mesmo quando a agenda usa outro fuso', async () => {
   const consulta = consultaDia({ inicio: '2026-11-22T23:45', fim: '2026-11-23T00:15' });
   vi.stubGlobal('fetch', vi.fn(async (url) => json(new URL(url).pathname === '/agendas' ? agendaPainel(MEDICO_PAINEL, 'America/Manaus') : [consulta])));
   expect(await buscarAgendaDoDia({ medicoId: MEDICO_PAINEL, dia })).toEqual({
-    consultas: [consulta], fusoHorario: 'America/Manaus', semAgenda: false,
+    consultas: [consulta], fusoHorario: 'America/Sao_Paulo', semAgenda: false,
   });
 });
 

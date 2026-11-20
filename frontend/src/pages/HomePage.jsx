@@ -1,14 +1,10 @@
-import { useState } from 'react';
 import ApiStatus from '../components/ApiStatus';
-import IndicadoresPainel from '../components/painel/IndicadoresPainel';
-import AgendaDiaPainel from '../components/painel/AgendaDiaPainel';
-import ProximasConsultasPainel from '../components/painel/ProximasConsultasPainel';
+import PainelOperacional from '../components/painel/PainelOperacional';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
-import { agoraNoFuso } from '../utils/calendario';
 
 const SHORTCUTS = [
   { to: '/pacientes', title: 'Pacientes', description: 'Informações de identificação e contato.', resource: 'pacientes' },
@@ -29,7 +25,6 @@ const PATIENT_SHORTCUTS = [
 
 export default function HomePage() {
   const { usuario } = useAuth();
-  const [dia] = useState(() => agoraNoFuso().slice(0, 10));
   const perfil = usuario?.perfil;
   const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
   const acessos = (operacional ? OPERATIONAL_SHORTCUTS : PATIENT_SHORTCUTS).filter(({ to }) => podeAbrir(to, perfil));
@@ -45,11 +40,7 @@ export default function HomePage() {
     <div className="page">
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
         action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
-      {operacional && <IndicadoresPainel de={dia} ate={dia} />}
-      {operacional && <>
-        <AgendaDiaPainel dia={dia} />
-        <ProximasConsultasPainel />
-      </>}
+      {operacional && <PainelOperacional />}
       <div className="record-grid">
         {acessos.map(({ to, title, description, label }) => (
           <Card key={to} title={title} description={description}><Button to={to} variant="outline">{label}</Button></Card>

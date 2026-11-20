@@ -37,7 +37,7 @@ export default function IndicadoresPainel({ de, ate, medicoId }) {
       <header className="page__header">
         <div>
           <h2 id={tituloId}>Indicadores</h2>
-          <p className="page__lead">Consultas de {dataBr(de)}{de !== ate && ` a ${dataBr(ate)}`} · America/Sao_Paulo</p>
+          <p className="page__lead">Consultas iniciadas de {dataBr(de)}{de !== ate && ` a ${dataBr(ate)}`} · America/Sao_Paulo</p>
         </div>
         <Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar indicadores</Button>
       </header>
