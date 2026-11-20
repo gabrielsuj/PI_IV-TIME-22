@@ -1,7 +1,7 @@
 import Button from './Button';
 
-export default function DataTable({ caption, columns, rows = [], loading, error, onRetry, emptyMessage = 'Nenhum registro encontrado.', getRowKey = (row) => row.id || row._id }) {
-  const message = loading ? 'Carregando registros…' : error ? 'Não foi possível carregar os registros.' : emptyMessage;
+export default function DataTable({ caption, columns, rows = [], loading, error, onRetry, emptyMessage = 'Nenhum registro encontrado.', loadingMessage = 'Carregando registros…', getRowKey = (row) => row.id || row._id }) {
+  const message = loading ? loadingMessage : error ? 'Não foi possível carregar os registros.' : emptyMessage;
 
   return (
     <div className="table-scroll" tabIndex={0} role="region" aria-label={caption} aria-busy={loading || undefined}>

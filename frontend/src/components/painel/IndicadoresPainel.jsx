@@ -44,6 +44,7 @@ export default function IndicadoresPainel({ de, ate, medicoId }) {
       {carregando && <p role="status">Carregando indicadores…</p>}
       {erro && <Alert action={<Button variant="outline" onClick={atualizar}>Tentar novamente</Button>}>{erro.message}</Alert>}
       {dados && <>
+        {dados.contagens.totalConsultas === 0 && <p role="status">Nenhuma consulta iniciada no período selecionado.</p>}
         <div className="record-grid">
           {METRICAS.map(({ campo, titulo, apoio }) => {
             const taxa = dados[campo];

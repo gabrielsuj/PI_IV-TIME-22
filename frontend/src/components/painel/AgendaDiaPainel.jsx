@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgendaDoDia } from '../../hooks/useConsultasPainel';
 import { FUSO_CLINICA, STATUS_CONSULTA } from '../../utils/consulta';
@@ -32,7 +33,7 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
   ];
 
   return (
-    <Card className="painel-consultas" title="Agenda do dia" description={`Atendimentos que ocorrem em ${dataBr(dia)} · ${FUSO_CLINICA}.`}
+    <Card className="painel-consultas" title="Agenda do dia" aria-busy={carregando} description={`Atendimentos que ocorrem em ${dataBr(dia)} · ${FUSO_CLINICA}.`}
       action={medicoId && <Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar agenda do dia</Button>}>
       {!medicoId && <p role="status">Selecione um médico no filtro do painel para consultar a agenda do dia.</p>}
       {medicoId && <>
@@ -40,9 +41,8 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
         {dados?.semAgenda && <Alert tone="info">Este médico ainda não tem agenda configurada. As consultas existentes continuam listadas.</Alert>}
         {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar agenda novamente</Button>}>{erro.message}</Alert>
           : <DataTable caption="Consultas na agenda do dia" columns={colunas} rows={dados?.consultas ?? []}
-            loading={carregando} emptyMessage="Nenhuma consulta na agenda deste dia." />}
+            loading={carregando} loadingMessage="Carregando agenda do dia…" emptyMessage="Nenhuma consulta na agenda deste dia." />}
       </>}
     </Card>
   );
 }
-import { useLocation } from 'react-router';

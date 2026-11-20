@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
-import { useRecords } from '../../hooks/useRecords';
+import { useMedicosPainel } from '../../hooks/useMedicosPainel';
 import { FUSO_CLINICA } from '../../utils/consulta';
 import { dataPainelValida, erroPeriodoPainel } from '../../utils/painel';
 import Alert from '../ui/Alert';
@@ -16,7 +16,7 @@ export default function PainelOperacional({ hoje }) {
   const secretaria = usuario?.perfil === 'SECRETARIA_ADMIN';
   const permitido = secretaria || usuario?.perfil === 'MEDICO';
   const [params, setParams] = useSearchParams();
-  const medicos = useRecords(secretaria ? 'medicos' : null);
+  const medicos = useMedicosPainel();
   if (!permitido) return null;
 
   const selecionado = secretaria ? (params.get('medicoId') ?? '').toLowerCase() : '';
@@ -60,6 +60,8 @@ export default function PainelOperacional({ hoje }) {
       {secretaria && medicos.error && <Alert action={<Button variant="outline" onClick={medicos.refresh}>Tentar carregar médicos novamente</Button>}>
         Não foi possível carregar os médicos. {medicos.error.message}
       </Alert>}
+      {secretaria && medicos.loading && <p role="status">Carregando lista de médicos…</p>}
+      {secretaria && !medicos.loading && !medicos.error && medicos.records.length === 0 && <p role="status">Nenhum médico cadastrado.</p>}
       <p className="page__lead">Escopo do painel: {escopo}.</p>
     </Card>
     {!medicoValido ? <Alert>O filtro de médico é inválido. Selecione um médico ou todos os médicos.</Alert> : <>

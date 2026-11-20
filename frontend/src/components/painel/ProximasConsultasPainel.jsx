@@ -32,12 +32,12 @@ export default function ProximasConsultasPainel({ medicoId }) {
   ].filter(Boolean);
 
   return (
-    <Card className="painel-consultas" title="Próximas consultas"
+    <Card className="painel-consultas" title="Próximas consultas" aria-busy={carregando}
       description={`Até ${LIMITE_PROXIMAS_PAINEL} consultas em andamento ou futuras a partir de agora, em ordem de início · ${FUSO_CLINICA}.`}
       action={<Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar próximas consultas</Button>}>
       {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar próximas consultas novamente</Button>}>{erro.message}</Alert>
         : <DataTable caption="Resumo das próximas consultas" columns={colunas} rows={dados?.consultas ?? []}
-          loading={carregando} emptyMessage="Nenhuma próxima consulta encontrada." />}
+          loading={carregando} loadingMessage="Carregando próximas consultas…" emptyMessage="Nenhuma próxima consulta encontrada." />}
       {dados && dados.totalRecebido > LIMITE_PROXIMAS_PAINEL && <p className="page__lead">
         Mostrando {dados.consultas.length} de {dados.totalRecebido} consultas recebidas.
       </p>}
