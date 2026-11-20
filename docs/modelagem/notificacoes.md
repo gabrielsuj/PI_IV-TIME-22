@@ -7,6 +7,7 @@
 | 2026-11-07 | Davi Vitoreti | v1.0.0 | Versão inicial da coleção `notificacoes`: campos, referências, status, regras por status da consulta e índices. |
 | 2026-11-13 | Gabriel Martins | v1.1.0 | Situação da implementação: `VAGA_LIBERADA` gerada pela sinalização da fila (#32). |
 | 2026-11-15 | Gabriel Martins | v1.2.0 | Avisos de vaga exibidos ao paciente, com agendamento e expiração (#57). |
+| 2026-11-20 | Murilo Moraes | v1.3.0 | Geração de confirmação, lembrete e cancelamento e agendador de envio (#34). |
 
 ## Entidades
 
@@ -14,7 +15,9 @@ A seguir é documentada a entidade (coleção MongoDB) e seus dados (atributos) 
 
 > Observação: a coleção `notificacoes` não consta na lista de coleções da seção 3.2.3 do relatório de ideação (pacientes, medicos, especialidades, agendas, consultas, filaEspera e historico). Ela foi acrescentada ao banco pelo script `database/init/09-esquema-notificacoes.js`.
 
-> **Situação da implementação:** a API gera hoje apenas `VAGA_LIBERADA`, criada com `status = AGENDADA` quando um interessado da fila é sinalizado (#32, ver [filaEspera.md](filaEspera.md#implementação-da-sinalização-32)). Se a vaga é ocupada por outra pessoa antes do envio, o aviso passa a `CANCELADA`. O paciente vê e usa os avisos na tela **Avisos de vaga** (`GET/POST /avisos-vaga`, #57, ver [fila-espera.md](../api/fila-espera.md#7-avisos-de-vaga-e-agendamento-57)), onde cada aviso aparece como disponível, agendado ou expirado. A central da #35 exibe notificações internas entregues ao paciente ou médico vinculado. A geração periódica e a entrega dos lembretes pertencem à #34.
+> **Lembretes e notificações (#34):** o `NotificacoesService` gera `CONFIRMACAO_AGENDAMENTO` (entregue na hora) e `LEMBRETE_CONSULTA` (programado para início − `NOTIFICACOES_ANTECEDENCIA_HORAS`, padrão 24 h) quando a consulta é criada. No cancelamento, os lembretes e confirmações pendentes passam a `CANCELADA` e `CANCELAMENTO_CONSULTA` vai ao paciente e ao médico, exceto ao perfil que cancelou. Um agendador no servidor roda a cada `NOTIFICACOES_INTERVALO_SEGUNDOS`: cria o lembrete que falta para consultas ativas dentro da janela de antecedência (ex.: carga de demonstração) e entrega as notificações vencidas (`AGENDADA` → `ENVIADA`). Antes de entregar, relê a consulta e descarta o lembrete se ela não está ativa, mudou de horário ou já começou. Se o lembrete já deveria ter saído (consulta marcada em cima da hora), ele é entregue no próximo ciclo. Duplicados são impedidos pelo índice `uq_notif_idempotencia`. Com `NOTIFICACOES_EMAIL_TESTE=true`, cada notificação do paciente ganha uma cópia no canal `EMAIL_TESTE`, "enviada" para o log do servidor com o endereço mascarado; após 3 tentativas sem sucesso, ela fica em `FALHA` com o motivo em `erro`. `VAGA_LIBERADA` continua com o fluxo próprio da fila (abaixo). Testes: `NotificacoesIntegrationTest`.
+
+> **Situação da implementação (fila):** a fila gera `VAGA_LIBERADA`, criada com `status = AGENDADA` quando um interessado da fila é sinalizado (#32, ver [filaEspera.md](filaEspera.md#implementação-da-sinalização-32)). Se a vaga é ocupada por outra pessoa antes do envio, o aviso passa a `CANCELADA`. O paciente vê e usa os avisos na tela **Avisos de vaga** (`GET/POST /avisos-vaga`, #57, ver [fila-espera.md](../api/fila-espera.md#7-avisos-de-vaga-e-agendamento-57)), onde cada aviso aparece como disponível, agendado ou expirado. A central da #35 exibe notificações internas entregues ao paciente ou médico vinculado. A geração e a entrega dos demais tipos estão descritas no bloco acima (#34).
 
 ### 1. Notificacao (coleção `notificacoes`)
 

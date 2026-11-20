@@ -61,7 +61,7 @@ class CancelamentoServiceTest {
         return new CancelamentoService(consultas, acesso, registro, fila, relogio);
     }
 
-    private final CancelamentoService service = criarService(avisosFila::add);
+    private final CancelamentoService service = criarService((consulta, ator) -> avisosFila.add(consulta));
 
     /** Consulta do Paulo com a Dra. Ana amanhã às 9h, já gravada no banco. */
     private ObjectId consultaDoPaulo(String status) {
@@ -203,7 +203,7 @@ class CancelamentoServiceTest {
 
     @Test void falhaNaFilaNaoDesfazOCancelamento() {
         ObjectId id = consultaDoPaulo("AGENDADA");
-        CancelamentoService comFilaQuebrada = criarService(c -> { throw new IllegalStateException("fila fora do ar"); });
+        CancelamentoService comFilaQuebrada = criarService((c, ator) -> { throw new IllegalStateException("notificação fora do ar"); });
 
         assertEquals("CANCELADA", assertDoesNotThrow(() -> comFilaQuebrada.cancelar(id, null, PAULO_LOGADO)).status());
         assertEquals("CANCELADA", consultas.docs.get(id).getString("status"));
