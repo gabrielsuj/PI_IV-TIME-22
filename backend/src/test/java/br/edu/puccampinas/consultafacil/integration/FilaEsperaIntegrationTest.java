@@ -423,6 +423,49 @@ class FilaEsperaIntegrationTest {
         assertEquals(1, db.getCollection("historico").countDocuments(new Document("consultaId", consulta).append("evento", "CONFIRMACAO")));
     }
 
+    @Test void antecedenciasOuCanaisDistintosSaoPermitidos() {
+        // O índice uq_notif_idempotencia deve bloquear apenas notificações
+        // com a mesma consulta, tipo, destinatário, canal e antecedência.
+        ObjectId consultaId = new ObjectId();
+        NotificacaoRepository repo = new NotificacaoRepository(db);
+        Document base = new Document("destinatarioPerfil", "PACIENTE")
+                .append("destinatarioId", P1)
+                .append("tipo", "LEMBRETE_CONSULTA")
+                .append("canal", "SISTEMA")
+                .append("simulada", true)
+                .append("consultaId", consultaId)
+                .append("filaEsperaId", null)
+                .append("statusConsulta", "AGENDADA")
+                .append("antecedenciaHoras", 24)
+                .append("titulo", "Lembrete")
+                .append("mensagem", "Confirme sua presença.")
+                .append("dadosConsulta", new Document("dataHora", Date.from(VAGA))
+                        .append("medicoNome", "Dra. Paula"))
+                .append("status", "AGENDADA")
+                .append("agendadaPara", Date.from(VAGA.minus(Duration.ofHours(24))))
+                .append("enviadaEm", null)
+                .append("tentativas", 0)
+                .append("erro", null)
+                .append("criadoEm", Date.from(AGORA));
+
+        Document lembrete24h = new Document(base).append("_id", new ObjectId());
+        Document lembrete48h = new Document(base).append("_id", new ObjectId())
+                .append("antecedenciaHoras", 48)
+                .append("agendadaPara", Date.from(VAGA.minus(Duration.ofHours(48))));
+        Document lembreteEmail = new Document(base).append("_id", new ObjectId())
+                .append("canal", "EMAIL_TESTE");
+
+        assertTrue(repo.inserirSeNova(lembrete24h));
+        assertFalse(repo.inserirSeNova(new Document(lembrete24h).append("_id", new ObjectId())));
+        assertTrue(repo.inserirSeNova(lembrete48h));
+        assertFalse(repo.inserirSeNova(new Document(lembrete48h).append("_id", new ObjectId())));
+        assertTrue(repo.inserirSeNova(lembreteEmail));
+        assertFalse(repo.inserirSeNova(new Document(lembreteEmail).append("_id", new ObjectId())));
+
+        assertEquals(3, db.getCollection("notificacoes")
+                .countDocuments(Filters.eq("consultaId", consultaId)));
+    }
+
     private ObjectId liberarVaga(ObjectId pacienteId) {
         UsuarioLogado sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
         ObjectId consulta = registro.criar(new Document("pacienteId", pacienteId).append("medicoId", MEDICO)
