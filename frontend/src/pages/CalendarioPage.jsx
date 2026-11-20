@@ -44,7 +44,9 @@ function useDadosDoCalendario(medicoId, de, ate) {
       listarBloqueios(medicoId, { de, ate, ...opcoes }),
       listarConsultas(medicoId, { de, ate, ...opcoes }),
     ])
-      .then(([agenda, bloqueios, consultas]) => setDados({ chave, erro: null, agenda, bloqueios: bloqueios ?? [], consultas: consultas ?? [] }))
+      .then(([agenda, bloqueios, consultas]) => {
+        if (!controller.signal.aborted) setDados({ chave, erro: null, agenda, bloqueios: bloqueios ?? [], consultas: consultas ?? [] });
+      })
       .catch((erro) => { if (!controller.signal.aborted) setDados({ chave, erro, agenda: null, bloqueios: [], consultas: [] }); });
     return () => controller.abort();
   }, [medicoId, de, ate, chave]);
@@ -155,6 +157,7 @@ export default function CalendarioPage() {
 
   const medicos = useRecords(agendaPropria ? null : 'medicos');
   const ativos = medicos.records.filter((m) => m.ativo !== false);
+  const selecionavel = ativos.some((m) => idDe(m) === medicoId);
   const dados = useDadosDoCalendario(medicoId, de, ate);
 
   const ir = (mudancas) => {
@@ -180,10 +183,11 @@ export default function CalendarioPage() {
       <Card className="search-card">
         <div className="cal-controles">
           {!agendaPropria && (
-            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading}
+            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading || ativos.length === 0}
               onChange={(event) => ir({ medicoId: event.target.value })}>
-              <option value="">{medicos.loading ? 'Carregando médicos…' : 'Selecione um médico'}</option>
+              <option value="">Selecione um médico</option>
               {ativos.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
+              {medicoId && !selecionavel && <option value={medicoId}>Médico {medicoId}</option>}
             </Field>
           )}
           <div className="cal-nav" role="group" aria-label="Visualização">
@@ -191,11 +195,24 @@ export default function CalendarioPage() {
             <Button variant={visao === 'dia' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'dia'} onClick={() => ir({ visao: 'dia' })}>Dia</Button>
           </div>
         </div>
-        {medicos.error && <Alert tone="info">Não foi possível carregar a lista de médicos ({medicos.error.message}).</Alert>}
+        {!agendaPropria && (
+          <>
+            {medicos.loading && <p role="status">Carregando lista de médicos…</p>}
+            {medicos.error && (
+              <Alert action={<Button variant="outline" size="sm" onClick={medicos.refresh}>Tentar novamente</Button>}>
+                Não foi possível carregar a lista de médicos. {medicos.error.message}
+              </Alert>
+            )}
+            {!medicos.loading && !medicos.error && ativos.length === 0 && (
+              <p className="empty-state" role="status">Nenhum médico ativo disponível para seleção.</p>
+            )}
+          </>
+        )}
       </Card>
 
       {!medicoId ? (
-        <Card><p className="empty-state" role="status">Selecione um médico para ver o calendário.</p></Card>
+        !medicos.loading && !medicos.error && ativos.length > 0 &&
+          <Card><p className="empty-state" role="status">Selecione um médico para ver o calendário.</p></Card>
       ) : (
         <Card>
           <div className="cal-cabecalho">

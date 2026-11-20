@@ -84,13 +84,14 @@ describe('request', () => {
     expect(error.isNetworkError).toBe(false);
   });
 
-  it('usa mensagem genérica quando o erro não traz corpo', async () => {
-    mockFetch(async () => new Response(null, { status: 500 }));
-
-    const error = await api.get('/health').catch((e) => e);
-
-    expect(error.status).toBe(500);
-    expect(error.message).toBe('A API respondeu com erro (HTTP 500).');
+  it.each([
+    [400, 'Revise os dados informados'],
+    [403, 'Seu perfil não tem permissão'],
+    [409, 'Houve um conflito'],
+    [503, 'A API está temporariamente indisponível'],
+  ])('orienta sobre HTTP %s quando o erro não traz uma mensagem', async (status, mensagem) => {
+    mockFetch(async () => new Response(null, { status }));
+    await expect(api.get('/health')).rejects.toMatchObject({ status, message: expect.stringContaining(mensagem) });
   });
 
   it('converte falha de rede em ApiError com status 0', async () => {
@@ -104,6 +105,15 @@ describe('request', () => {
     expect(error.status).toBe(0);
     expect(error.isNetworkError).toBe(true);
     expect(error.message).toMatch(/Não foi possível conectar à API/);
+  });
+
+  it('padroniza a falha de conexão que interrompe a leitura do corpo da resposta', async () => {
+    const falha = new TypeError('Conexão perdida durante a leitura');
+    mockFetch(async () => ({ status: 200, ok: true, text: async () => { throw falha; } }));
+
+    await expect(api.get('/pacientes')).rejects.toMatchObject({
+      name: 'ApiError', status: 0, message: expect.stringContaining('Não foi possível conectar à API'), cause: falha,
+    });
   });
 
   it('interrompe a requisição quando o tempo limite é atingido', async () => {

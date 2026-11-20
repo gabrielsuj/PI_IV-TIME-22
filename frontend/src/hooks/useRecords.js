@@ -13,6 +13,7 @@ export function useRecords(resource) {
     const controller = new AbortController();
     api.get(`/${resource}`, { signal: controller.signal })
       .then((data) => {
+        if (controller.signal.aborted) return;
         const items = Array.isArray(data) ? data : data?.items;
         if (!Array.isArray(items)) throw new Error('Não foi possível ler os cadastros. Tente novamente.');
         setRecords(items);
