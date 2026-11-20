@@ -12,19 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Capacidade e ocupação da #36, para um médico, usando sua agenda atual. Cálculo puro: não consulta
- * fontes nem altera reservas. Bloqueios e consultas recebidos devem ser completos, do mesmo médico,
- * incluindo sobreposições com as bordas dos slots (mesmo se o documento começar fora do período).
- * A leitura completa cabe ao repositório de indicadores; a autorização cabe ao serviço.
- *
- * <p>Seleciona slots pelo início na janela do {@link PeriodoIndicadores}, convertendo seus limites
- * para os dias do fuso da agenda. Não limita a capacidade ao futuro. Conta cada slot uma vez e
- * considera ocupado se sobreposto por AGENDADA, CONFIRMADA, CONCLUIDA ou FALTA; CANCELADA libera
- * o slot. Agenda ausente é indicada explicitamente, não apresentada como agenda configurada vazia.</p>
- * <p>O resultado é uma estimativa pela configuração atual; não reconstrói alterações históricas
- * de jornada, duração ou bloqueios. Ausência/falha de leitura de uma fonte não deve virar lista vazia.</p>
- */
 public final class CalculadoraCapacidade {
     private CalculadoraCapacidade() {}
 
@@ -43,7 +30,6 @@ public final class CalculadoraCapacidade {
         if (agenda.isEmpty()) return new Resultado(true, 0, 0);
 
         List<Vaga> capacidade = slotsNoPeriodo(agenda.get(), periodo, bloqueios);
-        // Status ausente/desconhecido é inconsistência da fonte, não uma reserva livre.
         List<Document> mantidas = consultas.stream()
                 .filter(consulta -> StatusConsulta.valueOf(consulta.getString("status")) != StatusConsulta.CANCELADA)
                 .toList();
@@ -52,7 +38,6 @@ public final class CalculadoraCapacidade {
         return new Resultado(false, capacidade.size(), ocupadas);
     }
 
-    /** Grade reutilizada para buscar sobreposições até o fim do último slot, inclusive fora da janela. */
     public static List<Vaga> slotsNoPeriodo(Document agenda, PeriodoIndicadores periodo, List<Document> bloqueios) {
         Objects.requireNonNull(agenda);
         Objects.requireNonNull(periodo);

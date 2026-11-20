@@ -13,21 +13,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Confirmação registrada da #36, por consultas distintas iniciadas no período e pelo médico atual
- * da consulta (medicoId do cadastro, não do login). Uma confirmação continua contando após conclusão,
- * falta, cancelamento ou remarcação que mantenha a consulta no recorte. A data do evento e os dados
- * antigos de médico/horário no histórico não redefinem esse recorte.
- *
- * <p>Recebe fontes completas, sem o limite 100 da listagem/timeline. Não busca, grava ou processa
- * pendências; a leitura completa cabe ao repositório de indicadores e a autorização ao serviço.
- * Eventos CONFIRMACAO são deduplicados por consultaId. O status atual não substitui o evento.</p>
- * <p>Expõe a contagem comprovada pelos eventos projetados. Havendo caixa de pendências não vazia,
- * suspende a taxa até uma nova leitura completa. Consulta sem CRIACAO nem CONFIRMACAO projetada
- * também não tem base suficiente para afirmar ausência de confirmação (ex.: legado). Não fabrica
- * eventos nem transforma esses casos em 0% verdadeiro. CONFIRMADA/CONCLUIDA sem evento comprovante
- * também indicam base histórica insuficiente, mesmo havendo CRIACAO. Inconsistências estruturais são recusadas.</p>
- */
 public final class CalculadoraConfirmacao {
     private CalculadoraConfirmacao() {}
 
@@ -35,7 +20,6 @@ public final class CalculadoraConfirmacao {
                             long consultasComProjecaoPendente, long consultasSemBaseHistorica) {
         public boolean atualizacaoPendente() { return consultasComProjecaoPendente > 0; }
 
-        /** Vazio significa fonte ainda insuficiente; taxa 0/0 significa período sem consultas. */
         public Optional<CalculadoraIndicadores.Taxa> confirmacao() {
             return atualizacaoPendente() || consultasSemBaseHistorica > 0 ? Optional.empty()
                     : Optional.of(new CalculadoraIndicadores.Taxa(comConfirmacaoRegistrada, totalConsultas));

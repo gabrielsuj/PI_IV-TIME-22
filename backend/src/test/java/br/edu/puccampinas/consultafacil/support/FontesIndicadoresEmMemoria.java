@@ -8,7 +8,6 @@ import org.bson.types.ObjectId;
 import java.time.Instant;
 import java.util.*;
 
-/** Fontes controladas para exercitar a consolidação; não interpreta BSON nem simula um servidor Mongo. */
 public class FontesIndicadoresEmMemoria implements Fontes {
     public static final ObjectId MEDICO = new ObjectId();
     public static final PeriodoIndicadores PERIODO = PeriodoIndicadores.de("2026-11-23", "2026-11-23");

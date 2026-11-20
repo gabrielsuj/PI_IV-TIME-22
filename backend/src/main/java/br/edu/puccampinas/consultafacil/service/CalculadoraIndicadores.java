@@ -4,36 +4,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
 
-/**
- * Contrato e cálculo puro dos indicadores da #36. Recebe contagens completas, do mesmo período
- * e escopo de médicos, sem acesso ao banco, relógio, fila ou processador de histórico.
- * As fontes são consolidadas pelo repositório de indicadores; dado desconhecido não é zero.
- *
- * <p>Decisões do MVP (todas as consultas são distintas por consultaId):</p>
- * <ul>
- *   <li>Ocupação = vagas ocupadas / capacidade. Capacidade são os slots completos da jornada
- *       atual, por duração e descontando bloqueios, sem retirar passado ou consultas. Um slot
- *       está ocupado se sobreposto por alguma consulta não CANCELADA, inclusive CONCLUIDA/FALTA.
- *       Cada slot conta uma vez; ocupação mede reserva da agenda, não comparecimento.</li>
- *   <li>Faltas = FALTA / (CONCLUIDA + FALTA). Consultas ainda em aberto ou canceladas não têm
- *       desfecho de comparecimento e não entram nesse denominador.</li>
- *   <li>Cancelamento = CANCELADA / total de consultas. Os cinco status atuais formam o total.</li>
- *   <li>Confirmação = consultas com evento CONFIRMACAO / total de consultas. Considera qualquer
- *       data do evento para as consultas iniciadas no período, mesmo se depois concluídas ou
- *       canceladas. Repetições do evento não aumentam o numerador; status atual não prova evento.</li>
- *   <li>Fila = consultas não canceladas vinculadas por consultaAgendadaId a inscrições ATENDIDA /
- *       consultas não canceladas. Deduplicar vínculos pela consulta, filtrar seu médico/início,
- *       não atendidaEm. Uma reserva depois cancelada sai de ambos; sinalização/notificação
- *       não prova preenchimento. O percentual mede a origem das reservas mantidas.</li>
- * </ul>
- * <p>Todos os recortes de consultas usam seu início no {@link PeriodoIndicadores}; a ocupação
- * considera os slots iniciados nessa janela e consultas sobrepostas a eles, inclusive as iniciadas
- * antes dela. A agenda atual não reconstrói a capacidade histórica depois de alterações de jornada,
- * duração ou bloqueios. Essa limitação deve acompanhar o resultado na futura resposta da API.</p>
- * <p>Percentuais = 100 * numerador / denominador, duas casas, HALF_UP. Sem denominador, percentual
- * é null (não 0%). Valores inválidos/overflow são recusados, sem limitar silenciosamente a 100%.
- * As contagens de apoio permanecem disponíveis mesmo quando a taxa não tem base de cálculo.</p>
- */
 public final class CalculadoraIndicadores {
     private CalculadoraIndicadores() {}
 
@@ -64,7 +34,6 @@ public final class CalculadoraIndicadores {
                 throw new IllegalArgumentException("Taxa exige 0 <= numerador <= denominador");
         }
 
-        /** null significa ausência de base, enquanto 0.00 significa base existente sem ocorrências. */
         public BigDecimal percentual() {
             return denominador == 0 ? null : BigDecimal.valueOf(numerador).multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(denominador), 2, RoundingMode.HALF_UP);

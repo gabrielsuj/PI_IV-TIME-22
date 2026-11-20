@@ -97,7 +97,6 @@ class RotasAutorizacaoTest {
         "GET,    /consultas,      PACIENTE,         403",
         "GET,    /consultas,      MEDICO,           200",
         "GET,    /consultas,      SECRETARIA_ADMIN, 200",
-        // Indicadores (#36): médico e secretaria; serviço limita o médico ao próprio cadastro.
         "GET,    /indicadores,    PACIENTE,         403",
         "GET,    /indicadores,    MEDICO,           200",
         "GET,    /indicadores,    SECRETARIA_ADMIN, 200",

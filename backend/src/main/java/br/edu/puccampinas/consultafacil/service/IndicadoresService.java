@@ -11,7 +11,6 @@ import org.bson.types.ObjectId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Autoriza antes de acessar as fontes e aplica o contrato de cálculo da #36. Apenas leitura. */
 public final class IndicadoresService {
     private final IndicadoresLeituraRepository leitura;
     private final AcessoAgenda acesso;
@@ -21,7 +20,6 @@ public final class IndicadoresService {
         this.acesso = Objects.requireNonNull(acesso);
     }
 
-    /** Médico sem filtro consulta o próprio cadastro; secretaria sem filtro consulta todos. */
     public IndicadoresResponse consultar(String de, String ate, String solicitado, UsuarioLogado ator) {
         if (ator == null || ator.perfil() == null || ator.id() == null || !ObjectId.isValid(ator.id()))
             throw ApiException.unauthorized("Faça login para consultar os indicadores");

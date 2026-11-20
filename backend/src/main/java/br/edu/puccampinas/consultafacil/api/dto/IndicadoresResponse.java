@@ -6,12 +6,6 @@ import com.google.gson.annotations.JsonAdapter;
 
 import java.math.BigDecimal;
 
-/**
- * Contrato da #36: datas inclusivas, fuso da clínica e médico do cadastro (null = todos).
- * Numeradores/denominadores são contagens observadas; percentual null e situacao explicam taxas
- * sem base ou ainda incompletas. Não expõe consultas, pacientes, filas, versões ou caixas internas.
- * Fórmulas e populações estão documentadas em CalculadoraIndicadores.
- */
 @JsonAdapter(JsonComNulos.class)
 public record IndicadoresResponse(String de, String ate, String fusoHorario, String medicoId,
                                   Contagens contagens, Taxa ocupacao, Taxa faltas, Taxa cancelamento,

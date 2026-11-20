@@ -6,13 +6,6 @@ import org.bson.types.ObjectId;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Leitura agregada interna da #36, sem documentos pessoais ou limite da listagem de consultas.
- * O serviço resolve o escopo autorizado antes da leitura. medicoId vazio significa todos os médicos;
- * um filtro de cadastro inexistente deve gerar 404, não um resumo vazio. Sem filtro, ausência real
- * de consultas pode produzir contagens zero. Falha/ausência da fonte não deve virar zero.
- * Não expira/revisa fila, recupera histórico ou escreve em qualquer coleção.
- */
 @FunctionalInterface
 public interface IndicadoresLeituraRepository {
     Resumo ler(PeriodoIndicadores periodo, Optional<ObjectId> medicoId);

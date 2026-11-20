@@ -8,14 +8,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 
-/**
- * Período da #36: datas inclusivas no fuso da clínica, inclusive ao reunir médicos com agendas
- * em fusos diferentes. A leitura deve usar a janela UTC [inicioInclusivo, fimExclusivo).
- * O recorte das consultas considera seu início, não a data em que foram criadas ou alteradas.
- */
 public record PeriodoIndicadores(LocalDate de, LocalDate ate) {
     public static final ZoneId FUSO = ZoneId.of(AgendaService.FUSO_PADRAO);
-    /** Mesmo limite de dias da visão de calendário; não limita o número de consultas lidas. */
     public static final int MAXIMO_DIAS = 62;
 
     public PeriodoIndicadores {

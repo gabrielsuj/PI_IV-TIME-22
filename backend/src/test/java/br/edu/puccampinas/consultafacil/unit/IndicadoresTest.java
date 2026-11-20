@@ -19,14 +19,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Contrato da etapa 1 da #36: aritmética e janela de leitura, sem simular integração com fontes. */
 class IndicadoresTest {
     private static final PeriodoIndicadores PERIODO = PeriodoIndicadores.de("2026-11-20", "2026-11-20");
 
     @Test void fixtureManualConfereCadaFormulaEContagensDeApoio() {
-        // 8 slots; 5 reservas mantidas ocupam 6 slots (uma usa dois); 1 reserva cancelada.
-        // Status: 1 AGENDADA, 1 CONFIRMADA, 2 CONCLUIDA, 1 FALTA, 1 CANCELADA.
-        // 4 consultas tiveram CONFIRMACAO; 2 reservas mantidas vieram de vínculos ATENDIDA.
         var base = new Contagens(8, 6, 1, 1, 2, 1, 1, 4, 2);
         var resultado = CalculadoraIndicadores.calcular(PERIODO, base);
         assertEquals(PERIODO, resultado.periodo());
@@ -124,7 +120,6 @@ class IndicadoresTest {
     }
 
     @Test void janelaUsaInicioDeCadaDiaEmVezDeSomarVinteEQuatroHoras() {
-        // Na transição histórica do horário de verão, esse dia em São Paulo teve 23 horas.
         var periodo = PeriodoIndicadores.de("2018-11-04", "2018-11-04");
         assertEquals(Instant.parse("2018-11-04T03:00:00Z"), periodo.inicioInclusivo());
         assertEquals(Instant.parse("2018-11-05T02:00:00Z"), periodo.fimExclusivo());

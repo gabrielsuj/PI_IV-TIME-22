@@ -19,7 +19,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Contagens sobre snapshots em memória; o fluxo com serviços/Mongo fica no teste de integração. */
 class PreenchimentoFilaIndicadoresTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final Instant INICIO = Instant.parse("2026-11-20T12:00:00Z");
@@ -111,7 +110,7 @@ class PreenchimentoFilaIndicadoresTest {
     @Test void dataDoAtendimentoEMedicoPreferidoNaoRedefinemRecorteDaConsulta() {
         var propria = consulta("CONCLUIDA");
         var outra = consulta("AGENDADA").append("medicoId", OUTRO_MEDICO);
-        var filaPropria = atendida(propria).append("medicoId", OUTRO_MEDICO); // preferência antiga, antes de remarcação.
+        var filaPropria = atendida(propria).append("medicoId", OUTRO_MEDICO);
         var filaOutra = atendida(outra).append("medicoId", MEDICO).append("atendidaEm", Date.from(INICIO));
         var consultas = List.of(propria, outra);
         var fila = List.of(filaPropria, filaOutra);

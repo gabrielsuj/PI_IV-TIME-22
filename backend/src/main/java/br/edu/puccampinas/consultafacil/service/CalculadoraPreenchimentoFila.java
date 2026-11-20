@@ -12,26 +12,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Origem das reservas mantidas na #36: consultas distintas vinculadas por consultaAgendadaId a
- * inscrições ATENDIDA / consultas não canceladas do recorte. AGENDADA, CONFIRMADA, CONCLUIDA e
- * FALTA permanecem na população; CANCELADA sai do numerador e do denominador, mesmo se a inscrição
- * continuar ATENDIDA. Sinalização de vaga ou notificação não comprova preenchimento.
- *
- * <p>Médico atual e início da consulta definem o recorte, não o médico preferido da inscrição nem
- * atendidaEm. Recebe fontes completas, sem limite 100: todas as consultas do recorte e as consultas
- * referenciadas pelas inscrições recebidas, inclusive fora do recorte. Uma referência não encontrada
- * pode indicar fonte incompleta ou vínculo órfão; a taxa fica indefinida, sem inventar zero.</p>
- * <p>Cálculo puro, sem expirar/revisar fila, sinalizar, reservar ou recuperar histórico. As leituras
- * das fontes cabem ao repositório de indicadores e a autorização ao serviço. Não reconstrói vínculos
- * de inscrições legadas sem consultaAgendadaId e não modifica o fluxo de atendimento existente.</p>
- */
 public final class CalculadoraPreenchimentoFila {
     private CalculadoraPreenchimentoFila() {}
     private static final Set<String> STATUS_FILA = Set.of("AGUARDANDO", "SINALIZADA", "ATENDIDA", "CANCELADA", "EXPIRADA");
 
     public record Resultado(long consultasNaoCanceladas, long preenchidasPelaFila, long inscricoesComVinculoInvalido) {
-        /** Vazio: vínculo/fonte insuficiente; taxa 0/0: nenhuma reserva mantida no recorte. */
         public Optional<CalculadoraIndicadores.Taxa> preenchimentoFila() {
             return inscricoesComVinculoInvalido > 0 ? Optional.empty()
                     : Optional.of(new CalculadoraIndicadores.Taxa(preenchidasPelaFila, consultasNaoCanceladas));

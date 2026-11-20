@@ -25,7 +25,6 @@ import java.util.List;
 public final class CalculadoraDisponibilidade {
     private CalculadoraDisponibilidade() {}
 
-    /** Um horário da jornada, em instantes UTC; a disponibilidade filtra os que estão livres. */
     public record Vaga(Instant inicio, Instant fim) {}
 
     /**
@@ -42,11 +41,6 @@ public final class CalculadoraDisponibilidade {
         return vagas;
     }
 
-    /**
-     * Capacidade da jornada atual em um dia no fuso da agenda, descontando somente os bloqueios.
-     * Não depende do relógio ou das reservas: horários passados/ocupados continuam na capacidade.
-     * Reutilizada pela disponibilidade e pelos indicadores (#36), sem reconstruir agendas antigas.
-     */
     public static List<Vaga> capacidadeDoDia(Document agenda, LocalDate data, List<Document> bloqueios) {
         ZoneId fuso = ZoneId.of(agenda.getString("fusoHorario"));
         Integer duracao = agenda.getInteger("duracaoMinutos");

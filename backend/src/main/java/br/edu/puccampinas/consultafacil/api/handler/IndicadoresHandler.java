@@ -12,12 +12,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * GET /indicadores?de=AAAA-MM-DD&ate=AAAA-MM-DD[&medicoId=ObjectId]. Até 62 dias inclusivos.
- * Médico: próprio cadastro, filtro ausente/meu/próprio ID. Secretaria: todos ou ID específico.
- * 400 parâmetros inválidos; 401 sem sessão; 403 paciente/outro médico/sem vínculo; 404 filtro
- * de cadastro inexistente; 503 fonte indisponível. Não repete escrita nem altera fila/histórico.
- */
 public final class IndicadoresHandler implements HttpHandler {
     private static final Set<String> PARAMETROS = Set.of("de", "ate", "medicoId");
     private final IndicadoresService service;

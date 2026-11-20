@@ -23,7 +23,6 @@ import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Sorts.ascending;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Opt-in HISTORICO_MONGO_URI: banco consultafacil_historico_test já inicializado; sem recriação/schema automático. */
 class IndicadoresMongoIntegrationTest {
     private static MongoConnection mongo;
     private final ObjectId medico = new ObjectId(), especialidade = new ObjectId();
@@ -65,7 +64,6 @@ class IndicadoresMongoIntegrationTest {
             String status = fixture.consultas.get(i).getString("status");
             if (Set.of("CONCLUIDA", "FALTA").contains(status)) registro.alterar(idsConsultas.get(i), new Document("status", status), ator);
         }
-        // A geração auditada acima ocorre só em memória; persistem-se apenas dados próprios desta fixture.
         db.getCollection("medicos").insertOne(new Document("_id", medico).append("nome", "Médico Indicadores Teste")
                 .append("crmNumero", Long.toString(Long.parseLong(medico.toHexString().substring(16), 16)))
                 .append("crmUf", "RR").append("especialidadeIds", List.of(especialidade)).append("ativo", false));

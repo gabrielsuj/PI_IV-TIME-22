@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** HTTP, sessão, AcessoAgenda, serviço e JSON reais. Resumos/resolvedor em memória, sem MongoDB. */
 class IndicadoresHttpTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final UsuarioLogado SECRETARIA = usuario(Perfil.SECRETARIA_ADMIN), MEDICO_LOGADO = usuario(Perfil.MEDICO), PACIENTE = usuario(Perfil.PACIENTE);
@@ -60,7 +59,6 @@ class IndicadoresHttpTest {
     }
 
     @BeforeEach void iniciar() throws Exception {
-        // Só o resolvedor é substituído: não há chamadas ao driver ou a um banco neste teste.
         MongoDatabase semBanco = (MongoDatabase) Proxy.newProxyInstance(MongoDatabase.class.getClassLoader(),
                 new Class<?>[]{MongoDatabase.class}, (proxy, metodo, argumentos) -> {
                     if ("getCollection".equals(metodo.getName())) return null;
@@ -185,7 +183,7 @@ class IndicadoresHttpTest {
         conferirErro(resposta, 503);
         assertFalse(resposta.body().contains("contagens"));
         assertFalse(resposta.body().contains(f.consultas.getFirst().getObjectId("_id").toHexString()));
-        assertEquals(1, leituras.get()); // Não tenta de novo automaticamente.
+        assertEquals(1, leituras.get());
         var recuperada = enviar("GET", caminho, sessao);
         assertEquals(200, recuperada.statusCode(), recuperada.body());
         assertEquals(2, json.readTree(recuperada.body()).get("contagens").get("canceladas").asInt());

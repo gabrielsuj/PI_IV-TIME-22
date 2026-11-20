@@ -19,9 +19,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Slots reais de uma jornada e bloqueios em memória; ainda não exercita leitura Mongo/endpoint. */
 class CapacidadeIndicadoresTest {
-    private static final LocalDate DIA = LocalDate.of(2026, 11, 23); // segunda-feira
+    private static final LocalDate DIA = LocalDate.of(2026, 11, 23);
     private static final PeriodoIndicadores PERIODO = new PeriodoIndicadores(DIA, DIA);
 
     private static Document agenda(String fuso, int duracao, int diaSemana, int inicio, int fim) {
@@ -41,8 +40,8 @@ class CapacidadeIndicadoresTest {
     }
 
     @Test void fixtureDeCapacidadeEOcupacaoConfereComAFormulaDaEtapaAnterior() {
-        var agenda = agendaDaSegunda(); // 08h-13h: 10 slots de 30 minutos.
-        var bloqueio = intervalo("2026-11-23T12:00:00Z", "2026-11-23T13:00:00Z"); // 09h-10h: remove 2.
+        var agenda = agendaDaSegunda();
+        var bloqueio = intervalo("2026-11-23T12:00:00Z", "2026-11-23T13:00:00Z");
         var consultas = List.of(
                 consulta("2026-11-23T11:00:00Z", "2026-11-23T11:30:00Z", "AGENDADA"),
                 consulta("2026-11-23T11:30:00Z", "2026-11-23T12:00:00Z", "CONFIRMADA"),
@@ -83,7 +82,7 @@ class CapacidadeIndicadoresTest {
     }
 
     @Test void intervalosApenasEncostadosNaoBloqueiamNemOcupamSlots() {
-        var agenda = agenda("America/Sao_Paulo", 30, 1, 480, 510); // 11:00Z-11:30Z.
+        var agenda = agenda("America/Sao_Paulo", 30, 1, 480, 510);
         var resultado = CalculadoraCapacidade.calcular(Optional.of(agenda), PERIODO,
                 List.of(intervalo("2026-11-23T10:30:00Z", "2026-11-23T11:00:00Z")),
                 List.of(consulta("2026-11-23T11:30:00Z", "2026-11-23T12:00:00Z", "AGENDADA")));
@@ -127,23 +126,22 @@ class CapacidadeIndicadoresTest {
     @Test void somaSomenteDiasDaJornadaNoPeriodo() {
         var resultado = CalculadoraCapacidade.calcular(Optional.of(agendaDaSegunda()),
                 PeriodoIndicadores.de("2026-11-23", "2026-11-30"), List.of(), List.of());
-        assertEquals(20, resultado.capacidade()); // Duas segundas, 10 slots em cada.
+        assertEquals(20, resultado.capacidade());
     }
 
     @Test void recorteDaClinicaIncluiDiasAdjacentesNoFusoDaAgendaEExcluiFimDaJanela() {
-        // 23/11 em São Paulo = [23/11 03:00Z, 24/11 03:00Z). A agenda UTC tem 8 slots/dia.
         var agenda = agenda("UTC", 30, 1, 0, 240);
         var segunda = agenda.getList("jornadas", Document.class).getFirst();
         agenda.put("jornadas", List.of(segunda, new Document(segunda).append("diaSemana", 2)));
         var resultado = CalculadoraCapacidade.calcular(Optional.of(agenda), PERIODO, List.of(), List.of(
                 consulta("2026-11-23T02:30:00Z", "2026-11-23T03:30:00Z", "AGENDADA"),
                 consulta("2026-11-24T03:00:00Z", "2026-11-24T03:30:00Z", "AGENDADA")));
-        assertEquals(8, resultado.capacidade()); // 2 slots da segunda + 6 da terça no fuso UTC.
-        assertEquals(1, resultado.vagasOcupadas()); // Reserva iniciada antes da janela ocupa o primeiro slot.
+        assertEquals(8, resultado.capacidade());
+        assertEquals(1, resultado.vagasOcupadas());
     }
 
     @Test void reservaAposOFimDoPeriodoPodeSobreporUltimoSlotIniciadoNaJanela() {
-        var agenda = agenda("UTC", 60, 2, 150, 210); // Terça 02:30Z-03:30Z; início ainda é segunda na clínica.
+        var agenda = agenda("UTC", 60, 2, 150, 210);
         var resultado = CalculadoraCapacidade.calcular(Optional.of(agenda), PERIODO, List.of(), List.of(
                 consulta("2026-11-24T03:00:00Z", "2026-11-24T03:30:00Z", "CONFIRMADA")));
         assertEquals(1, resultado.capacidade());
@@ -156,7 +154,7 @@ class CapacidadeIndicadoresTest {
         var consultas = List.of(consulta("2026-11-23T11:00:00Z", "2026-11-23T11:30:00Z", "CANCELADA"));
         var antes = new Document("agenda", agenda).append("bloqueios", bloqueios).append("consultas", consultas).toJson();
         var resultado = CalculadoraCapacidade.calcular(Optional.of(agenda), PERIODO, bloqueios, consultas);
-        assertEquals(1, resultado.capacidade()); // A sobra de 20 minutos não vira vaga.
+        assertEquals(1, resultado.capacidade());
         assertEquals(0, resultado.vagasOcupadas());
         assertEquals(new BigDecimal("0.00"), resultado.ocupacao().percentual());
         assertEquals(antes, new Document("agenda", agenda).append("bloqueios", bloqueios).append("consultas", consultas).toJson());

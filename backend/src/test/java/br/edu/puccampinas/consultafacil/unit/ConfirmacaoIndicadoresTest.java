@@ -24,7 +24,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Registro/projeção/status reais com repositório em memória; não é teste de MongoDB ou HTTP. */
 class ConfirmacaoIndicadoresTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final Instant INICIO = Instant.parse("2026-11-20T12:00:00Z");
@@ -36,7 +35,6 @@ class ConfirmacaoIndicadoresTest {
         if (indisponivel) throw new IllegalStateException("Histórico temporariamente indisponível");
         historico.putIfAbsent(evento.getObjectId("_id"), Document.parse(evento.toJson()));
     });
-    // O evento pode ocorrer fora do período da consulta: o indicador não filtra ocorridoEm.
     private final Clock relogio = Clock.fixed(Instant.parse("2026-11-22T15:00:00Z"), ZoneOffset.UTC);
     private final UsuarioLogado secretaria = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
     private final RegistroConsultaService registro = new RegistroConsultaService(consultas, processor, relogio);
@@ -58,14 +56,14 @@ class ConfirmacaoIndicadoresTest {
     }
 
     @Test void fixtureManualContaConfirmacaoAposConclusaoOuCancelamento() {
-        criar(); // AGENDADA sem confirmação.
-        confirmar(criar()); // CONFIRMADA.
+        criar();
+        confirmar(criar());
         for (int i = 0; i < 2; i++) {
             ObjectId id = criar();
             confirmar(id);
             status.alterar(id, StatusConsulta.CONCLUIDA, secretaria);
         }
-        status.alterar(criar(), StatusConsulta.FALTA, secretaria); // Falta aceita a partir de AGENDADA.
+        status.alterar(criar(), StatusConsulta.FALTA, secretaria);
         ObjectId cancelada = criar();
         confirmar(cancelada);
         registro.alterar(cancelada, new Document("status", "CANCELADA"), secretaria);
@@ -163,7 +161,7 @@ class ConfirmacaoIndicadoresTest {
         assertTrue(historico.isEmpty());
 
         indisponivel = false;
-        processor.processarConsulta(id); // Recuperação explícita, fora da calculadora.
+        processor.processarConsulta(id);
         var atualizada = calcular();
         assertFalse(atualizada.atualizacaoPendente());
         assertEquals(0, atualizada.consultasSemBaseHistorica());
@@ -187,7 +185,7 @@ class ConfirmacaoIndicadoresTest {
     void legadoSemBaseHistoricaNaoInventaConfirmacaoPeloStatus(String atual) {
         ObjectId id = criar();
         historico.clear();
-        consultas.docs.get(id).put("status", atual); // Snapshot legado sem eventos projetados.
+        consultas.docs.get(id).put("status", atual);
         var resultado = calcular();
         assertEquals(1, resultado.totalConsultas());
         assertEquals(0, resultado.comConfirmacaoRegistrada());
@@ -216,7 +214,7 @@ class ConfirmacaoIndicadoresTest {
         assertEquals(1, resultado.consultasSemBaseHistorica());
         assertFalse(resultado.atualizacaoPendente());
         assertTrue(resultado.confirmacao().isEmpty());
-        assertEquals(1, historico.size()); // A leitura não inventa o evento ausente.
+        assertEquals(1, historico.size());
     }
 
     @Test void outrosTiposDeEventoNaoSaoProvaDeConfirmacao() {
@@ -226,7 +224,7 @@ class ConfirmacaoIndicadoresTest {
         assertEquals(0, resultado.comConfirmacaoRegistrada());
         assertEquals(new BigDecimal("0.00"), resultado.confirmacao().orElseThrow().percentual());
         historico.values().removeIf(e -> "CRIACAO".equals(e.getString("evento")));
-        assertTrue(calcular().confirmacao().isEmpty()); // FALTA sem CRIACAO não comprova a base histórica.
+        assertTrue(calcular().confirmacao().isEmpty());
     }
 
     @Test void documentosRepetidosNaoDuplicamDenominadorESnapshotsDivergentesSaoRecusados() {

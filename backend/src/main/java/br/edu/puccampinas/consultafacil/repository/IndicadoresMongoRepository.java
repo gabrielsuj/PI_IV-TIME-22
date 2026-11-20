@@ -22,16 +22,7 @@ import java.util.function.Supplier;
 import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Projections.*;
 
-/**
- * Fontes completas da #36, sem chamar listagens públicas ou rotinas de manutenção. Projeta somente
- * campos de cálculo. Inclui médicos inativos para permitir o recorte histórico; filtro inexistente
- * gera 404. A capacidade continua sendo uma estimativa pela configuração atual.
- * <p>Na visão por médico, a fila é selecionada por consultas do escopo, nunca pelo médico preferido
- * da inscrição. A visão global também verifica referências órfãs/legadas, que não são atribuíveis
- * a um médico com segurança. Não há filtro por atendidaEm ou pela data do evento de confirmação.</p>
- */
 public final class IndicadoresMongoRepository implements IndicadoresLeituraRepository {
-    /** Porta de leituras internas completas, separada do cálculo para testes sem banco. */
     public interface Fontes {
         List<ObjectId> medicos(Optional<ObjectId> medico);
         List<Document> consultas(PeriodoIndicadores periodo, Optional<ObjectId> medico);
@@ -125,12 +116,6 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
         if (anterior != null && !anterior.equals(consulta)) throw new IllegalStateException("Snapshots divergentes da mesma consulta");
     }
 
-    /**
-     * Conferência otimista, inclusive de consultas novas/remarcadas e vínculos antes ausentes.
-     * Cada consulta às fontes é repetida uma vez, sem limite/paginação nem repetição de escritas.
-     * Compara documentos completos da projeção, sem depender da ordem de retorno do Mongo.
-     * Não é uma transação/snapshot atômico: mudanças observadas invalidam toda a resposta com 503.
-     */
     private static final class LeituraConferida {
         private final DocumentCodec codec = new DocumentCodec();
         private final List<Runnable> conferencias = new ArrayList<>();
@@ -157,7 +142,6 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
     }
 
     private static final class FontesMongo implements Fontes {
-        /** Tamanho do $in, não limite da quantidade de documentos retornados. */
         private static final int TAMANHO_LOTE = 500;
         private static final Bson CONSULTA = include("_id", "medicoId", "inicio", "status", "eventosPendentes._id", "versao");
         private final MongoDatabase db;

@@ -318,16 +318,15 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals(1, atendida.consultasNaoCanceladas());
         assertEquals(new BigDecimal("100.00"), atendida.preenchimentoFila().orElseThrow().percentual());
 
-        // Dois vínculos persistidos para a mesma reserva continuam representando uma consulta.
         db.getCollection("filaEspera").insertOne(new Document(fila(segundo)).append("_id", new ObjectId()));
-        agendar(PACIENTES.get(9), MEDICO, VAGA.plus(Duration.ofHours(1))); // Reserva direta, sem origem na fila.
+        agendar(PACIENTES.get(9), MEDICO, VAGA.plus(Duration.ofHours(1)));
         var mista = indicadorPreenchimentoFila();
         assertEquals(1, mista.preenchidasPelaFila());
         assertEquals(2, mista.consultasNaoCanceladas());
         assertEquals(new BigDecimal("50.00"), mista.preenchimentoFila().orElseThrow().percentual());
 
         cancelar(reservaDaFila);
-        assertEquals("ATENDIDA", fila(segundo).getString("status")); // O vínculo histórico não é apagado.
+        assertEquals("ATENDIDA", fila(segundo).getString("status"));
         var aposCancelar = indicadorPreenchimentoFila();
         assertEquals(0, aposCancelar.preenchidasPelaFila());
         assertEquals(1, aposCancelar.consultasNaoCanceladas());

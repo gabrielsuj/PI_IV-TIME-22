@@ -17,7 +17,6 @@ import java.util.*;
 import static br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Consolidação real com fontes em memória; os contratos BSON e o banco real têm testes separados. */
 class IndicadoresMongoRepositoryTest {
     @ParameterizedTest
     @ValueSource(strings = {"medicos", "novaConsulta", "remarcacao", "versao", "pendencias", "agenda", "bloqueio", "ocupante", "historico", "fila", "vinculo"})
@@ -61,7 +60,7 @@ class IndicadoresMongoRepositoryTest {
         assertEquals(4, r.confirmacao().registradas());
         for (String fonte : List.of("medicos", "consultas", "agendas", "historico", "fila"))
             assertEquals(2, Collections.frequency(f.chamadas, fonte), fonte);
-        assertEquals(4, f.janelas.size()); // Bloqueios e ocupantes lidos duas vezes.
+        assertEquals(4, f.janelas.size());
     }
 
     @Test void medicoScopadoInicialmenteVazioDetectaConsultaCriadaDuranteLeitura() {
@@ -195,7 +194,7 @@ class IndicadoresMongoRepositoryTest {
         f.consultas.add(new Document(intervalo("2026-11-24T03:00:00Z", "2026-11-24T03:30:00Z"))
                 .append("_id", new ObjectId()).append("medicoId", MEDICO).append("status", "CONCLUIDA"));
         var r = new IndicadoresMongoRepository(f).ler(PERIODO, Optional.of(MEDICO));
-        assertEquals(0, r.consultas().concluidas()); // início fora da população de consultas.
+        assertEquals(0, r.consultas().concluidas());
         assertEquals(1, r.capacidade().total());
         assertEquals(1, r.capacidade().ocupadas());
         assertTrue(f.janelas.stream().allMatch(j -> j.inicio().equals(Instant.parse("2026-11-24T02:30:00Z"))

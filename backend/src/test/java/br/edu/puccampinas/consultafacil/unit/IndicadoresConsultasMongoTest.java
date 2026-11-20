@@ -18,7 +18,6 @@ import java.util.*;
 import static br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Contratos de consultas/projeções do driver. O dublê registra BSON; não executa nem interpreta filtros. */
 class IndicadoresConsultasMongoTest {
     @Test void filtrosProtegemEscopoDatasStatusEProjecoesSemUsarTimelineTruncada() {
         var db = new DriverLeituras(fixture());
@@ -60,7 +59,7 @@ class IndicadoresConsultasMongoTest {
         assertEquals(501, resultado.fila().preenchidas());
         for (String colecao : List.of("historico", "filaEspera")) {
             var lotes = db.daColecao(colecao);
-            assertEquals(4, lotes.size()); // Dois lotes em cada uma das duas leituras completas.
+            assertEquals(4, lotes.size());
             String chave = colecao.equals("historico") ? "consultaId" : "consultaAgendadaId";
             Set<BsonValue> ids = new HashSet<>();
             for (Leitura lote : lotes) for (BsonDocument clausula : clausulas(lote.filtro)) {
@@ -81,7 +80,7 @@ class IndicadoresConsultasMongoTest {
         new IndicadoresMongoRepository(db.banco()).ler(PERIODO, Optional.empty());
         assertEquals(BsonDocument.parse("{status: 'ATENDIDA'}"), db.daColecao("filaEspera").getFirst().filtro);
         var consultas = db.daColecao("consultas");
-        assertEquals(6, consultas.size()); // Coorte, ocupantes e vínculos, com conferência de cada fonte.
+        assertEquals(6, consultas.size());
         assertEquals(new BsonArray(List.of(new BsonObjectId(fora))), consultas.getLast().filtro.getDocument("_id").getArray("$in"));
     }
 

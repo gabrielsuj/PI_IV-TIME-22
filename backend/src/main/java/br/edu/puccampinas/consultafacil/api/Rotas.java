@@ -18,7 +18,6 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET/PUT /agendas             |    -     |   ✓    |   ✓
  *  GET/POST/DELETE /bloqueios   |    -     |   ✓    |   ✓
  *  GET  /consultas (calendário) |    -     |   ✓    |   ✓
- *  GET  /indicadores (#36)      |    -     |   ✓    |   ✓ (médico só seu cadastro)
  *  GET  /pacientes[/{id}]       |    -     |   ✓    |   ✓
  *  POST/PUT /pacientes[/{id}]   |    -     |   -    |   ✓
  *  GET /medicos, /especialidades[/{id}] | ✓ | ✓ | ✓
