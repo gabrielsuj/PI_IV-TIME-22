@@ -48,7 +48,7 @@ public class Cliente implements AutoCloseable {
 
         Comunicado resposta = null;
         do {
-            resposta = (Comunicado)(servidor.espie());
+            resposta = servidor.envie();
         } while(!(resposta instanceof ValidarCPFResponse));
 
         return (ValidarCPFResponse)(resposta);

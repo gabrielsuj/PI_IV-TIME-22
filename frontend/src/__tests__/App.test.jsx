@@ -5,6 +5,8 @@ import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
 import { entrarComo } from './sessaoTeste';
+import { indicadoresDaUrl } from './fixtures/indicadores';
+import { agendaPainel } from './fixtures/consultasPainel';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -18,7 +20,15 @@ function renderAt(path) {
 }
 
 function mockHealth(implementation) {
-  const fetchMock = vi.fn(implementation);
+  const fetchMock = vi.fn((url, options) => {
+    const caminho = new URL(url).pathname;
+    let dados;
+    if (caminho === '/indicadores') dados = indicadoresDaUrl(url);
+    else if (caminho === '/agendas') dados = agendaPainel();
+    else if (['/medicos', '/consultas', '/consultas/lista'].includes(caminho)) dados = [];
+    else return implementation(url, options);
+    return Promise.resolve(new Response(JSON.stringify(dados), { headers: { 'Content-Type': 'application/json' } }));
+  });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
@@ -46,10 +56,37 @@ describe('roteamento', () => {
     mockHealth(healthy);
     renderAt('/');
 
-    expect(screen.getByRole('heading', { level: 1, name: 'ConsultaFácil' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Painel operacional' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Navegação principal' });
     expect(within(nav).getByRole('link', { name: 'Início' })).toHaveClass('active');
     expect(await screen.findByText('API disponível')).toBeInTheDocument();
+  });
+
+  it.each(['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'])('a entrada inicial e os acessos respeitam o perfil %s', async (perfil) => {
+    entrarComo({ id: 'u-inicio', nome: 'Teste', perfil });
+    const fetchMock = mockHealth(healthy);
+    renderAt('/');
+    expect(await screen.findByText('API disponível')).toBeInTheDocument();
+    const main = within(screen.getByRole('main'));
+    const paciente = perfil === 'PACIENTE';
+    expect(main.getByRole('heading', { level: 1, name: paciente ? 'Minha área' : 'Painel operacional' })).toBeInTheDocument();
+    if (paciente) {
+      expect(main.getByRole('link', { name: 'Ver minhas consultas' })).toHaveAttribute('href', '/consultas');
+      expect(main.getByRole('link', { name: 'Ver avisos de vaga' })).toHaveAttribute('href', '/avisos-vaga');
+      expect(main.getByRole('link', { name: 'Ver notificações' })).toHaveAttribute('href', '/notificacoes');
+      expect(main.queryByRole('link', { name: 'Abrir calendário' })).not.toBeInTheDocument();
+      expect(main.queryByRole('heading', { name: /indicadores|painel operacional/i })).not.toBeInTheDocument();
+    } else {
+      const calendario = new URL(main.getByRole('link', { name: 'Abrir calendário' }).getAttribute('href'), 'http://app.teste');
+      expect(calendario.pathname).toBe('/calendario');
+      expect(calendario.searchParams.get('visao')).toBe('dia');
+      expect(main.getByRole('link', { name: 'Ver consultas' })).toHaveAttribute('href', '/consultas');
+      expect(main.queryByRole('link', { name: 'Ver avisos de vaga' })).not.toBeInTheDocument();
+    }
+    if (perfil === 'MEDICO') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+    else expect(main.getByRole('link', { name: 'Nova consulta' })).toHaveAttribute('href', '/nova-consulta');
+    if (paciente) expect(fetchMock.mock.calls.every(([url]) => url === 'http://api.teste/health')).toBe(true);
+    else expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/indicadores')).toBe(true);
   });
 
   it('navega para a página de status pelo menu', async () => {
@@ -114,6 +151,6 @@ describe('verificação do /health', () => {
     await user.click(screen.getByRole('button', { name: 'Verificar novamente' }));
 
     expect(await screen.findByText('API disponível')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url === 'http://api.teste/health')).toHaveLength(2);
   });
 });

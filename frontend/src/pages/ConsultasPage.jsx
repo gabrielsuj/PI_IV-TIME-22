@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import { LIMITE_LISTAGEM, listarConsultas } from '../services/consultasService';
 import { dataHoraDaConsulta, STATUS_CONSULTA } from '../utils/consulta';
+import { origemPainel, retornoPainel } from '../utils/painel';
 
 const idDe = (registro) => registro.id || registro._id;
 
@@ -40,6 +41,9 @@ function useConsultas(filtros) {
 
 export default function ConsultasPage() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
+  const retorno = retornoPainel(location, usuario);
   const perfil = usuario?.perfil;
   const [params, setParams] = useSearchParams();
   const periodo = params.get('periodo') === 'anteriores' ? 'anteriores' : 'proximas';
@@ -52,7 +56,7 @@ export default function ConsultasPage() {
 
   const filtrar = (mudancas) => {
     const proximo = { periodo, status, medicoId, ...mudancas };
-    setParams(Object.fromEntries(Object.entries(proximo).filter(([chave, valor]) => valor && !(chave === 'periodo' && valor === 'proximas'))));
+    setParams(Object.fromEntries(Object.entries(proximo).filter(([chave, valor]) => valor && !(chave === 'periodo' && valor === 'proximas'))), { state: origem });
   };
 
   const colunas = [
@@ -68,7 +72,7 @@ export default function ConsultasPage() {
     {
       key: 'acoes', label: 'Ações', align: 'right',
       render: (c) => (
-        <Button to={`/consultas/${c.id}`} variant="outline" size="sm"
+        <Button to={`/consultas/${encodeURIComponent(c.id)}`} state={origem} variant="outline" size="sm"
           aria-label={`Ver detalhes da consulta de ${dataHoraDaConsulta(c).data}, ${dataHoraDaConsulta(c).periodo}`}>
           Ver detalhes
         </Button>
@@ -81,7 +85,10 @@ export default function ConsultasPage() {
   return (
     <div className="page">
       <PageHeader title={textos.titulo} description={textos.descricao}
-        action={perfil !== 'MEDICO' && <Button to="/nova-consulta">Nova consulta</Button>} />
+        action={(retorno || perfil !== 'MEDICO') && <div className="cal-nav">
+          {retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>}
+          {perfil !== 'MEDICO' && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>}
+        </div>} />
 
       <Card className="search-card">
         <div className="cal-controles">

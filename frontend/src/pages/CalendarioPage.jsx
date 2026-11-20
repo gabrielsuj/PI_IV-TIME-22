@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -14,6 +14,7 @@ import {
   agoraNoFuso, diasDaSemana, horariosDoCalendario, rotuloDia, rotuloDiaCompleto, somarDias,
 } from '../utils/calendario';
 import { hoje } from '../utils/horario';
+import { origemPainel, retornoPainel } from '../utils/painel';
 
 const ESTADOS = {
   livre: { rotulo: 'Livre', tom: 'success' },
@@ -145,6 +146,9 @@ function Dia({ horarios, canceladas }) {
 export default function CalendarioPage() {
   const [params, setParams] = useSearchParams();
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
+  const retorno = retornoPainel(location, usuario);
   const agendaPropria = usuario.perfil === 'MEDICO';
   const medicoId = agendaPropria ? 'meu' : params.get('medicoId') ?? '';
   const visao = params.get('visao') === 'dia' ? 'dia' : 'semana';
@@ -159,7 +163,7 @@ export default function CalendarioPage() {
 
   const ir = (mudancas) => {
     const proximo = { medicoId: agendaPropria ? undefined : medicoId, visao, data, ...mudancas };
-    setParams(Object.fromEntries(Object.entries(proximo).filter(([, valor]) => valor)));
+    setParams(Object.fromEntries(Object.entries(proximo).filter(([, valor]) => valor)), { state: origem });
   };
   const passo = visao === 'semana' ? 7 : 1;
 
@@ -175,7 +179,9 @@ export default function CalendarioPage() {
 
   return (
     <div className="page">
-      <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados." />
+      <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados."
+        action={retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>} />
+      {dados.agenda && <p className="page__lead">Horários no fuso da agenda: {dados.agenda.fusoHorario}.</p>}
 
       <Card className="search-card">
         <div className="cal-controles">
