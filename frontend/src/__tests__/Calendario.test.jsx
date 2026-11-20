@@ -18,10 +18,13 @@ const AGENDA = {
   ],
 };
 
-function mockApi({ agenda = AGENDA, consultas = [], bloqueios = [] } = {}) {
+function mockApi({
+  agenda = AGENDA, consultas = [], bloqueios = [],
+  medicos = () => json([{ id: 'm1', nome: 'Ana Martins', crmNumero: '123', crmUf: 'SP', ativo: true }]),
+} = {}) {
   const fetchMock = vi.fn(async (url) => {
     const { pathname } = new URL(url);
-    if (pathname === '/medicos') return json([{ id: 'm1', nome: 'Ana Martins', crmNumero: '123', crmUf: 'SP', ativo: true }]);
+    if (pathname === '/medicos') return medicos();
     if (pathname === '/agendas') return agenda ? json(agenda) : json({ status: 404, erro: 'Agenda não configurada' }, 404);
     if (pathname === '/bloqueios') return json(bloqueios);
     if (pathname === '/consultas') return json(consultas);
@@ -128,6 +131,28 @@ describe('tela do calendário', () => {
     expect(consultas.searchParams.get('de')).toBe('2026-11-09');
     expect(consultas.searchParams.get('ate')).toBe('2026-11-15');
     expect(screen.getByText('09/11 a 15/11/2026')).toBeInTheDocument();
+  });
+
+  it('recarrega o catálogo preservando médico, data e visão do calendário', async () => {
+    const medicos = vi.fn()
+      .mockReturnValueOnce(json({ erro: 'Serviço indisponível' }, 503))
+      .mockImplementation(() => json([{ id: 'm1', nome: 'Ana Martins', ativo: true }]));
+    const fetchMock = mockApi({ medicos });
+    const user = userEvent.setup();
+    const router = renderAt('/calendario?medicoId=m1&data=2026-11-09&visao=dia');
+
+    const erro = await screen.findByRole('alert');
+    expect(erro).toHaveTextContent('Não foi possível carregar a lista de médicos.');
+    expect(screen.getByRole('combobox', { name: 'Médico' })).toHaveValue('m1');
+    expect(await screen.findByText('08:00 – 08:30')).toBeInTheDocument();
+    const contexto = router.state.location.search;
+
+    await user.click(within(erro).getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByRole('option', { name: 'Ana Martins' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Médico' })).toHaveValue('m1');
+    expect(screen.getByRole('button', { name: 'Dia' })).toHaveAttribute('aria-pressed', 'true');
+    expect(router.state.location.search).toBe(contexto);
+    expect(chamadasPara(fetchMock, '/consultas')).toHaveLength(1);
   });
 
   it('avança e volta uma semana', async () => {

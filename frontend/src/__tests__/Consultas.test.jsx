@@ -25,10 +25,11 @@ const consulta = (id, extra = {}) => ({
  * Devolve o fetch simulado para conferir as chamadas.
  */
 function mockApi({ lista = [consulta('c1')], detalhes = { c1: consulta('c1') }, cancelar = () => json(consulta('c1', { status: 'CANCELADA' })),
-  alterarStatus = (_id, pedido) => json(consulta('c1', { status: pedido.status })), historico = [] } = {}) {
+  alterarStatus = (_id, pedido) => json(consulta('c1', { status: pedido.status })), historico = [],
+  medicos = () => json([{ id: 'm1', nome: 'Ana Martins', ativo: true }, { id: 'm2', nome: 'Bruno Lima', ativo: true }]) } = {}) {
   const fetchMock = vi.fn(async (url, init = {}) => {
     const { pathname } = new URL(url);
-    if (pathname === '/medicos') return json([{ id: 'm1', nome: 'Ana Martins', ativo: true }, { id: 'm2', nome: 'Bruno Lima', ativo: true }]);
+    if (pathname === '/medicos') return medicos();
     if (pathname === '/consultas/lista') return typeof lista === 'function' ? lista(url) : json(lista);
     const cancelamento = pathname.match(/^\/consultas\/([^/]+)\/cancelamento$/);
     if (cancelamento && init.method === 'POST') return cancelar(cancelamento[1], JSON.parse(init.body ?? '{}'));
@@ -801,7 +802,31 @@ describe('listagem de consultas', () => {
     entrarComo(PAULO);
     mockApi({ lista: () => erro(403, 'Seu login não está ligado a um cadastro de paciente. Procure a secretaria.') });
     renderAt('/consultas');
-    expect(await screen.findByText('Seu login não está ligado a um cadastro de paciente. Procure a secretaria.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Seu login não está ligado a um cadastro de paciente. Procure a secretaria.',
+    );
+    expect(screen.queryByRole('button', { name: 'Tentar novamente' })).not.toBeInTheDocument();
+  });
+
+  it('permite recuperar o catálogo de médicos sem perder os filtros de consulta', async () => {
+    entrarComo();
+    let falhar = true;
+    const fetchMock = mockApi({ medicos: () => falhar
+      ? erro(503, 'Catálogo temporariamente indisponível.')
+      : json([{ id: 'm1', nome: 'Ana Martins', ativo: true }]) });
+    const user = userEvent.setup();
+    renderAt('/consultas?medicoId=m1&status=AGENDADA');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Catálogo temporariamente indisponível.');
+    expect(screen.getByLabelText('Médico')).toHaveValue('m1');
+    expect(screen.getByLabelText('Médico')).toBeDisabled();
+    expect(screen.getByLabelText('Status')).toHaveValue('AGENDADA');
+    falhar = false;
+    await user.click(screen.getByRole('button', { name: 'Tentar carregar médicos novamente' }));
+    expect(await screen.findByRole('option', { name: 'Ana Martins' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Médico')).toHaveValue('m1');
+    expect(screen.getByLabelText('Médico')).toBeEnabled();
+    expect(chamadas(fetchMock, '/consultas/lista')).toHaveLength(1);
   });
 
   it('abre o detalhe pelo botão da linha', async () => {

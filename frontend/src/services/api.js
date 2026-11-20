@@ -76,12 +76,14 @@ async function parseBody(response) {
 
 function errorMessageFrom(data, status) {
   if (data && typeof data === 'object') {
-    if (typeof data.message === 'string') return data.message;
-    if (typeof data.mensagem === 'string') return data.mensagem;
-    if (typeof data.erro === 'string') return data.erro;
-    if (typeof data.error === 'string') return data.error;
-    if (typeof data.error?.message === 'string') return data.error.message;
+    const mensagens = [data.message, data.mensagem, data.erro, data.error, data.error?.message];
+    const mensagem = mensagens.find((valor) => typeof valor === 'string' && valor.trim());
+    if (mensagem) return mensagem;
   }
+  if (status === 400 || status === 422) return 'Revise os dados informados e tente novamente.';
+  if (status === 403) return 'Seu perfil não tem permissão para esta operação.';
+  if (status === 409) return 'Houve um conflito. Confira os dados atualizados antes de tentar novamente.';
+  if (status >= 500) return 'A API está temporariamente indisponível. Tente novamente.';
   return `A API respondeu com erro (HTTP ${status}).`;
 }
 
@@ -119,8 +121,10 @@ export async function request(
   }
 
   let response;
+  let data;
   try {
     response = await fetch(buildUrl(path, params), init);
+    data = await parseBody(response);
   } catch (error) {
     if (signal?.aborted) throw error;
     if (timeoutSignal.aborted) {
@@ -135,10 +139,13 @@ export async function request(
     });
   }
 
-  const data = await parseBody(response);
   if (!response.ok) {
-    // Token recusado (expirado, inválido ou encerrado no servidor): volta para o login.
-    if (response.status === 401 && accessToken) encerrarSessaoExpirada();
+    // Uma resposta atrasada só encerra a sessão associada ao token enviado.
+    if (response.status === 401 && accessToken && accessToken === sessionStorage.getItem(TOKEN_KEY)) {
+      const authorization = new Headers(finalHeaders).get('Authorization');
+      const tokenEnviado = authorization?.match(/^Bearer (.+)$/i)?.[1].trim();
+      if (tokenEnviado === accessToken) encerrarSessaoExpirada();
+    }
     throw new ApiError(errorMessageFrom(data, response.status), {
       status: response.status,
       data,
