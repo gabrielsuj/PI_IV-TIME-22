@@ -1,6 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useAgendaDoDia } from '../../hooks/useConsultasPainel';
 import { FUSO_CLINICA, STATUS_CONSULTA } from '../../utils/consulta';
+import { origemPainel } from '../../utils/painel';
 import Alert from '../ui/Alert';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
@@ -12,6 +13,8 @@ const horario = (valor, dia) => `${valor.slice(11)}${valor.slice(0, 10) === dia 
 
 export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
   const propria = usuario?.perfil === 'MEDICO';
   const medicoId = propria ? 'meu' : filtro;
   const { permitido, carregando, dados, erro, atualizar } = useAgendaDoDia(medicoId, dia);
@@ -22,6 +25,10 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
     { key: 'pacienteNome', label: 'Paciente' },
     { key: 'especialidadeNome', label: 'Especialidade' },
     { key: 'status', label: 'Status', render: (c) => <Badge tone={STATUS_CONSULTA[c.status].tom}>{STATUS_CONSULTA[c.status].rotulo}</Badge> },
+    { key: 'acoes', label: 'Ações', align: 'right', render: (c) => <Button to={`/consultas/${encodeURIComponent(c.id)}`}
+      state={origem} variant="outline" size="sm" aria-label={`Ver detalhes da consulta de ${c.pacienteNome || 'paciente não informado'}, ${horario(c.inicio, dia)}`}>
+      Ver detalhes
+    </Button> },
   ];
 
   return (
@@ -38,3 +45,4 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
     </Card>
   );
 }
+import { useLocation } from 'react-router';

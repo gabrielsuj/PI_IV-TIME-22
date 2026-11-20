@@ -1,10 +1,10 @@
 import { Link } from 'react-router';
 
-export default function Button({ children, variant = 'primary', size = 'md', loading = false, disabled, className = '', to, type = 'button', ...props }) {
+export default function Button({ children, variant = 'primary', size = 'md', loading = false, disabled, className = '', to, state, type = 'button', ...props }) {
   const classes = `button button--${variant} button--${size} ${className}`.trim();
 
   if (to && !disabled && !loading) {
-    return <Link to={to} className={classes} {...props}>{children}</Link>;
+    return <Link to={to} state={state} className={classes} {...props}>{children}</Link>;
   }
 
   return (

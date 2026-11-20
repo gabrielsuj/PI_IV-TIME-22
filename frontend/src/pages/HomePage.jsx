@@ -5,6 +5,8 @@ import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
+import { agoraNoFuso } from '../utils/calendario';
+import { atalhosPainel, origemPainel } from '../utils/painel';
 
 const SHORTCUTS = [
   { to: '/pacientes', title: 'Pacientes', description: 'Informações de identificação e contato.', resource: 'pacientes' },
@@ -13,7 +15,7 @@ const SHORTCUTS = [
 ];
 
 const OPERATIONAL_SHORTCUTS = [
-  { to: '/calendario', title: 'Calendário', description: 'Visualize os horários e os atendimentos agendados.', label: 'Abrir calendário' },
+  { to: '/calendario', title: 'Calendário', description: 'Visualize os horários e os atendimentos no fuso da agenda do médico.', label: 'Abrir calendário' },
   { to: '/consultas', title: 'Consultas', description: 'Acompanhe as consultas e abra os detalhes dos atendimentos.', label: 'Ver consultas' },
 ];
 
@@ -25,8 +27,12 @@ const PATIENT_SHORTCUTS = [
 
 export default function HomePage() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const [hoje] = useState(() => agoraNoFuso().slice(0, 10));
   const perfil = usuario?.perfil;
   const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
+  const destinos = atalhosPainel(location.search, perfil, hoje);
+  const origem = origemPainel(location, usuario);
   const acessos = (operacional ? OPERATIONAL_SHORTCUTS : PATIENT_SHORTCUTS).filter(({ to }) => podeAbrir(to, perfil));
   const shortcuts = SHORTCUTS.filter(({ to }) => podeAbrir(to, perfil));
   const action = perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
@@ -39,11 +45,15 @@ export default function HomePage() {
   return (
     <div className="page">
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
-        action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
-      {operacional && <PainelOperacional />}
+        action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>} />
+      {operacional && <PainelOperacional hoje={hoje} />}
       <div className="record-grid">
         {acessos.map(({ to, title, description, label }) => (
-          <Card key={to} title={title} description={description}><Button to={to} variant="outline">{label}</Button></Card>
+          <Card key={to} title={title} description={description}>
+            <Button to={operacional ? destinos[to === '/calendario' ? 'calendario' : 'consultas'] : to}
+              disabled={operacional && !destinos[to === '/calendario' ? 'calendario' : 'consultas']}
+              state={origem} variant="outline">{label}</Button>
+          </Card>
         ))}
       </div>
       {shortcuts.length > 0 && <div className="record-grid">
@@ -58,3 +68,5 @@ export default function HomePage() {
     </div>
   );
 }
+import { useState } from 'react';
+import { useLocation } from 'react-router';

@@ -77,7 +77,9 @@ describe('roteamento', () => {
       expect(main.queryByRole('link', { name: 'Abrir calendário' })).not.toBeInTheDocument();
       expect(main.queryByRole('heading', { name: /indicadores|painel operacional/i })).not.toBeInTheDocument();
     } else {
-      expect(main.getByRole('link', { name: 'Abrir calendário' })).toHaveAttribute('href', '/calendario');
+      const calendario = new URL(main.getByRole('link', { name: 'Abrir calendário' }).getAttribute('href'), 'http://app.teste');
+      expect(calendario.pathname).toBe('/calendario');
+      expect(calendario.searchParams.get('visao')).toBe('dia');
       expect(main.getByRole('link', { name: 'Ver consultas' })).toHaveAttribute('href', '/consultas');
       expect(main.queryByRole('link', { name: 'Ver avisos de vaga' })).not.toBeInTheDocument();
     }

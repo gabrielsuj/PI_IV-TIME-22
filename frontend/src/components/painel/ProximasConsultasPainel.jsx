@@ -3,6 +3,7 @@ import { useProximasConsultas } from '../../hooks/useConsultasPainel';
 import { LIMITE_LISTAGEM } from '../../services/consultasService';
 import { LIMITE_PROXIMAS_PAINEL } from '../../services/painelConsultasService';
 import { dataHoraDaConsulta, FUSO_CLINICA, STATUS_CONSULTA } from '../../utils/consulta';
+import { origemPainel } from '../../utils/painel';
 import Alert from '../ui/Alert';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
@@ -11,6 +12,8 @@ import DataTable from '../ui/DataTable';
 
 export default function ProximasConsultasPainel({ medicoId }) {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
   const { permitido, carregando, dados, erro, atualizar } = useProximasConsultas(medicoId);
   if (!permitido) return null;
 
@@ -21,6 +24,11 @@ export default function ProximasConsultasPainel({ medicoId }) {
     usuario?.perfil !== 'MEDICO' && { key: 'medicoNome', label: 'Médico' },
     { key: 'especialidadeNome', label: 'Especialidade' },
     { key: 'status', label: 'Status', render: (c) => <Badge tone={STATUS_CONSULTA[c.status].tom}>{STATUS_CONSULTA[c.status].rotulo}</Badge> },
+    { key: 'acoes', label: 'Ações', align: 'right', render: (c) => <Button to={`/consultas/${encodeURIComponent(c.id)}`}
+      state={origem} variant="outline" size="sm"
+      aria-label={`Ver detalhes da consulta de ${c.pacienteNome || 'paciente não informado'}, ${dataHoraDaConsulta(c).data}, ${dataHoraDaConsulta(c).periodo}`}>
+      Ver detalhes
+    </Button> },
   ].filter(Boolean);
 
   return (
@@ -36,7 +44,8 @@ export default function ProximasConsultasPainel({ medicoId }) {
       {dados?.limiteAtingido && <Alert tone="info">
         A listagem está limitada às primeiras {LIMITE_LISTAGEM} consultas. Use os filtros na página de consultas para encontrar outras.
       </Alert>}
-      <Button to={medicoId ? `/consultas?medicoId=${encodeURIComponent(medicoId)}` : '/consultas'} variant="outline">Abrir lista de consultas</Button>
+      <Button to={medicoId ? `/consultas?medicoId=${encodeURIComponent(medicoId)}` : '/consultas'} state={origem} variant="outline">Abrir lista de consultas</Button>
     </Card>
   );
 }
+import { useLocation } from 'react-router';

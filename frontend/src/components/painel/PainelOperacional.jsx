@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useRecords } from '../../hooks/useRecords';
-import { agoraNoFuso } from '../../utils/calendario';
 import { FUSO_CLINICA } from '../../utils/consulta';
 import { dataPainelValida, erroPeriodoPainel } from '../../utils/painel';
 import Alert from '../ui/Alert';
@@ -13,11 +11,10 @@ import AgendaDiaPainel from './AgendaDiaPainel';
 import IndicadoresPainel from './IndicadoresPainel';
 import ProximasConsultasPainel from './ProximasConsultasPainel';
 
-export default function PainelOperacional() {
+export default function PainelOperacional({ hoje }) {
   const { usuario } = useAuth();
   const secretaria = usuario?.perfil === 'SECRETARIA_ADMIN';
   const permitido = secretaria || usuario?.perfil === 'MEDICO';
-  const [hoje] = useState(() => agoraNoFuso(FUSO_CLINICA).slice(0, 10));
   const [params, setParams] = useSearchParams();
   const medicos = useRecords(secretaria ? 'medicos' : null);
   if (!permitido) return null;
