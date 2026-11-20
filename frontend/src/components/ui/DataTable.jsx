@@ -1,10 +1,14 @@
+import { useId } from 'react';
 import Button from './Button';
 
-export default function DataTable({ caption, columns, rows = [], loading, error, onRetry, emptyMessage = 'Nenhum registro encontrado.', loadingMessage = 'Carregando registros…', getRowKey = (row) => row.id || row._id }) {
+export default function DataTable({ caption, columns, rows = [], loading, error, onRetry, scrollHint, emptyMessage = 'Nenhum registro encontrado.', loadingMessage = 'Carregando registros…', getRowKey = (row) => row.id || row._id }) {
+  const hintId = useId();
   const message = loading ? loadingMessage : error ? 'Não foi possível carregar os registros.' : emptyMessage;
 
   return (
-    <div className="table-scroll" tabIndex={0} role="region" aria-label={caption} aria-busy={loading || undefined}>
+    <>
+    {scrollHint && <p id={hintId} className="page__lead">{scrollHint}</p>}
+    <div className="table-scroll" tabIndex={0} role="region" aria-label={caption} aria-describedby={scrollHint ? hintId : undefined} aria-busy={loading || undefined}>
       <table className="data-table">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -25,5 +29,6 @@ export default function DataTable({ caption, columns, rows = [], loading, error,
         </tbody>
       </table>
     </div>
+    </>
   );
 }

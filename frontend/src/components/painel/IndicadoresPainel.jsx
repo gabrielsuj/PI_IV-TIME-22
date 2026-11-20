@@ -50,7 +50,7 @@ export default function IndicadoresPainel({ de, ate, medicoId }) {
             const taxa = dados[campo];
             const situacao = SITUACOES[taxa.situacao];
             return (
-              <Card key={campo} title={titulo}>
+              <Card key={campo} title={titulo} headingLevel={3}>
                 <p className="indicador__valor">{taxa.percentual === null ? '—' : `${percentual.format(taxa.percentual)}%`}</p>
                 {situacao && <Badge tone={situacao.tone}>{situacao.rotulo}</Badge>}
                 <p className="card__description">{apoio(numero.format(taxa.numerador), numero.format(taxa.denominador))}</p>

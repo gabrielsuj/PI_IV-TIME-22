@@ -1,14 +1,15 @@
 import { useId } from 'react';
 
-export default function Card({ title, description, action, children, className = '', ...props }) {
+export default function Card({ title, description, action, children, headingLevel = 2, className = '', ...props }) {
   const titleId = useId();
+  const Heading = `h${headingLevel}`;
 
   return (
     <section className={`card ${className}`.trim()} aria-labelledby={title ? titleId : undefined} {...props}>
       {(title || action) && (
         <header className="card__header">
           <div>
-            {title && <h2 id={titleId} className="card__title">{title}</h2>}
+            {title && <Heading id={titleId} className="card__title">{title}</Heading>}
             {description && <p className="card__description">{description}</p>}
           </div>
           {action}

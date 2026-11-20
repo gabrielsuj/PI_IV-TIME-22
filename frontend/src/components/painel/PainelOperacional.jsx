@@ -62,7 +62,7 @@ export default function PainelOperacional({ hoje }) {
       </Alert>}
       {secretaria && medicos.loading && <p role="status">Carregando lista de médicos…</p>}
       {secretaria && !medicos.loading && !medicos.error && medicos.records.length === 0 && <p role="status">Nenhum médico cadastrado.</p>}
-      <p className="page__lead">Escopo do painel: {escopo}.</p>
+      <p className="page__lead" role="status" aria-atomic="true">Escopo do painel: {escopo}.</p>
     </Card>
     {!medicoValido ? <Alert>O filtro de médico é inválido. Selecione um médico ou todos os médicos.</Alert> : <>
       {!erroPeriodo && <IndicadoresPainel de={de} ate={ate} medicoId={medicoId} />}

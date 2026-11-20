@@ -37,6 +37,7 @@ export default function ProximasConsultasPainel({ medicoId }) {
       action={<Button variant="outline" onClick={atualizar} loading={carregando}>Atualizar próximas consultas</Button>}>
       {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar próximas consultas novamente</Button>}>{erro.message}</Alert>
         : <DataTable caption="Resumo das próximas consultas" columns={colunas} rows={dados?.consultas ?? []}
+          scrollHint="Para ver todas as colunas, deslize a tabela para os lados ou coloque-a em foco e use as setas."
           loading={carregando} loadingMessage="Carregando próximas consultas…" emptyMessage="Nenhuma próxima consulta encontrada." />}
       {dados && dados.totalRecebido > LIMITE_PROXIMAS_PAINEL && <p className="page__lead">
         Mostrando {dados.consultas.length} de {dados.totalRecebido} consultas recebidas.

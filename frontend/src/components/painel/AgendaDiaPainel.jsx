@@ -41,6 +41,7 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro }) {
         {dados?.semAgenda && <Alert tone="info">Este médico ainda não tem agenda configurada. As consultas existentes continuam listadas.</Alert>}
         {erro ? <Alert action={<Button variant="outline" onClick={atualizar}>Tentar carregar agenda novamente</Button>}>{erro.message}</Alert>
           : <DataTable caption="Consultas na agenda do dia" columns={colunas} rows={dados?.consultas ?? []}
+            scrollHint="Para ver todas as colunas, deslize a tabela para os lados ou coloque-a em foco e use as setas."
             loading={carregando} loadingMessage="Carregando agenda do dia…" emptyMessage="Nenhuma consulta na agenda deste dia." />}
       </>}
     </Card>

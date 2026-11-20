@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useLocation } from 'react-router';
 import ApiStatus from '../components/ApiStatus';
 import PainelOperacional from '../components/painel/PainelOperacional';
 import Button from '../components/ui/Button';
@@ -43,7 +45,7 @@ export default function HomePage() {
     : 'Agende consultas e acompanhe seus atendimentos e avisos de vaga.';
 
   return (
-    <div className="page">
+    <div className="page home-page">
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
         action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>} />
       {operacional && <PainelOperacional hoje={hoje} />}
@@ -68,5 +70,3 @@ export default function HomePage() {
     </div>
   );
 }
-import { useState } from 'react';
-import { useLocation } from 'react-router';
