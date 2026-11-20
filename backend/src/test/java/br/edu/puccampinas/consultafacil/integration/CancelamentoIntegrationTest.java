@@ -99,7 +99,7 @@ class CancelamentoIntegrationTest {
                 pacienteDoUsuario, registro);
         cancelamento = new CancelamentoService(consultas,
                 new AcessoConsulta(pacienteDoUsuario::buscar, new MedicoDoUsuarioRepository(db)::buscar),
-                registro, avisosFila::add, relogio);
+                registro, (consulta, ator) -> avisosFila.add(consulta), relogio);
     }
 
     private void salvar(String colecao, Document d) {

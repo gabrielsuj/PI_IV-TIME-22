@@ -30,7 +30,7 @@ Executados em ordem alfabética, cada um depende dos anteriores.
 - **Sem conflitos:** nenhum médico ou paciente com duas consultas ativas sobrepostas, e no máximo uma consulta por paciente no mesmo dia.
 - **Ocupação realista:** cerca de 50% da agenda no passado e na próxima semana, 30% na segunda e 15% na terceira.
 - **Status:**
-  - Passadas: CONCLUIDA (cerca de 74%), FALTA (9%) e CANCELADA (17%).
+  - Passadas: CONCLUIDA (cerca de 74%), FALTA (9%) e CANCELADA (17%). Toda consulta concluída foi confirmada antes; quem não confirmou com antecedência confirma na recepção, minutos antes do horário, como exige a API.
   - Futuras: AGENDADA ou CONFIRMADA (confirmação mais frequente nos próximos 2 dias) e cerca de 10% CANCELADA.
 - **Histórico igual ao da API:**
   - Cada consulta tem os eventos que `RegistroConsultaService` gravaria (CRIACAO, CONFIRMACAO, CONCLUSAO, FALTA ou CANCELAMENTO), com sequência 1..n, ator (perfil e id do usuário) e horários em ordem.

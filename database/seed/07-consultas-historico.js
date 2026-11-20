@@ -174,6 +174,13 @@ planos.forEach((p, i) => {
     registrar("CONFIRMACAO", "AGENDADA", "CONFIRMADA", ator, horario(inicioConfirmacao, fimConfirmacao));
     status = "CONFIRMADA";
   }
+  // A API só conclui consulta CONFIRMADA (StatusConsultaService). Quem não confirmou antes confirma na
+  // recepção, pouco antes do horário: sem isso a consulta iria de AGENDADA direto a CONCLUIDA e o
+  // indicador de confirmação ficaria sem base histórica (#48).
+  if (p.status === "CONCLUIDA" && status !== "CONFIRMADA") {
+    registrar("CONFIRMACAO", "AGENDADA", "CONFIRMADA", secretaria(), p.inicio - (5 + Math.floor(rand() * 25)) * MIN);
+    status = "CONFIRMADA";
+  }
 
   let motivoCancelamento = null;
   if (p.status === "CONCLUIDA") {
