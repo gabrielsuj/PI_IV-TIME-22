@@ -78,7 +78,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Confirmação, conclusão e falta pela interface | ✅ #28 |
 | Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
 | Central de notificações, leitura e confirmação de presença pelo lembrete | ✅ #35 |
-| Geração e envio periódico dos lembretes | 🚧 #34 |
+| Confirmação de agendamento, aviso de cancelamento e lembretes com envio periódico (e-mail de teste opcional) | ✅ #34 |
 | Indicadores e painel operacional | 🚧 #36 e #37 |
 
 O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne os cenários de demonstração e o passo a passo para publicar a versão final.
@@ -298,6 +298,9 @@ Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bas
 | `SERVER_PORT` | Porta da API | `3000` |
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
 | `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
+| `NOTIFICACOES_ANTECEDENCIA_HORAS` | Quantas horas antes da consulta o lembrete é enviado (#34) | `24` |
+| `NOTIFICACOES_INTERVALO_SEGUNDOS` | Intervalo do agendador que gera e envia os lembretes | `60` |
+| `NOTIFICACOES_EMAIL_TESTE` | `true` grava uma cópia de cada notificação do paciente no canal `EMAIL_TESTE`, "enviada" para o log do servidor com o e-mail mascarado | `false` |
 | `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:3000` |
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.
