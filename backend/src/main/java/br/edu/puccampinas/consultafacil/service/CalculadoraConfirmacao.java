@@ -20,7 +20,7 @@ import java.util.Set;
  * antigos de médico/horário no histórico não redefinem esse recorte.
  *
  * <p>Recebe fontes completas, sem o limite 100 da listagem/timeline. Não busca, grava ou processa
- * pendências; a leitura das fontes e a autorização serão integradas nas próximas etapas da #36.
+ * pendências; a leitura completa cabe ao repositório de indicadores e a autorização ao serviço.
  * Eventos CONFIRMACAO são deduplicados por consultaId. O status atual não substitui o evento.</p>
  * <p>Expõe a contagem comprovada pelos eventos projetados. Havendo caixa de pendências não vazia,
  * suspende a taxa até uma nova leitura completa. Consulta sem CRIACAO nem CONFIRMACAO projetada

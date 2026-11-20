@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Contrato e cálculo puro dos indicadores da #36. Recebe contagens completas, do mesmo período
  * e escopo de médicos, sem acesso ao banco, relógio, fila ou processador de histórico.
- * A leitura das fontes será integrada nas próximas etapas da #36; dado desconhecido não é zero.
+ * As fontes são consolidadas pelo repositório de indicadores; dado desconhecido não é zero.
  *
  * <p>Decisões do MVP (todas as consultas são distintas por consultaId):</p>
  * <ul>

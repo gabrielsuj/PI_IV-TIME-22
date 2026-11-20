@@ -1,6 +1,5 @@
 package br.edu.puccampinas.consultafacil.repository;
 
-import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.service.PeriodoIndicadores;
 import org.bson.types.ObjectId;
 
@@ -30,10 +29,5 @@ public interface IndicadoresLeituraRepository {
             Objects.requireNonNull(confirmacao, "Contagens de confirmação são obrigatórias");
             Objects.requireNonNull(fila, "Contagens da fila são obrigatórias");
         }
-    }
-
-    static IndicadoresLeituraRepository pendente() {
-        // Necessita leitura agregada da #36 (etapa 6).
-        return (periodo, medicoId) -> { throw new ApiException(503, "Indicadores temporariamente indisponíveis."); };
     }
 }

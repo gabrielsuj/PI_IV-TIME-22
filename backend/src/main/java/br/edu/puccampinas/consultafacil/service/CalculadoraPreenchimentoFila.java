@@ -23,7 +23,7 @@ import java.util.Set;
  * referenciadas pelas inscrições recebidas, inclusive fora do recorte. Uma referência não encontrada
  * pode indicar fonte incompleta ou vínculo órfão; a taxa fica indefinida, sem inventar zero.</p>
  * <p>Cálculo puro, sem expirar/revisar fila, sinalizar, reservar ou recuperar histórico. As leituras
- * das fontes e a autorização serão integradas nas próximas etapas da #36. Não reconstrói vínculos
+ * das fontes cabem ao repositório de indicadores e a autorização ao serviço. Não reconstrói vínculos
  * de inscrições legadas sem consultaAgendadaId e não modifica o fluxo de atendimento existente.</p>
  */
 public final class CalculadoraPreenchimentoFila {

@@ -123,7 +123,7 @@ public class App {
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
             consultaRepo, agendaRepo, medicos, nomes), acessoAgenda);
-        var indicadoresHandler = new IndicadoresHandler(new IndicadoresService(IndicadoresLeituraRepository.pendente(), acessoAgenda));
+        var indicadoresHandler = new IndicadoresHandler(new IndicadoresService(new IndicadoresMongoRepository(db), acessoAgenda));
 
         // Login e sessão (#9)
         var sessoes = new Sessoes(Duration.ofMinutes(config.sessionTtlMinutes()));

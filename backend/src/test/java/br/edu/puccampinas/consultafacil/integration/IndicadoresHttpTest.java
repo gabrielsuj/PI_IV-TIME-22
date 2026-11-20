@@ -5,6 +5,8 @@ import br.edu.puccampinas.consultafacil.api.handler.IndicadoresHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.IndicadoresLeituraRepository;
+import br.edu.puccampinas.consultafacil.repository.IndicadoresMongoRepository;
+import br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria;
 import br.edu.puccampinas.consultafacil.repository.IndicadoresLeituraRepository.*;
 import br.edu.puccampinas.consultafacil.repository.MedicoDoUsuarioRepository;
 import br.edu.puccampinas.consultafacil.security.*;
@@ -121,6 +123,24 @@ class IndicadoresHttpTest {
         assertEquals("2026-11-21T03:00:00Z", periodos.getFirst().fimExclusivo().toString());
     }
 
+    @Test void endpointConsolidaFontesEmMemoriaComAsCalculadorasReais() throws Exception {
+        var f = FontesIndicadoresEmMemoria.fixture();
+        f.medicos.clear(); f.medicos.add(MEDICO);
+        f.consultas.forEach(c -> c.put("medicoId", MEDICO));
+        f.agendas.getFirst().put("medicoId", MEDICO);
+        f.bloqueios.put(MEDICO, f.bloqueios.remove(FontesIndicadoresEmMemoria.MEDICO));
+        fonte = new IndicadoresMongoRepository(f);
+        var resposta = enviar("GET", "/indicadores?de=2026-11-23&ate=2026-11-23", token(MEDICO_LOGADO));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var corpo = json.readTree(resposta.body());
+        conferirTaxa(corpo.get("ocupacao"), 6, 8, "75.00");
+        conferirTaxa(corpo.get("faltas"), 1, 3, "33.33");
+        conferirTaxa(corpo.get("cancelamento"), 1, 6, "16.67");
+        conferirTaxa(corpo.get("confirmacao"), 4, 6, "66.67");
+        conferirTaxa(corpo.get("preenchimentoFila"), 2, 5, "40.00");
+        assertEquals(MEDICO.toHexString(), corpo.get("medicoId").asText());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"", "&medicoId=meu", "&medicoId=proprio"})
     void medicoSoConsultaCadastroResolvidoPeloUsuarioId(String filtro) throws Exception {
@@ -180,8 +200,8 @@ class IndicadoresHttpTest {
         assertEquals(1, leituras.get());
     }
 
-    @Test void fonteAindaNaoIntegradaRetorna503SemNumerosSimulados() throws Exception {
-        fonte = IndicadoresLeituraRepository.pendente();
+    @Test void fonteIndisponivelRetorna503SemNumerosSimulados() throws Exception {
+        fonte = (periodo, medico) -> { throw new ApiException(503, "Indicadores temporariamente indisponíveis."); };
         conferirErro(enviar("GET", CAMINHO, token(SECRETARIA)), 503);
         assertEquals(1, leituras.get());
     }
