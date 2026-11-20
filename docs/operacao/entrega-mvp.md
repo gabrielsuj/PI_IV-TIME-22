@@ -1,6 +1,6 @@
 # Entrega do ConsultaFácil
 
-Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4); a situação de cada funcionalidade está no [README](../../README.md#situação-atual-19112026).
+Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4). A situação de cada funcionalidade está no [README](../../README.md#situação-atual-20112026).
 
 ## Cadastro e agendamento por perfil
 
@@ -33,6 +33,32 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 2. Para ver o lembrete sem esperar 24 horas, agende uma consulta para as próximas 24 horas: o lembrete é entregue no próximo ciclo do agendador (até `NOTIFICACOES_INTERVALO_SEGUNDOS`, padrão 60 s). Use **Confirmar presença** nele.
 3. Entre com a secretaria e cancele uma consulta de Paulo. Paulo e o médico recebem "Consulta cancelada"; o lembrete pendente dessa consulta é descartado.
 4. Opcional: com `NOTIFICACOES_EMAIL_TESTE=true` no `.env`, reinicie a API e repita o passo 1. O terminal da API mostra `[e-mail de teste] para p***@...` com a mesma mensagem, sem CPF ou dado de saúde.
+
+## Validação local da integração (#45)
+
+Em 20/11/2026, a validação local foi executada no commit `866c2fc0566fb3bdf574a90535267deb291e9649` da branch `integracao/prs-mvp`. A revisão reúne, a partir da `develop` em `0b5fb2a`, a correção do Java 21 para o `server/`, a agenda e os avisos da fila (#53), os estados de falha da interface (#41) e o workflow de recuperação (#45). A revisão de entrega será conferida após a integração do painel.
+
+| Verificação | Resultado observado |
+|---|---|
+| Backend | 861 testes JUnit aprovados com MongoDB 7 descartável, incluindo os testes opcionais e a verificação da API de indicadores sobre a carga de demonstração. Zero falhas, erros ou testes ignorados. O empacotamento Maven com Java 21 gerou o JAR. |
+| Frontend | 320 testes Vitest aprovados em 21 arquivos com Node 24. ESLint e build de produção concluídos com sucesso. |
+| Módulo `server/` | `mvn clean verify` com Java 21 compilou 13 arquivos e gerou o JAR. O módulo não tem testes próprios. |
+| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 834 consultas, 1.945 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
+| Teste do workflow de backup | O comando executado localmente aprovou os backups simultâneos e a rejeição de arquivo inválido ou de outra origem com o destino preservado. Após a falha parcial, o retorno automático recuperou dados, índice único e validador. A cópia preservada também permitiu o retorno manual quando a recuperação automática falhou. |
+
+As contagens correspondem à carga gerada nessa execução. [Procedimento de backup e recuperação](backup-recuperacao.md) · [Workflow de backup](../../.github/workflows/backup-recuperacao.yml)
+
+### Agenda e disponibilidade (#53)
+
+O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de duração com bloqueio parcial passaram. A busca e a confirmação usam a disponibilidade da agenda, e os testes de fila aprovados cobrem a expiração do aviso após bloqueio ou mudança de jornada. Os contratos e a modelagem estão documentados. [API de agenda e bloqueios](../api/alteracoes-agenda.md) · [API de agendamento](../api/agendamento.md) · [Modelo de agendas e bloqueios](../modelagem/medicos-agenda.md)
+
+## Conferências antes da entrega
+
+- [x] **Lembretes (#34).** A geração, o envio sem duplicidade em dois ciclos e o descarte no cancelamento passaram na suíte integrada. A confirmação pela central foi coberta com registro no histórico.
+- [x] **API de indicadores (#36 e #48).** Os testes do serviço usado em `GET /indicadores` validaram as contagens e taxas da clínica e de cada médico com a carga de demonstração.
+- [ ] **Painel web (#37 e #47).** Integrar a interface ao `GET /indicadores`. Comparar agenda do dia, próximas consultas e taxas com os dados do mesmo médico e período. Validar os filtros da secretaria e a visualização do médico.
+- [ ] **Homologação ponta a ponta (#38).** Com o painel disponível, percorrer cadastro, agenda, disputa de vaga, cancelamento, fila, lembrete, histórico e painel pelos perfis previstos.
+- [ ] **Evidência final da #45.** Na revisão com todas as entregas, repetir as suítes, lint, build, aceite e recuperação. Registrar o SHA, a data, os resultados e o link da CI correspondente.
 
 ## Versão final (#45)
 
