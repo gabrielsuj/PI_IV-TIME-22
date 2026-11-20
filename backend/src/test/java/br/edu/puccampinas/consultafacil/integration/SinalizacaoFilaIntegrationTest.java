@@ -9,6 +9,8 @@ import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.repository.NotificacaoRepository;
 import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
 import br.edu.puccampinas.consultafacil.service.HistoricoProcessor;
+import br.edu.puccampinas.consultafacil.service.CalculadoraPreenchimentoFila;
+import br.edu.puccampinas.consultafacil.service.PeriodoIndicadores;
 import br.edu.puccampinas.consultafacil.service.RegistroConsultaService;
 import br.edu.puccampinas.consultafacil.service.SinalizacaoFilaService;
 import com.mongodb.client.MongoDatabase;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,6 +32,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -291,6 +295,50 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals(Date.from(AGORA.minus(Duration.ofDays(10)).plus(Duration.ofMinutes(1))), devolvida.getDate("criadoEm"),
                 "mantém a posição na fila");
         assertEquals("CANCELADA", aviso(cancelada, PACIENTES.get(1)).getString("status"), "aviso não enviado é descartado");
+    }
+
+    @Test void indicadorDaFilaAcompanhaCancelamentoSinalizacaoReservaEAtendimento() {
+        ObjectId origem = agendar(PACIENTES.get(0), MEDICO, VAGA);
+        ObjectId primeiro = interesse(PACIENTES.get(1), ESPECIALIDADE, null, "QUALQUER", 1, null, null, 90);
+        ObjectId segundo = interesse(PACIENTES.get(2), ESPECIALIDADE, null, "QUALQUER", 2, null, null, 90);
+        cancelar(origem);
+        assertEquals("SINALIZADA", fila(primeiro).getString("status"));
+        assertEquals("SINALIZADA", fila(segundo).getString("status"));
+        var soSinalizada = indicadorPreenchimentoFila();
+        assertEquals(0, soSinalizada.preenchidasPelaFila());
+        assertEquals(0, soSinalizada.consultasNaoCanceladas());
+        assertNull(soSinalizada.preenchimentoFila().orElseThrow().percentual());
+
+        ObjectId reservaDaFila = agendar(PACIENTES.get(2), MEDICO, VAGA);
+        assertEquals("ATENDIDA", fila(segundo).getString("status"));
+        assertEquals(reservaDaFila, fila(segundo).getObjectId("consultaAgendadaId"));
+        assertEquals("AGUARDANDO", fila(primeiro).getString("status"));
+        var atendida = indicadorPreenchimentoFila();
+        assertEquals(1, atendida.preenchidasPelaFila());
+        assertEquals(1, atendida.consultasNaoCanceladas());
+        assertEquals(new BigDecimal("100.00"), atendida.preenchimentoFila().orElseThrow().percentual());
+
+        db.getCollection("filaEspera").insertOne(new Document(fila(segundo)).append("_id", new ObjectId()));
+        agendar(PACIENTES.get(9), MEDICO, VAGA.plus(Duration.ofHours(1)));
+        var mista = indicadorPreenchimentoFila();
+        assertEquals(1, mista.preenchidasPelaFila());
+        assertEquals(2, mista.consultasNaoCanceladas());
+        assertEquals(new BigDecimal("50.00"), mista.preenchimentoFila().orElseThrow().percentual());
+
+        cancelar(reservaDaFila);
+        assertEquals("ATENDIDA", fila(segundo).getString("status"));
+        var aposCancelar = indicadorPreenchimentoFila();
+        assertEquals(0, aposCancelar.preenchidasPelaFila());
+        assertEquals(1, aposCancelar.consultasNaoCanceladas());
+        assertEquals(0, aposCancelar.inscricoesComVinculoInvalido());
+        assertEquals(new BigDecimal("0.00"), aposCancelar.preenchimentoFila().orElseThrow().percentual());
+    }
+
+    private CalculadoraPreenchimentoFila.Resultado indicadorPreenchimentoFila() {
+        var consultas = db.getCollection("consultas").find(Filters.in("medicoId", MEDICO, OUTRO_MEDICO)).into(new ArrayList<>());
+        var fila = db.getCollection("filaEspera").find(Filters.in("pacienteId", PACIENTES)).into(new ArrayList<>());
+        return CalculadoraPreenchimentoFila.calcular(PeriodoIndicadores.de("2026-10-26", "2026-10-26"),
+                Optional.of(MEDICO), consultas, fila);
     }
 
     @Test void pacienteForaDaFilaOcupaAVagaETodosOsAvisadosVoltam() {
