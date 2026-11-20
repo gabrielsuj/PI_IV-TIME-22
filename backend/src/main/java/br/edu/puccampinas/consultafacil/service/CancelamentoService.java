@@ -68,7 +68,7 @@ public class CancelamentoService {
         if (motivoLimpo != null) campos.append("motivoCancelamento", motivoLimpo);
 
         Document cancelada = registro.alterar(consultaId, campos, ator);
-        avisarFila(cancelada);
+        avisarDepois(cancelada, ator);
         return ConsultaResponse.de(cancelada);
     }
 
@@ -90,12 +90,12 @@ public class CancelamentoService {
         return texto.isEmpty() ? null : texto;
     }
 
-    /** O cancelamento já está gravado: uma falha na fila (#32) não pode virar erro para quem cancelou. */
-    private void avisarFila(Document cancelada) {
+    /** O cancelamento já está gravado: uma falha nas notificações (#34) não pode virar erro para quem cancelou. */
+    private void avisarDepois(Document cancelada, UsuarioLogado ator) {
         try {
-            aposCancelamento.vagaLiberada(cancelada);
+            aposCancelamento.consultaCancelada(cancelada, ator);
         } catch (RuntimeException e) {
-            LOG.warn("Consulta {} cancelada, mas o aviso à fila falhou ({})",
+            LOG.warn("Consulta {} cancelada, mas a ação posterior falhou ({})",
                     cancelada.getObjectId("_id"), e.getClass().getSimpleName());
         }
     }

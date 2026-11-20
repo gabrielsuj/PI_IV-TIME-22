@@ -82,4 +82,54 @@ public class NotificacaoRepository {
         col.updateOne(Filters.and(Filters.eq("_id", id), Filters.eq("status", "AGENDADA")),
                 Updates.set("status", "CANCELADA"));
     }
+
+    // ---- Lembretes e envio (#34) ----
+
+    /** Tipos que o agendador da #34 entrega. VAGA_LIBERADA tem fluxo próprio na tela Avisos de vaga (#57). */
+    public static final List<String> TIPOS_ENVIADOS_PELO_AGENDADOR =
+            List.of("CONFIRMACAO_AGENDAMENTO", "LEMBRETE_CONSULTA", "CANCELAMENTO_CONSULTA");
+    public static final int MAXIMO_TENTATIVAS = 3;
+
+    /** Notificações AGENDADA cujo horário de envio já chegou, das mais antigas para as mais novas. */
+    public List<Document> vencidas(Date agora, int limite) {
+        return col.find(Filters.and(Filters.eq("status", "AGENDADA"), Filters.lte("agendadaPara", agora),
+                        Filters.in("tipo", TIPOS_ENVIADOS_PELO_AGENDADOR)))
+                .sort(Sorts.ascending("agendadaPara", "_id")).limit(limite).into(new ArrayList<>());
+    }
+
+    /** AGENDADA -> ENVIADA. Retorna false se outra execução já mudou o status (não reenvia). */
+    public boolean marcarEnviada(ObjectId id, Date agora) {
+        return col.updateOne(Filters.and(Filters.eq("_id", id), Filters.eq("status", "AGENDADA")),
+                Updates.combine(Updates.set("status", "ENVIADA"), Updates.set("enviadaEm", agora),
+                        Updates.inc("tentativas", 1))).getModifiedCount() == 1;
+    }
+
+    /**
+     * Conta uma tentativa que falhou. Na terceira, a notificação passa a FALHA com o motivo
+     * (o validador só aceita "erro" preenchido no status FALHA).
+     */
+    public void registrarFalha(Document notificacao, String erro) {
+        Bson pendente = Filters.and(Filters.eq("_id", notificacao.getObjectId("_id")), Filters.eq("status", "AGENDADA"));
+        if (notificacao.getInteger("tentativas", 0) + 1 >= MAXIMO_TENTATIVAS) {
+            String motivo = erro == null || erro.isBlank() ? "Falha no envio" : erro;
+            col.updateOne(pendente, Updates.combine(Updates.set("status", "FALHA"),
+                    Updates.set("erro", motivo.length() > 500 ? motivo.substring(0, 500) : motivo),
+                    Updates.set("tentativas", MAXIMO_TENTATIVAS)));
+        } else {
+            col.updateOne(pendente, Updates.inc("tentativas", 1));
+        }
+    }
+
+    /** Lembretes e confirmações ainda não enviados de uma consulta passam a CANCELADA (ex.: consulta cancelada). */
+    public long cancelarPendentesDaConsulta(ObjectId consultaId) {
+        return col.updateMany(Filters.and(Filters.eq("consultaId", consultaId), Filters.eq("status", "AGENDADA"),
+                        Filters.in("tipo", List.of("CONFIRMACAO_AGENDAMENTO", "LEMBRETE_CONSULTA"))),
+                Updates.set("status", "CANCELADA")).getModifiedCount();
+    }
+
+    /** true se a consulta já tem algum lembrete no canal do sistema (de qualquer antecedência ou status). */
+    public boolean temLembrete(ObjectId consultaId) {
+        return col.find(Filters.and(Filters.eq("consultaId", consultaId), Filters.eq("tipo", "LEMBRETE_CONSULTA"),
+                Filters.eq("canal", "SISTEMA"))).limit(1).first() != null;
+    }
 }
