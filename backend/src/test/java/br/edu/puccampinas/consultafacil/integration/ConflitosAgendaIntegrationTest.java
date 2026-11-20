@@ -200,7 +200,7 @@ class ConflitosAgendaIntegrationTest {
             var calendario = new ConsultaCalendarioService(new ConsultaRepository(db), new AgendaRepository(db),
                     new MedicoRepository(db), new NomesRepository.Mongo(db));
             var handlers = new Rotas.Handlers(null, null, new AgendaHandler(agendas, acesso),
-                    new BloqueioHandler(bloqueios, acesso), null, null, null, new ConsultaCalendarioHandler(calendario, acesso), null, null);
+                    new BloqueioHandler(bloqueios, acesso), null, null, null, new ConsultaCalendarioHandler(calendario, acesso), null, null, null);
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/", Rotas.router(new Cors(List.of()), new Autorizacao(new Autenticador(sessoes)), handlers));
             server.start();

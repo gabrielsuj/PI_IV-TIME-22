@@ -54,7 +54,7 @@ class RotasAutorizacaoTest {
     @BeforeEach void iniciar() throws Exception {
         var cors = new Cors(List.of());
         var autz = new Autorizacao(new Autenticador(sessoes));
-        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -97,6 +97,12 @@ class RotasAutorizacaoTest {
         "GET,    /consultas,      PACIENTE,         403",
         "GET,    /consultas,      MEDICO,           200",
         "GET,    /consultas,      SECRETARIA_ADMIN, 200",
+        // Indicadores (#36): médico e secretaria; serviço limita o médico ao próprio cadastro.
+        "GET,    /indicadores,    PACIENTE,         403",
+        "GET,    /indicadores,    MEDICO,           200",
+        "GET,    /indicadores,    SECRETARIA_ADMIN, 200",
+        "POST,   /indicadores,    SECRETARIA_ADMIN, 404",
+        "GET,    /indicadores/extra, MEDICO,         404",
         // Pacientes: leitura médico e secretaria; escrita só secretaria
         "GET,    /pacientes,      PACIENTE,         403",
         "GET,    /pacientes,      MEDICO,           200",
@@ -166,6 +172,7 @@ class RotasAutorizacaoTest {
 
     @Test void semLoginRetorna401EmRotaProtegida() throws Exception {
         assertEquals(401, enviar("GET", "/agendas", null).statusCode());
+        assertEquals(401, enviar("GET", "/indicadores", null).statusCode());
         assertEquals(401, enviar("GET", "/pacientes", null).statusCode());
         assertEquals(401, enviar("GET", "/bloqueios", "token-inventado").statusCode());
         assertEquals(401, enviar("GET", "/vagas", null).statusCode());
@@ -222,6 +229,7 @@ class RotasAutorizacaoTest {
 
     @Test void preflightCorsNaoExigeLogin() throws Exception {
         assertEquals(204, enviar("OPTIONS", "/agendas", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/indicadores", null).statusCode());
         assertEquals(204, enviar("OPTIONS", "/pacientes", null).statusCode());
     }
 

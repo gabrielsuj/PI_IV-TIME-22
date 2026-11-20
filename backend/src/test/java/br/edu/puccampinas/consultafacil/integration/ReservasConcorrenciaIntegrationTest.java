@@ -146,7 +146,7 @@ class ReservasConcorrenciaIntegrationTest {
         token = sessoes.criar(SECRETARIA).token();
         var autz = new Autorizacao(new Autenticador(sessoes));
         var router = Rotas.router(new Cors(List.of()), autz, new Rotas.Handlers(NAO_USADO, NAO_USADO, NAO_USADO,
-                NAO_USADO, NAO_USADO, new VagasHandler(agendamento), new ConsultaHandler(agendamento), NAO_USADO, NAO_USADO, null));
+                NAO_USADO, NAO_USADO, new VagasHandler(agendamento), new ConsultaHandler(agendamento), NAO_USADO, NAO_USADO, null, null));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsDoServidor = Executors.newFixedThreadPool(16);

@@ -18,6 +18,7 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET/PUT /agendas             |    -     |   ✓    |   ✓
  *  GET/POST/DELETE /bloqueios   |    -     |   ✓    |   ✓
  *  GET  /consultas (calendário) |    -     |   ✓    |   ✓
+ *  GET  /indicadores (#36)      |    -     |   ✓    |   ✓ (médico só seu cadastro)
  *  GET  /pacientes[/{id}]       |    -     |   ✓    |   ✓
  *  POST/PUT /pacientes[/{id}]   |    -     |   -    |   ✓
  *  GET /medicos, /especialidades[/{id}] | ✓ | ✓ | ✓
@@ -36,11 +37,13 @@ public final class Rotas {
 
     public record Handlers(HttpHandler health, HttpHandler auth, HttpHandler agendas,
                            HttpHandler bloqueios, HttpHandler pacientes,
-                           HttpHandler vagas, HttpHandler consultas, HttpHandler calendario, HttpHandler avisosVaga, HttpHandler notificacoes) {}
+                           HttpHandler vagas, HttpHandler consultas, HttpHandler calendario, HttpHandler avisosVaga,
+                           HttpHandler notificacoes, HttpHandler indicadores) {}
 
     public static Router router(Cors cors, Autorizacao autz, Handlers h) {
         return new Router(cors)
             .add("GET", "/health", h.health())
+            .add("GET", "/indicadores", autz.exigir(h.indicadores(), MEDICO, SECRETARIA_ADMIN))
             .add("POST", "/auth/login", h.auth())
             .add("POST", "/auth/logout", h.auth())
             .add("GET", "/auth/me", h.auth())

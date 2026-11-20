@@ -176,7 +176,7 @@ class FilaEsperaIntegrationTest {
                 registro, relogio);
         var central = new CentralNotificacoesHandler(new CentralNotificacoesService(notificacoes, consultas,
                 pacienteDoUsuario::buscar, medicosDoUsuario::buscar, status, relogio));
-        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos, central));
+        var router = Rotas.router(cors, autorizacao, new Rotas.Handlers(null, null, null, null, null, null, null, null, avisos, central, null));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsHttp = Executors.newFixedThreadPool(4);
         server.setExecutor(threadsHttp);
