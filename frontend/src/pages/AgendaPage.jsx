@@ -4,6 +4,7 @@ import JornadaForm from '../components/agenda/JornadaForm';
 import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
@@ -16,7 +17,7 @@ export default function AgendaPage() {
   const medicos = useRecords(agendaPropria ? null : 'medicos');
   const idDe = (medico) => medico.id || medico._id;
   const ativos = medicos.records.filter((medico) => medico.ativo !== false);
-  const conhecido = medicos.records.some((medico) => idDe(medico) === medicoId);
+  const selecionavel = ativos.some((medico) => idDe(medico) === medicoId);
 
   return (
     <div className="page">
@@ -24,18 +25,22 @@ export default function AgendaPage() {
 
       {!agendaPropria && (
         <Card className="search-card">
-          <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading}
+          <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading || ativos.length === 0}
             onChange={(event) => setSearchParams(event.target.value ? { medicoId: event.target.value } : {})}>
-            <option value="">{medicos.loading ? 'Carregando médicos…' : 'Selecione um médico'}</option>
+            <option value="">Selecione um médico</option>
             {ativos.map((medico) => (
               <option key={idDe(medico)} value={idDe(medico)}>{medico.nome} — CRM {medico.crmNumero}/{medico.crmUf}</option>
             ))}
-            {medicoId && !conhecido && <option value={medicoId}>Médico {medicoId}</option>}
+            {medicoId && !selecionavel && <option value={medicoId}>Médico {medicoId}</option>}
           </Field>
+          {medicos.loading && <p role="status">Carregando lista de médicos…</p>}
           {medicos.error && (
-            <Alert tone="info">
-              Não foi possível carregar a lista de médicos ({medicos.error.message}). A agenda ainda pode ser aberta pelo endereço <code>/agenda?medicoId=…</code>
+            <Alert action={<Button variant="outline" size="sm" onClick={medicos.refresh}>Tentar novamente</Button>}>
+              Não foi possível carregar a lista de médicos. {medicos.error.message}
             </Alert>
+          )}
+          {!medicos.loading && !medicos.error && ativos.length === 0 && (
+            <p className="empty-state" role="status">Nenhum médico ativo disponível para seleção.</p>
           )}
         </Card>
       )}
@@ -46,7 +51,8 @@ export default function AgendaPage() {
           <BloqueiosCard key={`bloqueios-${medicoId}`} medicoId={medicoId} />
         </div>
       ) : (
-        <Card><p className="empty-state" role="status">Selecione um médico para configurar a agenda.</p></Card>
+        !medicos.loading && !medicos.error && ativos.length > 0 &&
+          <Card><p className="empty-state" role="status">Selecione um médico para configurar a agenda.</p></Card>
       )}
     </div>
   );

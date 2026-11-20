@@ -8,7 +8,6 @@ import DataTable from '../components/ui/DataTable';
 import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
-import { api } from '../services/api';
 import { useRecords } from '../hooks/useRecords';
 import { cancelarInscricaoFila, inscreverFilaEspera, listarFilaEspera } from '../services/filaEsperaService';
 
@@ -59,31 +58,13 @@ function dataHojeSP() {
   return `${pegar('year')}-${pegar('month')}-${pegar('day')}`;
 }
 
-// Evita buscar /pacientes para o perfil PACIENTE, que não tem acesso ao cadastro geral.
-function usePacientesSecretaria(ativo) {
-  const [estado, setEstado] = useState({ records: [], loading: ativo, error: null });
-  useEffect(() => {
-    if (!ativo) return undefined;
-    const ctrl = new AbortController();
-    api.get('/pacientes', { signal: ctrl.signal })
-      .then((dados) => {
-        const itens = Array.isArray(dados) ? dados : dados?.items;
-        if (!Array.isArray(itens)) throw new Error('A API retornou pacientes em formato inválido.');
-        setEstado({ records: itens, loading: false, error: null });
-      })
-      .catch((error) => { if (!ctrl.signal.aborted) setEstado({ records: [], loading: false, error }); });
-    return () => ctrl.abort();
-  }, [ativo]);
-  return estado;
-}
-
 export default function FilaEsperaPage() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const perfil = usuario?.perfil;
   const secretaria = perfil === 'SECRETARIA_ADMIN';
   const permitido = secretaria || perfil === 'PACIENTE';
-  const pacientes = usePacientesSecretaria(secretaria);
+  const pacientes = useRecords(secretaria ? 'pacientes' : null);
   const especialidades = useRecords('especialidades');
   const medicos = useRecords('medicos');
   const modalRef = useRef(null);
@@ -140,6 +121,14 @@ export default function FilaEsperaPage() {
     sinalizada: estado.ativos.filter((item) => item.status === 'SINALIZADA').length,
     atendidos: estado.atendidos.length,
   }), [estado.ativos, estado.atendidos]);
+
+  const catalogos = secretaria ? [pacientes, especialidades, medicos] : [especialidades, medicos];
+  const carregandoCatalogos = catalogos.some((catalogo) => catalogo.loading);
+  const catalogosComErro = catalogos.filter((catalogo) => catalogo.error);
+  const especialidadesAtivas = especialidades.records.filter((especialidade) => especialidade.ativa !== false);
+  const semCadastroObrigatorio = !carregandoCatalogos && !catalogosComErro.length && (
+    especialidadesAtivas.length === 0 || (secretaria && pacientes.records.length === 0)
+  );
 
   const medicosElegiveis = useMemo(() => medicos.records.filter((m) =>
     m.ativo !== false && (m.especialidadeIds ?? []).includes(form.especialidadeId)
@@ -309,7 +298,7 @@ export default function FilaEsperaPage() {
             </Field>}
             <Field as="select" className="form-grid__wide" label="Especialidade" required value={form.especialidadeId} disabled={especialidades.loading || enviando} onChange={(e) => alterar('especialidadeId', e.target.value)}>
               <option value="">Selecione a especialidade</option>
-              {especialidades.records.filter((e) => e.ativa !== false).map((e) => <option key={ID(e)} value={ID(e)}>{e.nome || ID(e)}</option>)}
+              {especialidadesAtivas.map((e) => <option key={ID(e)} value={ID(e)}>{e.nome || ID(e)}</option>)}
             </Field>
             <Field as="select" label="Médico (opcional)" value={form.medicoId} disabled={!form.especialidadeId || medicos.loading || enviando} onChange={(e) => alterar('medicoId', e.target.value)}>
               <option value="">Qualquer médico</option>
@@ -321,11 +310,19 @@ export default function FilaEsperaPage() {
             <Field label="Data inicial (opcional)" type="date" min={dataHojeSP()} value={form.dataInicio} disabled={enviando} onChange={(e) => alterar('dataInicio', e.target.value)} />
             <Field label="Data final (opcional)" type="date" min={form.dataInicio || dataHojeSP()} value={form.dataFim} disabled={enviando} onChange={(e) => alterar('dataFim', e.target.value)} />
           </div>
-          {(pacientes.error && secretaria || especialidades.error || medicos.error) && <Alert>Não foi possível carregar um dos cadastros. Feche e abra novamente o formulário ou atualize a página.</Alert>}
+          {carregandoCatalogos && <p role="status">Carregando cadastros…</p>}
+          {catalogosComErro.length > 0 && (
+            <Alert action={<Button variant="outline" size="sm" onClick={() => catalogosComErro.forEach(({ refresh }) => refresh())}>Tentar novamente</Button>}>
+              Não foi possível carregar os cadastros da fila. {catalogosComErro[0].error.message}
+            </Alert>
+          )}
+          {semCadastroObrigatorio && <Alert tone="info">{especialidadesAtivas.length === 0
+            ? 'Nenhuma especialidade ativa disponível para inscrição.'
+            : 'Nenhum paciente cadastrado para inscrição.'}</Alert>}
           {erroForm && <Alert>{erroForm}</Alert>}
           <div className="form-actions">
             <Button variant="outline" onClick={fecharFormulario} disabled={enviando}>Cancelar</Button>
-            <Button type="submit" loading={enviando} disabled={especialidades.loading || !!especialidades.error || !!medicos.error || (secretaria && (pacientes.loading || !!pacientes.error))}>Confirmar inscrição</Button>
+            <Button type="submit" loading={enviando} disabled={carregandoCatalogos || catalogosComErro.length > 0 || semCadastroObrigatorio}>Confirmar inscrição</Button>
           </div>
         </form>
       </dialog>

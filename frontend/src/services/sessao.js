@@ -2,9 +2,8 @@
  * Sessão do usuário no navegador.
  *
  * O token e os dados básicos do usuário ficam no sessionStorage (somem ao
- * fechar a aba). Quem decide se o token ainda vale é a API: quando ela
- * responde 401, o cliente HTTP chama encerrarSessaoExpirada() e a interface
- * volta para a tela de login.
+ * fechar a aba). Se a API recusa o token da sessão atual com 401, o cliente
+ * HTTP chama encerrarSessaoExpirada() e a interface volta para a tela de login.
  */
 export const TOKEN_KEY = 'consultafacil.accessToken';
 export const USUARIO_KEY = 'consultafacil.usuario';

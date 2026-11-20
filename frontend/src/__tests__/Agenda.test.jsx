@@ -146,14 +146,42 @@ describe('tela de agenda', () => {
     for (const dia of ['Segunda-feira', 'Domingo']) expect(screen.getByRole('checkbox', { name: dia })).not.toBeChecked();
   });
 
-  it('continua funcionando quando a lista de médicos não está disponível', async () => {
+  it('recarrega a lista de médicos sem perder a seleção nem a jornada em edição', async () => {
+    const medicos = vi.fn()
+      .mockReturnValueOnce(response({ erro: 'Serviço indisponível' }, 503))
+      .mockImplementation(() => response([ANA]));
     mockApi({
+      'GET /medicos': medicos,
       'GET /agendas': () => response(AGENDA_ANA),
       'GET /bloqueios': () => response([]),
     });
+    const user = userEvent.setup();
     renderAt('/agenda?medicoId=m1');
-    expect(await screen.findByText(/Não foi possível carregar a lista de médicos/)).toBeInTheDocument();
-    expect(await screen.findByRole('checkbox', { name: 'Segunda-feira' })).toBeChecked();
+
+    const erro = await screen.findByRole('alert');
+    expect(erro).toHaveTextContent('Não foi possível carregar a lista de médicos.');
+    await user.click(await screen.findByRole('checkbox', { name: 'Quarta-feira' }));
+    await user.click(within(erro).getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByRole('option', { name: /Ana Martins/ })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Médico' })).toHaveValue('m1');
+    expect(screen.getByRole('checkbox', { name: 'Quarta-feira' })).toBeChecked();
+    expect(medicos).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['/agenda', '/calendario'])('distingue carregamento e ausência de médicos ativos em %s', async (rota) => {
+    let concluir;
+    const pendente = new Promise((resolve) => { concluir = resolve; });
+    mockApi({ 'GET /medicos': () => pendente });
+    renderAt(rota);
+
+    expect(screen.getByText('Carregando lista de médicos…')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum médico ativo disponível para seleção.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Selecione um médico para/)).not.toBeInTheDocument();
+
+    concluir(response([{ ...ANA, ativo: false }]));
+    expect(await screen.findByText('Nenhum médico ativo disponível para seleção.')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Médico' })).toBeDisabled();
+    expect(screen.queryByText('Carregando lista de médicos…')).not.toBeInTheDocument();
   });
 
   it('cadastra um bloqueio de dia inteiro e remove um bloqueio existente', async () => {

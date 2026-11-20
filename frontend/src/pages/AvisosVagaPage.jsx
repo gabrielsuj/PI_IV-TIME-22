@@ -27,7 +27,11 @@ export default function AvisosVagaPage() {
   const [selecionado, setSelecionado] = useState(state?.avisoId ?? null);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
-  const atualizar = () => setRevisao((r) => r + 1);
+  const [erroConfirmacao, setErroConfirmacao] = useState('');
+  function atualizar() {
+    setLista((anterior) => ({ ...anterior, carregando: true, erro: null }));
+    setRevisao((r) => r + 1);
+  }
 
   useEffect(() => {
     let controller;
@@ -54,20 +58,33 @@ export default function AvisosVagaPage() {
   }, [revisao]);
 
   const avisoAtual = lista.avisos.find((aviso) => aviso.id === selecionado);
+  const disponibilidadeVerificada = !lista.carregando && !lista.erro;
+  const podeConfirmar = disponibilidadeVerificada && avisoAtual?.status === 'DISPONIVEL';
+
+  function fecharConfirmacao() {
+    setSelecionado(null);
+    setErroConfirmacao('');
+  }
 
   async function confirmar(evento) {
     evento.preventDefault();
-    if (enviando || avisoAtual?.status !== 'DISPONIVEL') return;
+    if (enviando || !podeConfirmar) return;
     setEnviando(true);
     setResultado(null);
+    setErroConfirmacao('');
     try {
       const consulta = await agendarPeloAviso(avisoAtual.id);
       setResultado({ consultaId: consulta.id });
+      fecharConfirmacao();
     } catch (erro) {
-      setResultado({ erro: erro.message });
+      if (erro.status === 404 || erro.status === 409) {
+        setResultado({ erro: erro.message });
+        fecharConfirmacao();
+      } else {
+        setErroConfirmacao(erro.message);
+      }
     } finally {
       setEnviando(false);
-      setSelecionado(null);
       atualizar();
     }
   }
@@ -94,7 +111,6 @@ export default function AvisosVagaPage() {
   ];
 
   const horario = avisoAtual && dataHoraDaConsulta(avisoAtual);
-  const disponivel = avisoAtual?.status === 'DISPONIVEL';
 
   return (
     <div className="page">
@@ -112,12 +128,30 @@ export default function AvisosVagaPage() {
       </Card>
       {avisoAtual && (
         <Modal title="Confirmar agendamento" description={`${avisoAtual.medicoNome} · ${horario.data}, ${horario.periodo}`}
-          busy={enviando} onClose={() => setSelecionado(null)}>
+          busy={enviando} onClose={fecharConfirmacao}>
           <form onSubmit={confirmar}>
-            {!disponivel && <Alert>A vaga deste aviso não está mais disponível.</Alert>}
+            {lista.carregando && <p role="status">Verificando a disponibilidade da vaga…</p>}
+            {lista.erro && (
+              <Alert action={<Button variant="outline" size="sm" onClick={atualizar}>Tentar novamente</Button>}>
+                Não foi possível verificar a disponibilidade da vaga. {lista.erro.message}
+              </Alert>
+            )}
+            {erroConfirmacao && (!disponibilidadeVerificada || podeConfirmar) && <Alert>{erroConfirmacao}</Alert>}
+            {disponibilidadeVerificada && avisoAtual.status === 'EXPIRADO' && (
+              <Alert action={<Button to="/nova-consulta" variant="outline" size="sm">Buscar outra vaga</Button>}>
+                A vaga deste aviso não está mais disponível.
+              </Alert>
+            )}
+            {disponibilidadeVerificada && avisoAtual.status === 'AGENDADO' && (
+              <Alert tone="success" action={avisoAtual.consultaAgendadaId
+                ? <Button to={`/consultas/${avisoAtual.consultaAgendadaId}`} variant="outline" size="sm">Ver consulta</Button>
+                : undefined}>
+                A consulta deste aviso já foi agendada.
+              </Alert>
+            )}
             <div className="form-actions">
-              <Button variant="outline" disabled={enviando} onClick={() => setSelecionado(null)}>Voltar</Button>
-              <Button type="submit" loading={enviando} disabled={!disponivel}>Confirmar agendamento</Button>
+              <Button variant="outline" disabled={enviando} onClick={fecharConfirmacao}>Voltar</Button>
+              <Button type="submit" loading={enviando} disabled={!podeConfirmar}>Confirmar agendamento</Button>
             </div>
           </form>
         </Modal>
