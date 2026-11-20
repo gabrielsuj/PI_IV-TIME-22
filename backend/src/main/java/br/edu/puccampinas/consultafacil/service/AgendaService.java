@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class AgendaService {
     public static final String FUSO_PADRAO = "America/Sao_Paulo";
@@ -25,11 +26,18 @@ public class AgendaService {
     private final MedicoRepository medicos;
     private final ConsultasAfetadas afetadas;
     private final Clock relogio;
+    private final Consumer<ObjectId> aposAlteracao;
 
     public AgendaService(AgendaRepository agendas, MedicoRepository medicos, ConsultasAfetadas afetadas, Clock relogio) {
+        this(agendas, medicos, afetadas, relogio, id -> {});
+    }
+
+    public AgendaService(AgendaRepository agendas, MedicoRepository medicos, ConsultasAfetadas afetadas,
+                         Clock relogio, Consumer<ObjectId> aposAlteracao) {
         this.agendas = agendas;
         this.medicos = medicos;
         this.afetadas = afetadas;
+        this.aposAlteracao = aposAlteracao;
         this.relogio = relogio;
     }
 
@@ -75,7 +83,9 @@ public class AgendaService {
                     .append("duracaoMinutos", r.duracaoMinutos())
                     .append("jornadas", jornadas);
 
-            return paraResposta(agendas.salvar(medicoId, dados));
+            var agenda = paraResposta(agendas.salvar(medicoId, dados));
+            aposAlteracao.accept(medicoId);
+            return agenda;
         }
     }
 

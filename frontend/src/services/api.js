@@ -137,8 +137,12 @@ export async function request(
 
   const data = await parseBody(response);
   if (!response.ok) {
-    // Token recusado (expirado, inválido ou encerrado no servidor): volta para o login.
-    if (response.status === 401 && accessToken) encerrarSessaoExpirada();
+    // Uma resposta atrasada só encerra a sessão associada ao token enviado.
+    if (response.status === 401 && accessToken && accessToken === sessionStorage.getItem(TOKEN_KEY)) {
+      const authorization = new Headers(finalHeaders).get('Authorization');
+      const tokenEnviado = authorization?.match(/^Bearer (.+)$/i)?.[1].trim();
+      if (tokenEnviado === accessToken) encerrarSessaoExpirada();
+    }
     throw new ApiError(errorMessageFrom(data, response.status), {
       status: response.status,
       data,

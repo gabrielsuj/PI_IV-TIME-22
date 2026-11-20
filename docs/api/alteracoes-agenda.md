@@ -1,12 +1,51 @@
 # Alterações de agenda com consultas marcadas (#44)
 
-Criar um bloqueio ou mudar a jornada de um médico pode atingir consultas já marcadas. A API não grava a mudança sem que a secretaria veja quais consultas serão afetadas.
+Criar um bloqueio ou mudar a jornada de um médico pode atingir consultas já marcadas. Quando a mudança afeta consultas, a API devolve a lista antes de gravar, salvo quando o pedido já inclui a confirmação explícita. Consulte a [modelagem de agendas e bloqueios](../modelagem/medicos-agenda.md) e a [API de busca de vagas e agendamento](agendamento.md).
 
-## Permissões
+## Rotas e permissões
 
-O médico abre sua jornada e seu calendário diretamente. A API resolve `medicoId=meu` pelo vínculo entre o login e o cadastro de médico. Também aceita o ID explícito do próprio médico. A secretaria informa o ID do profissional escolhido. A criação de bloqueio usa o mesmo campo no corpo JSON.
+As rotas abaixo exigem `Authorization: Bearer <token>` e estão disponíveis para `MEDICO` e `SECRETARIA_ADMIN`. O médico usa `medicoId=meu` ou o ID do próprio cadastro. A secretaria informa o ID do profissional. Em `POST /bloqueios`, o campo `medicoId` vem no corpo JSON.
 
-A API responde 403 para consultas ou mudanças em outra agenda e para médicos sem vínculo. Na remoção por ID, retorna 404 se o bloqueio estiver fora da agenda autorizada ou não existir. A verificação precede a resposta de conflito com os dados das consultas afetadas.
+| Método | Caminho | Resposta de sucesso |
+|---|---|---|
+| GET | `/agendas?medicoId=<id>` | 200 com a configuração atual |
+| PUT | `/agendas?medicoId=<id>` | 200 com a configuração salva |
+| GET | `/bloqueios?medicoId=<id>[&de=AAAA-MM-DD&ate=AAAA-MM-DD]` | 200 com uma lista de bloqueios |
+| POST | `/bloqueios` | 201 com o bloqueio criado |
+| DELETE | `/bloqueios?id=<id>` | 200 com `{"removido":true}` |
+
+A API retorna 400 para parâmetros ou corpo inválidos, 401 para sessão ausente ou expirada e 403 para perfil sem acesso, médico sem vínculo ou acesso à agenda de outro profissional. Retorna 404 se a agenda consultada ainda não foi configurada ou se o bloqueio a remover não existe na agenda autorizada. O filtro de acesso é aplicado antes da consulta de conflitos.
+
+## Jornada semanal
+
+`PUT /agendas` recebe a configuração semanal completa. O exemplo define atendimento às segundas, das 8h às 12h, com consultas de 30 minutos.
+
+```json
+{
+  "fusoHorario": "America/Sao_Paulo",
+  "duracaoMinutos": 30,
+  "jornadas": [
+    {"diaSemana": 1, "faixas": [{"inicioMinuto": 480, "fimMinuto": 720}]}
+  ]
+}
+```
+
+`fusoHorario` é opcional e assume `America/Sao_Paulo` quando omitido. A duração vai de 5 a 240 minutos e precisa caber em cada faixa. Os dias vão de 1 (segunda) a 7 (domingo). As faixas usam minutos desde a meia-noite e podem ser adjacentes. Uma lista de jornadas vazia representa uma agenda sem atendimento. Tanto o `GET` como o `PUT` devolvem os três campos acima mais `id` e `medicoId`, com dias e faixas ordenados.
+
+## Bloqueios
+
+`POST /bloqueios` recebe o intervalo no fuso do médico, com início incluído e fim excluído.
+
+```json
+{
+  "medicoId": "100000000000000000000001",
+  "inicio": "2026-11-16T09:00",
+  "fim": "2026-11-16T10:00",
+  "motivo": "Reunião"
+}
+```
+
+O início deve preceder o fim e o motivo é opcional, com até 200 caracteres. A resposta acrescenta `id`, usa o identificador do médico mesmo quando o pedido enviou `meu` e devolve `null` se não houver motivo. A listagem devolve esses mesmos campos para cada registro. Para filtrar, envie `de` e `ate` juntos. As duas datas são inclusivas e a listagem inclui bloqueios que tocam o período. Bloqueios sobrepostos recebem 409 mesmo com confirmação.
 
 ## Quando acontece
 

@@ -1,9 +1,10 @@
-﻿import { render, screen, waitFor, within } from '@testing-library/react';
+﻿import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
+import { api } from '../services/api';
 import { TOKEN_KEY } from '../services/sessao';
 import { entrarComo, SECRETARIA_TESTE } from './sessaoTeste';
 
@@ -57,6 +58,40 @@ describe('sessão e rotas protegidas', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(fetchMock).toHaveBeenCalledWith('http://api.teste/auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  it('mantém o novo login quando chega um 401 da sessão anterior', async () => {
+    entrarComo();
+    const { promise: respostaAntiga, resolve: responder } = Promise.withResolvers();
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(respostaAntiga)
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ token: 'token-novo', usuario: SECRETARIA_TESTE }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    const router = renderAt('/perfis');
+    const requisicaoAntiga = api.get('/pacientes');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.teste/pacientes', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer token-de-teste' }),
+    }));
+
+    await user.click(screen.getByRole('button', { name: 'Conta de Sofia Secretaria' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    await user.type(await screen.findByLabelText(/E-mail/), 'secretaria@consultafacil.demo');
+    await user.type(screen.getByLabelText(/Senha/), 'Demo@123');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    await screen.findByRole('button', { name: 'Conta de Sofia Secretaria' });
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe('token-novo');
+
+    await act(async () => {
+      responder(json({ erro: 'Sessão expirada.' }, 401));
+      await expect(requisicaoAntiga).rejects.toMatchObject({ status: 401 });
+    });
+
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe('token-novo');
+    expect(router.state.location.pathname).toBe('/perfis');
+    expect(screen.getByRole('button', { name: 'Conta de Sofia Secretaria' })).toBeInTheDocument();
   });
 
   it('volta para o login quando a API recusa o token', async () => {

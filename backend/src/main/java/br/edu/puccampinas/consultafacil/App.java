@@ -66,21 +66,7 @@ public class App {
         var consultasAfetadas = new ConsultasAfetadas(consultaRepo, new NomesRepository.Mongo(db));
         var medicoDoUsuario = new MedicoDoUsuarioRepository(db);
         var acessoAgenda = new AcessoAgenda(medicoDoUsuario);
-        var agendaHandler = new AgendaHandler(
-            new AgendaService(agendaRepo, medicos, consultasAfetadas, Clock.systemUTC()), acessoAgenda
-        );
-
-        // Bloqueios (develop)
         var bloqueioRepo = new BloqueioRepository(db);
-        var bloqueioHandler = new BloqueioHandler(
-            new BloqueioService(
-                bloqueioRepo,
-                agendaRepo,
-                medicos,
-                consultasAfetadas
-            ), acessoAgenda
-        );
-
         var relogio = Clock.systemUTC();
         var fila = new FilaEsperaRepository(db);
         var notificacoes = new NotificacaoRepository(db);
@@ -90,11 +76,16 @@ public class App {
         var historicoRepo = new HistoricoRepository.Mongo(db);
         var historico = new HistoricoProcessor(consultaRepo, historicoRepo);
         // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
-        var sinalizacaoFila = new SinalizacaoFilaService(fila, notificacoes, consultaRepo, nomes, historico, relogio);
+        var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, relogio);
+        var sinalizacaoFila = new SinalizacaoFilaService(fila, notificacoes, consultaRepo, nomes, historico, relogio,
+            disponibilidade);
+        var agendaHandler = new AgendaHandler(
+            new AgendaService(agendaRepo, medicos, consultasAfetadas, relogio, sinalizacaoFila::revisarAgenda), acessoAgenda);
+        var bloqueioHandler = new BloqueioHandler(
+            new BloqueioService(bloqueioRepo, agendaRepo, medicos, consultasAfetadas, sinalizacaoFila::revisarAgenda), acessoAgenda);
         // e, quando uma vaga sinalizada é agendada, atualiza a fila (ATENDIDA / volta a AGUARDANDO)
         var registroConsultas = new RegistroConsultaService(consultaRepo, historico, relogio,
             sinalizacaoFila::sinalizar, sinalizacaoFila::consultaAgendada);
-        var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, relogio);
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, pacienteDoUsuario, registroConsultas);
         var avisosVaga = new AvisoVagaHandler(new AvisoVagaService(notificacoes, fila, consultaRepo,

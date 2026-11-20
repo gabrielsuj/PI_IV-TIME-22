@@ -127,6 +127,8 @@ A opção **Avisos de vaga** aparece no menu do paciente. O aviso nasce quando u
 
 As rotas exigem token de paciente vinculado a um cadastro. ID malformado retorna 400. Aviso inexistente ou de outro paciente retorna 404. Aviso expirado, já usado ou horário indisponível retorna 409.
 
+Depois de salvar um bloqueio ou uma alteração de jornada, a API revalida as ofertas do médico com as regras de disponibilidade do agendamento. Se o intervalo já não puder ser reservado, o aviso aparece como `EXPIRADO`. A inscrição ainda válida volta a `AGUARDANDO` na posição original. A leitura e a confirmação do aviso também revalidam o intervalo.
+
 A lista devolve `id`, `medicoNome`, `inicio`, `fim`, `validoAte`, `status` e, quando agendado, `consultaAgendadaId`. Os horários estão em ISO 8601 UTC. A validade termina no início da vaga ou no vencimento da inscrição, o que ocorrer primeiro.
 
 - **`DISPONIVEL`**: o paciente pode tentar agendar. A confirmação revalida a jornada, os bloqueios e a ocupação.

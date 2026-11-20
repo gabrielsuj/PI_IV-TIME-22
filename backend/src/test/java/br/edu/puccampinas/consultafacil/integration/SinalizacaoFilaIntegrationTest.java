@@ -1,5 +1,8 @@
 package br.edu.puccampinas.consultafacil.integration;
 
+import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
+import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
+import br.edu.puccampinas.consultafacil.service.DisponibilidadeService;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
 import br.edu.puccampinas.consultafacil.repository.ConsultaRepository;
@@ -88,8 +91,11 @@ class SinalizacaoFilaIntegrationTest {
         Clock relogio = Clock.fixed(AGORA, ZoneOffset.UTC);
         var consultas = new ConsultaRepository(db);
         var historico = new HistoricoProcessor(consultas, new HistoricoRepository.Mongo(db));
+        new AgendaRepository(db).salvar(MEDICO, new Document("fusoHorario", "America/Sao_Paulo")
+                .append("duracaoMinutos", 30).append("jornadas", List.of(new Document("diaSemana", 1)
+                        .append("faixas", List.of(new Document("inicioMinuto", 600).append("fimMinuto", 690))))));
         var sinalizacao = new SinalizacaoFilaService(new FilaEsperaRepository(db), new NotificacaoRepository(db),
-                consultas, new NomesRepository.Mongo(db), historico, relogio);
+                consultas, new NomesRepository.Mongo(db), historico, relogio, disponibilidade(consultas, relogio));
         registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
     }
 
@@ -112,7 +118,7 @@ class SinalizacaoFilaIntegrationTest {
                 return inserida;
             }
         };
-        var interrompida = new SinalizacaoFilaService(fila, falha, consultas, nomes, historico, relogio);
+        var interrompida = new SinalizacaoFilaService(fila, falha, consultas, nomes, historico, relogio, disponibilidade(consultas, relogio));
         registro = new RegistroConsultaService(consultas, historico, relogio, id -> {
             if (!falharAposInserirAviso) throw new IllegalStateException("Interrompido após cancelar");
             interrompida.sinalizar(id);
@@ -127,7 +133,7 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals("AGUARDANDO", fila(segunda).getString("status"));
 
         // Nova instância sem estado em memória, como após reiniciar a API.
-        var retomada = new SinalizacaoFilaService(fila, avisos, consultas, nomes, historico, relogio);
+        var retomada = new SinalizacaoFilaService(fila, avisos, consultas, nomes, historico, relogio, disponibilidade(consultas, relogio));
         retomada.recuperarPendentes();
         retomada.recuperarPendentes();
         assertNull(consultaDoBanco(origem).get("sinalizacaoFila"));
@@ -258,7 +264,7 @@ class SinalizacaoFilaIntegrationTest {
             }
         };
         var sinalizacao = new SinalizacaoFilaService(new FilaEsperaRepository(db), notificacoes, consultas,
-                new NomesRepository.Mongo(db), historico, relogio);
+                new NomesRepository.Mongo(db), historico, relogio, disponibilidade(consultas, relogio));
         registro = new RegistroConsultaService(consultas, historico, relogio, sinalizacao::sinalizar, sinalizacao::consultaAgendada);
 
         cancelar(origem);
@@ -331,6 +337,10 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals("SINALIZADA", atual.getString("status"));
         assertEquals(consulta, atual.get("ultimaSinalizacao", Document.class).getObjectId("consultaOrigemId"),
                 "foi sinalizado de novo, para a vaga nova");
+    }
+
+    private DisponibilidadeService disponibilidade(ConsultaRepository consultas, Clock relogio) {
+        return new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio);
     }
 
     // ---- apoio ----
