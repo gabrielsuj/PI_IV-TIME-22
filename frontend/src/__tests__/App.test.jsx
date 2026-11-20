@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
 import { entrarComo } from './sessaoTeste';
 import { indicadoresDaUrl } from './fixtures/indicadores';
+import { agendaPainel } from './fixtures/consultasPainel';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -19,9 +20,15 @@ function renderAt(path) {
 }
 
 function mockHealth(implementation) {
-  const fetchMock = vi.fn((url, options) => new URL(url).pathname === '/indicadores'
-    ? Promise.resolve(new Response(JSON.stringify(indicadoresDaUrl(url)), { headers: { 'Content-Type': 'application/json' } }))
-    : implementation(url, options));
+  const fetchMock = vi.fn((url, options) => {
+    const caminho = new URL(url).pathname;
+    let dados;
+    if (caminho === '/indicadores') dados = indicadoresDaUrl(url);
+    else if (caminho === '/agendas') dados = agendaPainel();
+    else if (['/medicos', '/consultas', '/consultas/lista'].includes(caminho)) dados = [];
+    else return implementation(url, options);
+    return Promise.resolve(new Response(JSON.stringify(dados), { headers: { 'Content-Type': 'application/json' } }));
+  });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }

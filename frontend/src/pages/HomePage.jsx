@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import ApiStatus from '../components/ApiStatus';
 import IndicadoresPainel from '../components/painel/IndicadoresPainel';
+import AgendaDiaPainel from '../components/painel/AgendaDiaPainel';
+import ProximasConsultasPainel from '../components/painel/ProximasConsultasPainel';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
@@ -44,6 +46,10 @@ export default function HomePage() {
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
         action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
       {operacional && <IndicadoresPainel de={dia} ate={dia} />}
+      {operacional && <>
+        <AgendaDiaPainel dia={dia} />
+        <ProximasConsultasPainel />
+      </>}
       <div className="record-grid">
         {acessos.map(({ to, title, description, label }) => (
           <Card key={to} title={title} description={description}><Button to={to} variant="outline">{label}</Button></Card>

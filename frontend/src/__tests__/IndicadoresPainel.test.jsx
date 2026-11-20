@@ -155,7 +155,10 @@ it('a repetição de montagem do StrictMode não mantém a primeira resposta abo
 it('usa a data da clínica na entrada mesmo quando o dia UTC já mudou', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-24T01:30:00Z'));
-  const fetchMock = vi.fn(async (url) => json(new URL(url).pathname === '/health' ? { status: 'ok' } : indicadoresDaUrl(url)));
+  const fetchMock = vi.fn(async (url) => {
+    const caminho = new URL(url).pathname;
+    return json(caminho === '/health' ? { status: 'ok' } : caminho === '/indicadores' ? indicadoresDaUrl(url) : []);
+  });
   vi.stubGlobal('fetch', fetchMock);
   render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />);
   expect(await screen.findByText('75,00%')).toBeInTheDocument();
@@ -165,8 +168,10 @@ it('usa a data da clínica na entrada mesmo quando o dia UTC já mudou', async (
 });
 
 it('o erro 401 de indicadores segue a expiração centralizada da sessão', async () => {
-  vi.stubGlobal('fetch', vi.fn(async (url) => new URL(url).pathname === '/health'
-    ? json({ status: 'ok' }) : json({ erro: 'Sessão expirada.' }, 401)));
+  vi.stubGlobal('fetch', vi.fn(async (url) => {
+    const caminho = new URL(url).pathname;
+    return caminho === '/indicadores' ? json({ erro: 'Sessão expirada.' }, 401) : json(caminho === '/health' ? { status: 'ok' } : []);
+  }));
   const router = createMemoryRouter(routes, { initialEntries: ['/'] });
   render(<RouterProvider router={router} />);
   await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
