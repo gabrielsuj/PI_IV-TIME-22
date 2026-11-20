@@ -9,12 +9,15 @@ import br.edu.puccampinas.consultafacil.service.PeriodoIndicadores;
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
+import org.bson.RawBsonDocument;
+import org.bson.codecs.DocumentCodec;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Projections.*;
@@ -47,17 +50,24 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
     @Override public Resumo ler(PeriodoIndicadores periodo, Optional<ObjectId> medico) {
         Objects.requireNonNull(periodo);
         Objects.requireNonNull(medico);
-        try { return agregar(periodo, medico); }
+        try {
+            var leitura = new LeituraConferida();
+            Resumo resumo = agregar(periodo, medico, leitura);
+            leitura.conferir();
+            return resumo;
+        }
         catch (MongoException e) { throw new ApiException(503, "Não foi possível ler os indicadores. Tente novamente."); }
+        catch (IllegalArgumentException | IllegalStateException | NullPointerException | ClassCastException e) {
+            throw new ApiException(503, "As fontes dos indicadores estão inconsistentes. Tente novamente.");
+        }
     }
 
-    private Resumo agregar(PeriodoIndicadores periodo, Optional<ObjectId> medico) {
-        // Necessita revisão de consistência entre leituras da #36 (etapa 7).
-        Set<ObjectId> medicos = new HashSet<>(fontes.medicos(medico));
+    private Resumo agregar(PeriodoIndicadores periodo, Optional<ObjectId> medico, LeituraConferida leitura) {
+        Set<ObjectId> medicos = new HashSet<>(leitura.ids(() -> fontes.medicos(medico)));
         medico.ifPresent(id -> medicos.removeIf(outro -> !id.equals(outro)));
         if (medico.isPresent() && !medicos.contains(medico.get())) throw ApiException.notFound("Médico não encontrado");
         Map<ObjectId, Document> coorte = new LinkedHashMap<>();
-        for (Document consulta : fontes.consultas(periodo, medico)) {
+        for (Document consulta : leitura.documentos(() -> fontes.consultas(periodo, medico))) {
             var inicio = consulta.getDate("inicio").toInstant();
             ObjectId medicoDaConsulta = Objects.requireNonNull(consulta.getObjectId("medicoId"));
             if (inicio.isBefore(periodo.inicioInclusivo()) || !inicio.isBefore(periodo.fimExclusivo())
@@ -73,7 +83,7 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
                 totais.getOrDefault(StatusConsulta.CONCLUIDA, 0L), totais.getOrDefault(StatusConsulta.FALTA, 0L), totais.getOrDefault(StatusConsulta.CANCELADA, 0L));
 
         Map<ObjectId, Document> agendas = new HashMap<>();
-        for (Document agenda : fontes.agendas(Set.copyOf(medicos))) {
+        for (Document agenda : leitura.documentos(() -> fontes.agendas(Set.copyOf(medicos)))) {
             ObjectId id = Objects.requireNonNull(agenda.getObjectId("medicoId"));
             if (!medicos.contains(id)) continue;
             if (agendas.putIfAbsent(id, agenda) != null) throw new IllegalStateException("Mais de uma agenda para o mesmo médico");
@@ -87,17 +97,20 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
             Instant inicio = grade.getFirst().inicio();
             Instant fim = grade.stream().map(v -> v.fim()).max(Comparator.naturalOrder()).orElseThrow();
             var calculada = CalculadoraCapacidade.calcular(Optional.of(agenda), periodo,
-                    fontes.bloqueios(id, inicio, fim), fontes.ocupantes(id, inicio, fim));
+                    leitura.documentos(() -> fontes.bloqueios(id, inicio, fim)),
+                    leitura.documentos(() -> fontes.ocupantes(id, inicio, fim)));
             capacidade = Math.addExact(capacidade, calculada.capacidade());
             ocupadas = Math.addExact(ocupadas, calculada.vagasOcupadas());
         }
-        var confirmacao = CalculadoraConfirmacao.calcular(periodo, medico, consultas, ids.isEmpty() ? List.of() : fontes.historico(ids));
-        var inscricoes = medico.isPresent() && ids.isEmpty() ? List.<Document>of() : fontes.atendidas(medico, ids);
+        var confirmacao = CalculadoraConfirmacao.calcular(periodo, medico, consultas,
+                ids.isEmpty() ? List.of() : leitura.documentos(() -> fontes.historico(ids)));
+        var inscricoes = medico.isPresent() && ids.isEmpty() ? List.<Document>of()
+                : leitura.documentos(() -> fontes.atendidas(medico, ids));
         Set<ObjectId> referencias = new HashSet<>();
         for (Document inscricao : inscricoes)
             if (inscricao.get("consultaAgendadaId") instanceof ObjectId id && !coorte.containsKey(id)) referencias.add(id);
         Map<ObjectId, Document> vinculadas = new LinkedHashMap<>(coorte);
-        if (!referencias.isEmpty()) for (Document consulta : fontes.consultasPorIds(Set.copyOf(referencias))) adicionar(vinculadas, consulta);
+        if (!referencias.isEmpty()) for (Document consulta : leitura.documentos(() -> fontes.consultasPorIds(Set.copyOf(referencias)))) adicionar(vinculadas, consulta);
         var fila = CalculadoraPreenchimentoFila.calcular(periodo, medico, new ArrayList<>(vinculadas.values()), inscricoes);
         long mantidas = consultas.size() - estados.canceladas();
         if (fila.consultasNaoCanceladas() != mantidas) throw new IllegalStateException("População da fila mudou durante a leitura dos indicadores");
@@ -110,6 +123,37 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
         ObjectId id = Objects.requireNonNull(consulta.getObjectId("_id"));
         Document anterior = destino.putIfAbsent(id, consulta);
         if (anterior != null && !anterior.equals(consulta)) throw new IllegalStateException("Snapshots divergentes da mesma consulta");
+    }
+
+    /**
+     * Conferência otimista, inclusive de consultas novas/remarcadas e vínculos antes ausentes.
+     * Cada consulta às fontes é repetida uma vez, sem limite/paginação nem repetição de escritas.
+     * Compara documentos completos da projeção, sem depender da ordem de retorno do Mongo.
+     * Não é uma transação/snapshot atômico: mudanças observadas invalidam toda a resposta com 503.
+     */
+    private static final class LeituraConferida {
+        private final DocumentCodec codec = new DocumentCodec();
+        private final List<Runnable> conferencias = new ArrayList<>();
+
+        List<ObjectId> ids(Supplier<List<ObjectId>> consulta) { return listar(consulta, Function.identity()); }
+        List<Document> documentos(Supplier<List<Document>> consulta) {
+            return listar(consulta, d -> new RawBsonDocument(d, codec).decode(codec));
+        }
+        private <T> List<T> listar(Supplier<List<T>> consulta, Function<T, T> copiar) {
+            var valores = consulta.get().stream().map(copiar).toList();
+            var esperado = frequencias(valores);
+            conferencias.add(() -> {
+                if (!esperado.equals(frequencias(consulta.get())))
+                    throw new ApiException(503, "Os dados dos indicadores mudaram durante a leitura. Tente novamente.");
+            });
+            return valores;
+        }
+        private static <T> Map<T, Long> frequencias(List<T> valores) {
+            Map<T, Long> resultado = new HashMap<>();
+            valores.forEach(valor -> resultado.merge(valor, 1L, Math::addExact));
+            return resultado;
+        }
+        void conferir() { conferencias.forEach(Runnable::run); }
     }
 
     private static final class FontesMongo implements Fontes {

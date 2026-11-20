@@ -206,6 +206,19 @@ class ConfirmacaoIndicadoresTest {
         assertEquals(new BigDecimal("100.00"), resultado.confirmacao().orElseThrow().percentual());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"CONFIRMADA", "CONCLUIDA"})
+    void criacaoProjetadaNaoTornaZeroVerdadeiroUmaConfirmacaoAusenteDoHistorico(String atual) {
+        ObjectId id = criar();
+        consultas.docs.get(id).put("status", atual);
+        var resultado = calcular();
+        assertEquals(0, resultado.comConfirmacaoRegistrada());
+        assertEquals(1, resultado.consultasSemBaseHistorica());
+        assertFalse(resultado.atualizacaoPendente());
+        assertTrue(resultado.confirmacao().isEmpty());
+        assertEquals(1, historico.size()); // A leitura não inventa o evento ausente.
+    }
+
     @Test void outrosTiposDeEventoNaoSaoProvaDeConfirmacao() {
         ObjectId id = criar();
         status.alterar(id, StatusConsulta.FALTA, secretaria);

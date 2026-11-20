@@ -2,11 +2,14 @@ package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.repository.IndicadoresMongoRepository;
+import br.edu.puccampinas.consultafacil.service.PeriodoIndicadores;
 import br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria;
 import com.mongodb.MongoException;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.*;
@@ -16,6 +19,124 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Consolidação real com fontes em memória; os contratos BSON e o banco real têm testes separados. */
 class IndicadoresMongoRepositoryTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"medicos", "novaConsulta", "remarcacao", "versao", "pendencias", "agenda", "bloqueio", "ocupante", "historico", "fila", "vinculo"})
+    void mudancaEntreFontesRecusaRespostaInteiraSemRepetirCalculoOuEscrita(String fonte) {
+        var f = new FontesComConferencia();
+        var fora = new Document(f.consultas.getFirst()).append("_id", new ObjectId())
+                .append("inicio", Date.from(PERIODO.fimExclusivo())).append("fim", Date.from(PERIODO.fimExclusivo().plusSeconds(1800)));
+        f.consultas.add(fora);
+        f.fila.add(atendida(fora.getObjectId("_id")));
+        f.aoConferir = () -> {
+            switch (fonte) {
+                case "medicos" -> f.medicos.add(new ObjectId());
+                case "novaConsulta" -> f.consultas.add(new Document(f.consultas.getFirst()).append("_id", new ObjectId()));
+                case "remarcacao" -> f.consultas.getFirst().put("inicio", Date.from(PERIODO.fimExclusivo()));
+                case "versao" -> f.consultas.getFirst().put("versao", 2);
+                case "pendencias" -> f.consultas.getFirst().put("eventosPendentes", List.of(new Document("_id", new ObjectId())));
+                case "agenda" -> f.agendas.getFirst().put("duracaoMinutos", 60);
+                case "bloqueio" -> f.bloqueios.get(MEDICO).getFirst().getDate("fim").setTime(PERIODO.fimExclusivo().toEpochMilli());
+                case "ocupante" -> f.consultas.getFirst().put("fim", Date.from(PERIODO.fimExclusivo()));
+                case "historico" -> f.eventos.removeFirst();
+                case "fila" -> f.fila.getFirst().put("consultaAgendadaId", f.consultas.get(1).getObjectId("_id"));
+                case "vinculo" -> f.consultas.remove(fora);
+                default -> throw new AssertionError(fonte);
+            }
+        };
+        var erro = assertThrows(ApiException.class, () -> new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty()));
+        assertEquals(503, erro.status());
+        assertTrue(erro.getMessage().contains("mudaram"));
+        assertEquals(2, Collections.frequency(f.chamadas, "medicos"));
+        assertEquals(Set.of("fila", "vinculo").contains(fonte) ? 2 : 1, Collections.frequency(f.chamadas, "fila"));
+    }
+
+    @Test void ordemDasFontesNaoImportaEConferenciaTemQuantidadeLimitadaDeLeituras() {
+        var f = new FontesComConferencia();
+        f.aoConferir = () -> {
+            Collections.reverse(f.medicos); Collections.reverse(f.consultas);
+            Collections.reverse(f.agendas); Collections.reverse(f.eventos); Collections.reverse(f.fila);
+        };
+        var r = new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty());
+        assertEquals(2, r.fila().preenchidas());
+        assertEquals(4, r.confirmacao().registradas());
+        for (String fonte : List.of("medicos", "consultas", "agendas", "historico", "fila"))
+            assertEquals(2, Collections.frequency(f.chamadas, fonte), fonte);
+        assertEquals(4, f.janelas.size()); // Bloqueios e ocupantes lidos duas vezes.
+    }
+
+    @Test void medicoScopadoInicialmenteVazioDetectaConsultaCriadaDuranteLeitura() {
+        var f = new FontesComConferencia();
+        var nova = f.consultas.getFirst();
+        f.consultas.clear(); f.eventos.clear(); f.fila.clear();
+        f.aoConferir = () -> f.consultas.add(nova);
+        assertEquals(503, assertThrows(ApiException.class,
+                () -> new IndicadoresMongoRepository(f).ler(PERIODO, Optional.of(MEDICO))).status());
+    }
+
+    @Test void referenciaInicialmenteAusenteQueApareceNaConferenciaInvalidaOResumo() {
+        var f = new FontesComConferencia();
+        var fora = new Document(f.consultas.getFirst()).append("_id", new ObjectId())
+                .append("inicio", Date.from(PERIODO.fimExclusivo())).append("fim", Date.from(PERIODO.fimExclusivo().plusSeconds(1800)));
+        f.fila.add(atendida(fora.getObjectId("_id")));
+        f.aoConferir = () -> f.consultas.add(fora);
+        var erro = assertThrows(ApiException.class, () -> new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty()));
+        assertEquals(503, erro.status());
+        assertEquals(2, Collections.frequency(f.chamadas, "vinculadas"));
+    }
+
+    @Test void falhaMongoDuranteConferenciaNaoEntregaOResumoJaCalculado() {
+        var f = new FontesComConferencia();
+        f.aoConferir = () -> { throw new MongoException("erro interno na conferência"); };
+        var erro = assertThrows(ApiException.class, () -> new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty()));
+        assertEquals(503, erro.status());
+        assertFalse(erro.getMessage().contains("erro interno"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"medicoAusente", "statusDesconhecido", "duplicataDivergente", "duasAgendas", "inicioAusente", "pendenciasInvalidas"})
+    void fontesEstruturalmenteInconsistentesNaoViramZeroNemErroInternoExposto(String defeito) {
+        var f = fixture();
+        switch (defeito) {
+            case "medicoAusente" -> f.medicos.clear();
+            case "statusDesconhecido" -> f.consultas.getFirst().put("status", "DESCONHECIDO");
+            case "duplicataDivergente" -> f.consultas.add(new Document(f.consultas.getFirst()).append("status", "CANCELADA"));
+            case "duasAgendas" -> f.agendas.add(new Document(f.agendas.getFirst()));
+            case "inicioAusente" -> f.consultas.getFirst().remove("inicio");
+            case "pendenciasInvalidas" -> f.consultas.getFirst().put("eventosPendentes", "inválido");
+            default -> throw new AssertionError(defeito);
+        }
+        var erro = assertThrows(ApiException.class, () -> new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty()));
+        assertEquals(503, erro.status());
+        assertFalse(erro.getMessage().contains("DESCONHECIDO"));
+        assertFalse(erro.getMessage().contains(MEDICO.toHexString()));
+    }
+
+    private static final class FontesComConferencia extends FontesIndicadoresEmMemoria {
+        Runnable aoConferir = () -> {};
+        int leiturasMedicos;
+        FontesComConferencia() {
+            var f = fixture();
+            medicos.addAll(f.medicos); consultas.addAll(f.consultas); agendas.addAll(f.agendas);
+            eventos.addAll(f.eventos); fila.addAll(f.fila); bloqueios.putAll(f.bloqueios);
+        }
+        @Override public List<ObjectId> medicos(Optional<ObjectId> medico) {
+            if (++leiturasMedicos == 2) aoConferir.run();
+            return super.medicos(medico);
+        }
+        @Override public List<Document> consultas(PeriodoIndicadores periodo, Optional<ObjectId> medico) {
+            return super.consultas(periodo, medico).stream()
+                    .filter(d -> !d.getDate("inicio").toInstant().isBefore(periodo.inicioInclusivo())
+                            && d.getDate("inicio").toInstant().isBefore(periodo.fimExclusivo())
+                            && (medico.isEmpty() || medico.get().equals(d.getObjectId("medicoId"))))
+                    .map(d -> { var projecao = new Document(d); projecao.remove("fim"); return projecao; }).toList();
+        }
+        @Override public List<Document> ocupantes(ObjectId medico, Instant inicio, Instant fim) {
+            return super.ocupantes(medico, inicio, fim).stream()
+                    .filter(d -> d.getDate("inicio").toInstant().isBefore(fim) && d.getDate("fim").toInstant().isAfter(inicio)
+                            && !"CANCELADA".equals(d.getString("status"))).toList();
+        }
+    }
+
     @Test void fixtureManualConsolidaTodasAsFontesSemMudarDados() {
         var f = fixture();
         String antes = new Document("consultas", f.consultas).append("agendas", f.agendas).append("eventos", f.eventos).append("fila", f.fila).toJson();

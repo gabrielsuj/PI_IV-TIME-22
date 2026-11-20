@@ -17,6 +17,7 @@ import com.mongodb.client.MongoDatabase;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.bson.types.ObjectId;
+import org.bson.Document;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -139,6 +140,56 @@ class IndicadoresHttpTest {
         conferirTaxa(corpo.get("confirmacao"), 4, 6, "66.67");
         conferirTaxa(corpo.get("preenchimentoFila"), 2, 5, "40.00");
         assertEquals(MEDICO.toHexString(), corpo.get("medicoId").asText());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"pendencia,confirmacao,DADOS_PENDENTES", "legado,confirmacao,DADOS_INCOMPLETOS",
+            "confirmacaoAusente,confirmacao,DADOS_INCOMPLETOS", "orfao,preenchimentoFila,DADOS_INCOMPLETOS",
+            "semAgenda,ocupacao,DADOS_INCOMPLETOS"})
+    void qualidadeDasFontesCompletasChegaAoJsonSemPercentualFalso(String defeito, String metrica, String situacao) throws Exception {
+        var f = FontesIndicadoresEmMemoria.fixture();
+        switch (defeito) {
+            case "pendencia" -> f.consultas.getFirst().put("eventosPendentes", List.of(new Document("_id", new ObjectId())));
+            case "legado" -> f.eventos.clear();
+            case "confirmacaoAusente" -> f.eventos.removeIf(e -> "CONFIRMACAO".equals(e.getString("evento")));
+            case "orfao" -> f.fila.add(FontesIndicadoresEmMemoria.atendida(new ObjectId()));
+            case "semAgenda" -> f.agendas.clear();
+            default -> throw new AssertionError(defeito);
+        }
+        String antes = new Document("consultas", f.consultas).append("historico", f.eventos).append("fila", f.fila).toJson();
+        fonte = new IndicadoresMongoRepository(f);
+        var resposta = enviar("GET", "/indicadores?de=2026-11-23&ate=2026-11-23", token(SECRETARIA));
+        assertEquals(200, resposta.statusCode(), resposta.body());
+        var corpo = json.readTree(resposta.body());
+        assertEquals(situacao, corpo.get(metrica).get("situacao").asText());
+        assertTrue(corpo.get(metrica).get("percentual").isNull());
+        assertEquals(6, corpo.get("contagens").get("totalConsultas").asInt());
+        conferirTaxa(corpo.get("faltas"), 1, 3, "33.33");
+        assertEquals(antes, new Document("consultas", f.consultas).append("historico", f.eventos).append("fila", f.fila).toJson());
+    }
+
+    @Test void mudancaDuranteLeituraRetorna503EOutraRequisicaoPodeLerDadosEstaveis() throws Exception {
+        var f = new FontesIndicadoresEmMemoria() {
+            @Override public List<Document> historico(Set<ObjectId> ids) {
+                consultas.getFirst().put("status", "CANCELADA");
+                return super.historico(ids);
+            }
+        };
+        var dados = FontesIndicadoresEmMemoria.fixture();
+        f.medicos.addAll(dados.medicos); f.consultas.addAll(dados.consultas); f.agendas.addAll(dados.agendas);
+        f.bloqueios.putAll(dados.bloqueios); f.eventos.addAll(dados.eventos); f.fila.addAll(dados.fila);
+        fonte = new IndicadoresMongoRepository(f);
+        String caminho = "/indicadores?de=2026-11-23&ate=2026-11-23";
+        String sessao = token(SECRETARIA);
+        var resposta = enviar("GET", caminho, sessao);
+        conferirErro(resposta, 503);
+        assertFalse(resposta.body().contains("contagens"));
+        assertFalse(resposta.body().contains(f.consultas.getFirst().getObjectId("_id").toHexString()));
+        assertEquals(1, leituras.get()); // Não tenta de novo automaticamente.
+        var recuperada = enviar("GET", caminho, sessao);
+        assertEquals(200, recuperada.statusCode(), recuperada.body());
+        assertEquals(2, json.readTree(recuperada.body()).get("contagens").get("canceladas").asInt());
+        assertEquals(2, leituras.get());
     }
 
     @ParameterizedTest

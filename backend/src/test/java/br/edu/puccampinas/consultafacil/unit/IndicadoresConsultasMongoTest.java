@@ -60,7 +60,7 @@ class IndicadoresConsultasMongoTest {
         assertEquals(501, resultado.fila().preenchidas());
         for (String colecao : List.of("historico", "filaEspera")) {
             var lotes = db.daColecao(colecao);
-            assertEquals(2, lotes.size());
+            assertEquals(4, lotes.size()); // Dois lotes em cada uma das duas leituras completas.
             String chave = colecao.equals("historico") ? "consultaId" : "consultaAgendadaId";
             Set<BsonValue> ids = new HashSet<>();
             for (Leitura lote : lotes) for (BsonDocument clausula : clausulas(lote.filtro)) {
@@ -81,7 +81,7 @@ class IndicadoresConsultasMongoTest {
         new IndicadoresMongoRepository(db.banco()).ler(PERIODO, Optional.empty());
         assertEquals(BsonDocument.parse("{status: 'ATENDIDA'}"), db.daColecao("filaEspera").getFirst().filtro);
         var consultas = db.daColecao("consultas");
-        assertEquals(3, consultas.size());
+        assertEquals(6, consultas.size()); // Coorte, ocupantes e vínculos, com conferência de cada fonte.
         assertEquals(new BsonArray(List.of(new BsonObjectId(fora))), consultas.getLast().filtro.getDocument("_id").getArray("$in"));
     }
 

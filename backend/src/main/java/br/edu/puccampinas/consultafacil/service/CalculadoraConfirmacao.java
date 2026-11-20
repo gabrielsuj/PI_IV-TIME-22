@@ -25,7 +25,8 @@ import java.util.Set;
  * <p>Expõe a contagem comprovada pelos eventos projetados. Havendo caixa de pendências não vazia,
  * suspende a taxa até uma nova leitura completa. Consulta sem CRIACAO nem CONFIRMACAO projetada
  * também não tem base suficiente para afirmar ausência de confirmação (ex.: legado). Não fabrica
- * eventos nem transforma esses casos em 0% verdadeiro. Inconsistências estruturais são recusadas.</p>
+ * eventos nem transforma esses casos em 0% verdadeiro. CONFIRMADA/CONCLUIDA sem evento comprovante
+ * também indicam base histórica insuficiente, mesmo havendo CRIACAO. Inconsistências estruturais são recusadas.</p>
  */
 public final class CalculadoraConfirmacao {
     private CalculadoraConfirmacao() {}
@@ -75,7 +76,8 @@ public final class CalculadoraConfirmacao {
         long pendentes = selecionadas.values().stream()
                 .filter(consulta -> !consulta.getList("eventosPendentes", Document.class, List.of()).isEmpty()).count();
         long semBase = selecionadas.keySet().stream()
-                .filter(id -> !comCriacao.contains(id) && !confirmadas.contains(id)).count();
+                .filter(id -> !confirmadas.contains(id) && (!comCriacao.contains(id)
+                        || Set.of("CONFIRMADA", "CONCLUIDA").contains(selecionadas.get(id).getString("status")))).count();
         return new Resultado(selecionadas.size(), confirmadas.size(), pendentes, semBase);
     }
 }
