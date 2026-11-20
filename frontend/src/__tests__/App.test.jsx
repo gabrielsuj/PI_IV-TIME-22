@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../routes';
 import { entrarComo } from './sessaoTeste';
+import { indicadoresDaUrl } from './fixtures/indicadores';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -18,7 +19,9 @@ function renderAt(path) {
 }
 
 function mockHealth(implementation) {
-  const fetchMock = vi.fn(implementation);
+  const fetchMock = vi.fn((url, options) => new URL(url).pathname === '/indicadores'
+    ? Promise.resolve(new Response(JSON.stringify(indicadoresDaUrl(url)), { headers: { 'Content-Type': 'application/json' } }))
+    : implementation(url, options));
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
@@ -73,7 +76,8 @@ describe('roteamento', () => {
     }
     if (perfil === 'MEDICO') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
     else expect(main.getByRole('link', { name: 'Nova consulta' })).toHaveAttribute('href', '/nova-consulta');
-    expect(fetchMock.mock.calls.every(([url]) => url === 'http://api.teste/health')).toBe(true);
+    if (paciente) expect(fetchMock.mock.calls.every(([url]) => url === 'http://api.teste/health')).toBe(true);
+    else expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/indicadores')).toBe(true);
   });
 
   it('navega para a página de status pelo menu', async () => {
@@ -138,6 +142,6 @@ describe('verificação do /health', () => {
     await user.click(screen.getByRole('button', { name: 'Verificar novamente' }));
 
     expect(await screen.findByText('API disponível')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url === 'http://api.teste/health')).toHaveLength(2);
   });
 });

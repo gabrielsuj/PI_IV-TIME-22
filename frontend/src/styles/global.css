@@ -167,6 +167,7 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .search-card .card__content { padding: var(--space-4); }
 .search-field { width: 100%; max-width: 448px; }
 .record-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.indicador__valor { color: var(--color-heading); font-size: 2rem; font-weight: 600; line-height: 1.2; }
 .record-card .card__content { gap: var(--space-3); padding: var(--space-5); }
 .record-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); width: 100%; }
 .record-card__title { font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
