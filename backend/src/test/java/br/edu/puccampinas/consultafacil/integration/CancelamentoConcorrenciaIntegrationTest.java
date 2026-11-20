@@ -104,7 +104,8 @@ class CancelamentoConcorrenciaIntegrationTest {
         var nomes = new NomesRepository.Mongo(db);
         var notificacoesRepo = new NotificacaoRepository(db);
         var pacienteDoUsuario = new PacienteDoUsuarioRepository(db);
-        var sinalizacao = new SinalizacaoFilaService(filaRepo, notificacoesRepo, consultas, nomes, processor, relogio);
+        var disponibilidade = new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio);
+        var sinalizacao = new SinalizacaoFilaService(filaRepo, notificacoesRepo, consultas, nomes, processor, relogio, disponibilidade);
         var notificacoes = new NotificacoesService(notificacoesRepo, consultas, nomes, n -> {},
                 new AppConfig.Notificacoes(24, 60, false), relogio);
         var registro = new RegistroConsultaService(consultas, processor, relogio, sinalizacao::sinalizar, consulta -> {
@@ -113,7 +114,7 @@ class CancelamentoConcorrenciaIntegrationTest {
         });
         var acesso = new AcessoConsulta(pacienteDoUsuario::buscar, new MedicoDoUsuarioRepository(db)::buscar);
         agendamento = new AgendamentoService(
-                new DisponibilidadeService(new AgendaRepository(db), new BloqueioRepository(db), consultas, relogio),
+                disponibilidade,
                 new MedicoRepository(db), new EspecialidadeRepository.Mongo(db), new PacienteRepository.Mongo(db),
                 pacienteDoUsuario, registro);
         cancelamento = new CancelamentoService(consultas, acesso, registro, notificacoes::consultaCancelada, relogio);

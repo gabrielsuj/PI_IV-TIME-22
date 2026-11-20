@@ -28,6 +28,6 @@ public class ConsultaCalendarioHandler implements HttpHandler {
         if (!"GET".equals(ex.getRequestMethod())) throw new ApiException(405, "Método não permitido");
         Map<String, String> q = Query.params(ex);
         Http.sendJson(ex, 200, service.listar(
-                acesso.medicoAutorizado(Autorizacao.usuario(ex), Query.obrigatorio(ex, "medicoId")), q.get("de"), q.get("ate")));
+                acesso.medicoAutorizado(Autorizacao.usuario(ex), Query.obrigatorio(ex, "medicoId")), q.get("de"), q.get("ate"), q.get("fusoHorario")));
     }
 }

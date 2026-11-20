@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import HistoricoConsulta from '../components/consultas/HistoricoConsulta';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { usePrazoConsulta } from '../hooks/usePrazoConsulta';
 import { alterarStatusConsulta, buscarConsulta, cancelarConsulta } from '../services/consultasService';
 import { acoesStatusDaConsulta, dataHoraDaConsulta, STATUS_ATIVOS, STATUS_CONSULTA } from '../utils/consulta';
+import { retornoPainel } from '../utils/painel';
 
 const LIMITE_MOTIVO = 255;
 const ACOES_STATUS = {
@@ -93,6 +94,8 @@ export default function ConsultaDetalhePage() {
 
 function DetalheConsulta({ id }) {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const retorno = retornoPainel(location, usuario);
   const { consulta, erro, carregando, recarregar, chave, revisao } = useConsulta(id);
   const [cancelando, setCancelando] = useState(false);
   const [aviso, setAviso] = useState(null);
@@ -150,7 +153,9 @@ function DetalheConsulta({ id }) {
     }
   }
 
-  const voltar = <Button to="/consultas" variant="outline" disabled={Boolean(enviandoStatus)}>‹ Voltar para consultas</Button>;
+  const voltar = <Button to={retorno || '/consultas'} variant="outline" disabled={Boolean(enviandoStatus)}>
+    {retorno ? '‹ Voltar ao painel' : '‹ Voltar para consultas'}
+  </Button>;
   const feedback = aviso && <Alert ref={avisoRef} tabIndex={-1} tone={aviso.conferir && !conferir ? 'info' : aviso.tom}
     action={conferir && !acessoRecusado && <Button variant="outline" size="sm" disabled={carregando} onClick={recarregar}>Conferir status da consulta</Button>}>
     {aviso.conferir && !conferir ? 'Status atualizado. Confira o resumo antes de decidir sobre outra alteração.' : aviso.texto}

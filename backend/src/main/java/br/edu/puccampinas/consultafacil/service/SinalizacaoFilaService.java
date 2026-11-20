@@ -1,11 +1,13 @@
 package br.edu.puccampinas.consultafacil.service;
 
+import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.domain.enums.EventoHistorico;
 import br.edu.puccampinas.consultafacil.domain.enums.StatusConsulta;
 import br.edu.puccampinas.consultafacil.repository.ConsultaRepository;
 import br.edu.puccampinas.consultafacil.repository.FilaEsperaRepository;
 import br.edu.puccampinas.consultafacil.repository.NomesRepository;
 import br.edu.puccampinas.consultafacil.repository.NotificacaoRepository;
+import br.edu.puccampinas.consultafacil.repository.TravaAgenda;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -41,16 +43,19 @@ public final class SinalizacaoFilaService {
     private final FilaEsperaRepository fila;
     private final NotificacaoRepository notificacoes;
     private final ConsultaRepository consultas;
+    private final DisponibilidadeService disponibilidade;
     private final NomesRepository nomes;
     private final HistoricoProcessor historico;
     private final Clock relogio;
     private ObjectId cursor;
 
     public SinalizacaoFilaService(FilaEsperaRepository fila, NotificacaoRepository notificacoes, ConsultaRepository consultas,
-                                  NomesRepository nomes, HistoricoProcessor historico, Clock relogio) {
+                                  NomesRepository nomes, HistoricoProcessor historico, Clock relogio,
+                                  DisponibilidadeService disponibilidade) {
         this.fila = fila;
         this.notificacoes = notificacoes;
         this.consultas = consultas;
+        this.disponibilidade = disponibilidade;
         this.nomes = nomes;
         this.historico = historico;
         this.relogio = relogio;
@@ -96,10 +101,44 @@ public final class SinalizacaoFilaService {
         }
     }
 
+    /** Revalida os avisos depois de gravar uma alteração na agenda. */
+    public void revisarAgenda(ObjectId medicoId) {
+        try {
+            for (ObjectId origem : fila.origensSinalizadasDoMedico(medicoId))
+                consultas.buscar(origem).ifPresent(this::reconciliarVaga);
+        } catch (RuntimeException e) {
+            // A agenda já foi gravada. A leitura ou tentativa de uso do aviso volta a validá-lo.
+            LOG.warn("Revisão dos avisos adiada para o médico {}", medicoId, e);
+        }
+    }
+
+    /** Retorna true se o intervalo oferecido deixou de poder ser agendado. */
     boolean reconciliarVaga(Document origem) {
-        var ocupante = consultas.ativaNaVaga(origem.getObjectId("medicoId"), origem.getDate("inicio"));
-        ocupante.ifPresent(this::consultaAgendada);
-        return ocupante.isPresent();
+        ObjectId medicoId = origem.getObjectId("medicoId");
+        Date inicio = origem.getDate("inicio");
+        synchronized (TravaAgenda.porMedico(medicoId)) {
+            var ocupante = consultas.ativaNaVaga(medicoId, inicio);
+            if (ocupante.isPresent()) {
+                consultaAgendada(ocupante.get());
+                return true;
+            }
+
+            try {
+                disponibilidade.exigirVagaLivre(medicoId, inicio.toInstant(), origem.getDate("fim").toInstant());
+                return false;
+            } catch (ApiException e) {
+                if (e.status() != 409) throw e;
+            }
+
+            Date agora = Date.from(relogio.instant());
+            ObjectId origemId = origem.getObjectId("_id");
+            for (Document inscricao : fila.sinalizadasParaVaga(medicoId, inicio)) {
+                var ultima = inscricao.get("ultimaSinalizacao", Document.class);
+                if (origemId.equals(ultima.getObjectId("consultaOrigemId")))
+                    devolverParaFila(inscricao.getObjectId("_id"), ultima.getObjectId("notificacaoId"), agora);
+            }
+            return true;
+        }
     }
 
     private static boolean vagaFutura(Document consulta, Date agora) {
@@ -154,12 +193,17 @@ public final class SinalizacaoFilaService {
             ObjectId notificacaoId = inscricao.get("ultimaSinalizacao", Document.class).getObjectId("notificacaoId");
             if (pacienteId.equals(inscricao.getObjectId("pacienteId"))) {
                 if (fila.marcarAtendida(id, notificacaoId, consulta.getObjectId("_id"), agora)) alteradas++;
-            } else if (fila.voltarParaAguardando(id, notificacaoId, agora)) {
-                notificacoes.descartar(notificacaoId);
+            } else if (devolverParaFila(id, notificacaoId, agora)) {
                 alteradas++;
             }
         }
         return alteradas;
+    }
+
+    private boolean devolverParaFila(ObjectId inscricao, ObjectId aviso, Date agora) {
+        if (!fila.voltarParaAguardando(inscricao, aviso, agora)) return false;
+        notificacoes.descartar(aviso);
+        return true;
     }
 
     /**
