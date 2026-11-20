@@ -36,22 +36,29 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 
 ## Validação local da integração (#45)
 
-Em 19/11/2026, a revisão testada na branch `integracao/mvp-45` foi `0e1ab172a609505fe99b3e0f0d3a8c5243909943`.
+Em 20/11/2026, a branch `integracao/mvp-45` reuniu a `develop` `0b5fb2a` com as correções de avisos da fila, sessão, agenda (#53) e CI de backup. A revisão de código validada foi `47df28608c54bbaec99a5ad2cc99087cf80fc549`.
 
-| Verificação | Resultado observado nessa revisão |
+| Verificação | Resultado observado |
 |---|---|
-| Backend | 523 testes JUnit passaram com MongoDB 7 descartável, incluindo as suítes opcionais. Zero falhas, erros ou testes ignorados. |
-| Frontend | 307 testes Vitest passaram em 21 arquivos. ESLint e build de produção concluídos com sucesso. |
-| Backup da demonstração | O verificador de coerência aprovou a carga. O backup de 76 KiB restaurou as dez coleções em um banco temporário, incluindo 857 consultas, 1.946 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
-| Concorrência e falhas na restauração | Dois backups do mesmo banco no mesmo segundo produziram arquivos distintos, ambos restauráveis. Um arquivo inválido e um arquivo de outra origem foram recusados com o destino preservado. Após uma falha de escrita parcial, o retorno automático recuperou o registro, o índice único e o validador anteriores. Quando o retorno automático também falhou, a cópia preservada permitiu a recuperação manual. |
+| Backend | Compilação limpa com Java 21 e 861 testes JUnit aprovados com MongoDB 7 descartável, incluindo os testes opcionais e as verificações dos indicadores sobre a carga de demonstração. Zero falhas, erros ou testes ignorados. |
+| Frontend | 308 testes Vitest aprovados em 21 arquivos com Node 24. ESLint e build de produção concluídos com sucesso. |
+| Módulo `server/` | O compilador Maven passou a usar a mesma versão do Java declarada pelo projeto. A compilação limpa do módulo separado aprovou as 13 fontes em Java 21. |
+| Backup da demonstração | O verificador de coerência aprovou a carga. O backup restaurou dez coleções em um banco temporário, incluindo 834 consultas, 1.939 eventos de histórico e 150 pacientes. Contagens, hashes de conteúdo, índices e validadores conferiram nas dez coleções. |
+| Teste do workflow de backup | O comando executado localmente aprovou os backups simultâneos e a rejeição de arquivo inválido ou de outra origem com o destino preservado. Após a falha parcial, o retorno automático recuperou dados, índice único e validador. A cópia preservada também permitiu o retorno manual quando a recuperação automática falhou. |
 
-As quantidades acima identificam a carga utilizada nessa execução. Para repetir a comparação, use a origem e a cópia restaurada da mesma carga. [Procedimento de backup e recuperação](backup-recuperacao.md)
+As contagens correspondem à carga gerada nessa execução. A compilação do módulo `server/` e os checks do frontend foram executados em `8cf6cb1`, com os mesmos arquivos dessas áreas na revisão validada. [Procedimento de backup e recuperação](backup-recuperacao.md) · [Workflow de backup](../../.github/workflows/backup-recuperacao.yml)
 
-## Conferências após a integração dos lembretes e do painel
+### Agenda e disponibilidade (#53)
 
-- [ ] **Lembretes (#34).** Agende uma consulta dentro da janela configurada e acompanhe dois ciclos do agendador. Confira que o paciente recebe um único lembrete na central. Confirme a presença por ele e verifique o estado da consulta, a leitura do aviso e um único evento de confirmação no histórico.
-- [ ] **Indicadores e painel (#36 e #37).** Escolha um médico e um período da carga de demonstração. Compare a agenda do dia, as próximas consultas, a ocupação e as taxas de falta, cancelamento, confirmação e preenchimento pela fila com os dados desse mesmo recorte. Valide os filtros com a secretaria e o acesso do médico à própria agenda.
-- [ ] **Evidência final da #45.** No commit que reunir as entregas, repita as suítes, o lint, o build, os cenários de aceite e a recuperação do backup. Registre o novo SHA, a data, os resultados e o link da CI correspondente quando disponível.
+O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de duração com bloqueio parcial passaram. A busca e a confirmação usam a disponibilidade da agenda, e os testes de fila aprovados cobrem a expiração do aviso após bloqueio ou mudança de jornada. Os contratos e a modelagem estão documentados. [API de agenda e bloqueios](../api/alteracoes-agenda.md) · [API de agendamento](../api/agendamento.md) · [Modelo de agendas e bloqueios](../modelagem/medicos-agenda.md)
+
+## Conferências antes da entrega
+
+- [x] **Lembretes (#34).** A geração, o envio sem duplicidade em dois ciclos e o descarte no cancelamento passaram na suíte integrada. A confirmação pela central foi coberta com registro no histórico.
+- [x] **API de indicadores (#36 e #48).** Os testes aprovaram os cálculos sobre a carga de demonstração.
+- [ ] **Painel web (#37 e #47).** Integrar a interface ao `GET /indicadores`. Comparar agenda do dia, próximas consultas e taxas com os dados do mesmo médico e período. Validar os filtros da secretaria e a visualização do médico.
+- [ ] **Homologação ponta a ponta (#38).** Com o painel disponível, percorrer cadastro, agenda, disputa de vaga, cancelamento, fila, lembrete, histórico e painel pelos perfis previstos.
+- [ ] **Evidência final da #45.** Na revisão com todas as entregas, repetir as suítes, lint, build, aceite e recuperação. Registrar o SHA, a data, os resultados e o link da CI correspondente.
 
 ## Versão final (#45)
 
