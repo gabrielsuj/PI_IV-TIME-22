@@ -9,7 +9,7 @@ As chamadas exigem `Authorization: Bearer <token>`.
 
 | Método | Caminho | Resultado | Perfis autorizados |
 |---|---|---|---|
-| GET | `/consultas/lista?periodo=&status=&medicoId=` | 200, lista de consultas | PACIENTE, MEDICO, SECRETARIA_ADMIN |
+| GET | `/consultas/lista?periodo=&status=&medicoId=&somenteAtivas=` | 200, lista de consultas | PACIENTE, MEDICO, SECRETARIA_ADMIN |
 | GET | `/consultas/{id}` | 200, detalhe de uma consulta | PACIENTE, MEDICO, SECRETARIA_ADMIN |
 
 O que cada perfil enxerga é decidido no servidor, pela classe `AcessoConsulta`. É a mesma regra do cancelamento:
@@ -27,6 +27,7 @@ O `GET /consultas?medicoId=&de=&ate=` (sem barra) continua sendo o calendário d
 | `periodo` | não | `proximas` (padrão): consultas que ainda não terminaram, da mais próxima para a mais distante. `anteriores`: consultas que já terminaram, da mais recente para a mais antiga |
 | `status` | não | `AGENDADA`, `CONFIRMADA`, `CANCELADA`, `CONCLUIDA` ou `FALTA` |
 | `medicoId` | não | id do médico. Para o perfil médico, o filtro se soma à restrição: filtrar por outro médico devolve lista vazia |
+| `somenteAtivas` | não | `true` seleciona `AGENDADA` e `CONFIRMADA` antes da ordenação e do limite. Omitir ou enviar `false` mantém a listagem usual. O filtro se soma a `status`, `periodo` e `medicoId`. |
 
 A lista traz no máximo **100** consultas (`ConsultaLeituraService.LIMITE`). A tela avisa quando esse limite é atingido.
 
@@ -56,7 +57,7 @@ A lista traz no máximo **100** consultas (`ConsultaLeituraService.LIMITE`). A t
 
 | Status | Quando |
 |---|---|
-| 400 | `periodo`, `status`, `medicoId` ou `id` inválido |
+| 400 | `periodo`, `status`, `medicoId`, `somenteAtivas` ou `id` inválido |
 | 401 | Sem login ou sessão expirada |
 | 403 | Consulta de outra pessoa, ou login sem cadastro de paciente/médico ligado |
 | 404 | Consulta não encontrada; caminho ou método inexistente abaixo de `/consultas/` |
@@ -74,6 +75,6 @@ O detalhe permite confirmar presença, registrar conclusão ou falta conforme as
 
 | Teste | Precisa do Mongo? | O que cobre |
 |---|---|---|
-| `integration/ConsultaLeituraIntegrationTest` | sim (`consultafacil_test`) | Ordem de próximas e anteriores, nomes, `podeCancelar`, filtros de status e médico, visão do paciente, do médico e da secretaria, 400/403/404 |
+| `integration/ConsultaLeituraIntegrationTest` | sim (`consultafacil_test`) | Ordem de próximas e anteriores, nomes, `podeCancelar`, filtros de status e médico, consultas ativas filtradas antes do limite, visão do paciente, do médico e da secretaria, 400/403/404 |
 | `integration/RotasAutorizacaoTest` | não | Os três perfis chegam às rotas novas; 401 sem login; 404 para caminho ou método errado |
 | `frontend/src/__tests__/Consultas.test.jsx` | não | Colunas por perfil, filtros na URL e na API, lista vazia, erro com "Tentar novamente", navegação para o detalhe, cancelamento com e sem motivo, 409, erro genérico, consulta que já começou, 403/404 |

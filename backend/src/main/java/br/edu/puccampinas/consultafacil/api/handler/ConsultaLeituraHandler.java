@@ -1,5 +1,6 @@
 package br.edu.puccampinas.consultafacil.api.handler;
 
+import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.api.Http;
 import br.edu.puccampinas.consultafacil.api.Query;
 import br.edu.puccampinas.consultafacil.security.Autorizacao;
@@ -12,7 +13,7 @@ import java.util.Map;
 
 /**
  * Leitura de consultas para as telas da #30:
- *  GET /consultas/lista?periodo=proximas|anteriores&status=&medicoId=  → lista
+ *  GET /consultas/lista?periodo=proximas|anteriores&status=&medicoId=&somenteAtivas= → lista
  *  GET /consultas/{id}                                                → detalhe
  * Perfil verificado em Rotas.consultaPorId; o serviço limita ao que o usuário pode ver.
  */
@@ -29,7 +30,11 @@ public class ConsultaLeituraHandler implements HttpHandler {
         var ator = Autorizacao.usuario(ex);
         if (LISTA.equals(caminho)) {
             Map<String, String> q = Query.params(ex);
-            Http.sendJson(ex, 200, service.listar(q.get("periodo"), q.get("status"), q.get("medicoId"), ator));
+            String somenteAtivas = q.get("somenteAtivas");
+            boolean filtrarAtivas = "true".equalsIgnoreCase(somenteAtivas);
+            if (somenteAtivas != null && !filtrarAtivas && !"false".equalsIgnoreCase(somenteAtivas))
+                throw ApiException.badRequest("somenteAtivas deve ser true ou false");
+            Http.sendJson(ex, 200, service.listar(q.get("periodo"), q.get("status"), q.get("medicoId"), filtrarAtivas, ator));
             return;
         }
         // Caminho: /consultas/{id} → partes ["", "consultas", "{id}"]
