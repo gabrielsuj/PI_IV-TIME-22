@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { AuthContext } from '../contexts/authContext';
@@ -11,6 +16,8 @@ function pendente() {
 }
 const wrapper = ({ children }) => <AuthContext.Provider value={{ usuario: SECRETARIA_TESTE }}>{children}</AuthContext.Provider>;
 
+// Promessas controladas permitem entregar respostas fora de ordem e conferir o
+// descarte dos dados de filtros ou contas anteriores.
 it('ignora respostas e erros atrasados de filtros anteriores', async () => {
   const antigo = pendente();
   const ler = vi.fn().mockImplementationOnce(() => antigo.promessa).mockResolvedValueOnce('novo');

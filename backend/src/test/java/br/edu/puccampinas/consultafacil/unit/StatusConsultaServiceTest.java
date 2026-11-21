@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -32,6 +37,8 @@ import java.util.stream.Stream;
 import static br.edu.puccampinas.consultafacil.domain.enums.StatusConsulta.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+// O relógio controlado mantém os testes na fronteira do prazo para conferir transições
+// sem depender do horário de execução.
 class StatusConsultaServiceTest {
     private static final Instant INICIO = Instant.parse("2026-11-18T12:00:00Z");
     private static final Instant FIM = INICIO.plusSeconds(1800);

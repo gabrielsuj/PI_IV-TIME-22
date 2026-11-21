@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
@@ -14,12 +19,10 @@ import java.util.concurrent.*;
 import static com.mongodb.client.model.Filters.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * @author Murilo Rigoni (criador)
- * @author Vinicius (modificador)
- */
 
 /** Opt-in: HISTORICO_MONGO_URI; usa apenas consultafacil_historico_test com os schemas aplicados. */
+// A fixture usa o esquema real para conferir recuperação e repetição de eventos sem
+// duplicar a sequência do histórico.
 class HistoricoPersistenceIntegrationTest {
     private static MongoConnection mongo;
     private final List<ObjectId> criadas = new ArrayList<>();

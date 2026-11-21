@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -25,6 +30,9 @@ public record PeriodoIndicadores(LocalDate de, LocalDate ate) {
         return new PeriodoIndicadores(data(de, "de"), data(ate, "ate"));
     }
 
+    // A janela inclui todo o último dia no fuso da clínica e termina
+    // no início do dia seguinte. O limite exclusivo evita contar uma
+    // consulta da meia-noite em dois períodos consecutivos.
     public Instant inicioInclusivo() { return de.atStartOfDay(FUSO).toInstant(); }
     public Instant fimExclusivo() { return ate.plusDays(1).atStartOfDay(FUSO).toInstant(); }
 

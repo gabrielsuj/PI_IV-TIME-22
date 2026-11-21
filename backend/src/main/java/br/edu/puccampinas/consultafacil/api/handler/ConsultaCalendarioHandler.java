@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -26,6 +31,8 @@ public class ConsultaCalendarioHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) throw new ApiException(405, "Método não permitido");
+        // Encaminha o fuso opcional junto das datas; a autorização continua resolvendo
+        // o médico permitido pela sessão.
         Map<String, String> q = Query.params(ex);
         Http.sendJson(ex, 200, service.listar(
                 acesso.medicoAutorizado(Autorizacao.usuario(ex), Query.obrigatorio(ex, "medicoId")), q.get("de"), q.get("ate"), q.get("fusoHorario")));

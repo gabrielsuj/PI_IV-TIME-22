@@ -1,6 +1,13 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { buscarHistoricoConsulta } from '../services/consultasService';
 
+// A atualização automática tem limite para não consultar indefinidamente uma projeção
+// pendente; a tentativa manual permanece disponível.
 const MAX_ATUALIZACOES_AUTOMATICAS = 3;
 const INTERVALO_ATUALIZACAO = 2000;
 

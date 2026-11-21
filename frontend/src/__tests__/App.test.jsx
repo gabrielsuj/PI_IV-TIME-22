@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -38,6 +43,8 @@ const healthy = async () =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+// O roteador em memória permite abrir endereços diretamente e conferir a navegação sem
+// depender do histórico do navegador.
 describe('roteamento', () => {
   it.each(['MEDICO', 'PACIENTE'])('os atalhos iniciais respeitam o perfil %s', async (perfil) => {
     entrarComo({ id: 'u-perfil', nome: 'Teste', perfil });

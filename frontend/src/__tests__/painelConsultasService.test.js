@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { beforeEach, expect, it, vi } from 'vitest';
 import { buscarAgendaDoDia, buscarProximasConsultas } from '../services/painelConsultasService';
 import { entrarComo } from './sessaoTeste';
@@ -8,6 +13,8 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
+// Agenda diária e próximas consultas têm limites distintos; os cenários conferem que o
+// resumo não trunque a leitura do dia.
 it('busca a agenda e as consultas do calendário com sessão, médico e dia exatos', async () => {
   const consulta = consultaDia();
   const fetchMock = vi.fn(async (url) => json(new URL(url).pathname === '/agendas' ? agendaPainel() : [consulta]));

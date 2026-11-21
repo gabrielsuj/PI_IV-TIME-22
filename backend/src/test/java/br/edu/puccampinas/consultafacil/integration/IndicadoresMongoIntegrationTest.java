@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -23,6 +28,8 @@ import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Sorts.ascending;
 import static org.junit.jupiter.api.Assertions.*;
 
+// A fixture auditada permite conferir os totais no MongoDB real e verificar que a
+// leitura dos indicadores não produz escritas.
 class IndicadoresMongoIntegrationTest {
     private static MongoConnection mongo;
     private final ObjectId medico = new ObjectId(), especialidade = new ObjectId();

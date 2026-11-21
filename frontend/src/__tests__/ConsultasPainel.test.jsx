@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, MemoryRouter } from 'react-router';
@@ -36,6 +41,8 @@ function mockApi({ calendario = [consultaDia()], proximas = [consultaProxima()],
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
+// O login médico usa um ID diferente do cadastro para detectar filtros que confundam a
+// sessão com o profissional da agenda.
 it('agenda usa o médico recebido do painel e os horários locais não são deslocados', async () => {
   const fetchMock = mockApi();
   render(contexto(<AgendaDiaPainel dia={dia} medicoId={MEDICO_PAINEL} />));

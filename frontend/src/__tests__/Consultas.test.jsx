@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -92,6 +97,8 @@ const eventoHistorico = (sequencia, extra = {}) => ({ id: `h${sequencia}`, seque
   statusNovo: 'AGENDADA', ocorridoEm: '2026-11-18T12:30:00Z', dataHoraConsulta: '2026-12-01T12:00:00Z',
   ator: { id: 'u-secretaria', perfil: 'SECRETARIA_ADMIN', nome: 'Sofia Secretaria' }, ...extra });
 
+// O instante fixo permite conferir as ações de status antes e depois do fim previsto
+// sem depender do relógio da máquina.
 describe('histórico no detalhe da consulta (#46)', () => {
   it.each([
     ['CRIACAO', 'Consulta criada', {}],

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
@@ -176,6 +181,8 @@ export default function CalendarioPage() {
   const medicoId = agendaPropria ? 'meu' : params.get('medicoId') ?? '';
   const visao = params.get('visao') === 'dia' ? 'dia' : 'semana';
   const data = dataPainelValida(params.get('data')) ? params.get('data') : hoje();
+  // O atalho do painel marca o dia da clínica para preservar a data selecionada mesmo
+  // quando a agenda usa outro fuso.
   const diaClinica = visao === 'dia' && params.get('diaClinica') === '1' ? data : null;
   const dias = useMemo(() => visao === 'semana' ? diasDaSemana(data) : [data], [data, visao]);
   const de = dias[0];

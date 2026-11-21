@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -18,6 +23,8 @@ import java.util.*;
 import static br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+// As fontes controladas permitem conferir filtros e lotes sem aceitar um resumo
+// parcial quando o driver interrompe a leitura.
 class IndicadoresConsultasMongoTest {
     @Test void filtrosProtegemEscopoDatasStatusEProjecoesSemUsarTimelineTruncada() {
         var db = new DriverLeituras(fixture());

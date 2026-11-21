@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 import br.edu.puccampinas.consultafacil.api.JsonComNulos;
@@ -15,6 +20,8 @@ import java.util.Set;
 public record HistoricoAlteracaoResponse(String campo, Object valorAnterior, Object valorNovo) {
     private static final Set<String> CAMPOS = Set.of("pacienteId", "medicoId", "especialidadeId", "inicio", "fim",
             "dataHora", "dataHoraConsulta", "status", "motivoCancelamento");
+    // O marcador separa valor inválido de null legítimo, permitindo omitir detalhes
+    // incompatíveis sem esconder a ausência de um dado.
     private static final Object INVALIDO = new Object();
 
     /** Campos desconhecidos ou valores compostos não são publicados como detalhes da reserva. */

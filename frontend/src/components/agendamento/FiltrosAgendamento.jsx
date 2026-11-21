@@ -1,12 +1,18 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import Field from '../ui/Field';
 
-// Necessita issue #21 para conectar os filtros à busca de horários.
 export default function FiltrosAgendamento({ especialidades = [], medicos = [], value, onChange, loading = false, error, onRetry, disabled = false }) {
   const especialidadeId = especialidades.some((especialidade) => especialidade.id === value.especialidadeId)
     ? value.especialidadeId : '';
+  // A seleção de especialidade restringe os médicos oferecidos; ao trocá-la, o médico
+  // anterior é limpo para evitar combinações incompatíveis.
   const medicosDaEspecialidade = especialidadeId
     ? medicos.filter((medico) => medico.especialidadeIds.includes(especialidadeId)) : [];
   const medicoId = medicosDaEspecialidade.some((medico) => medico.id === value.medicoId) ? value.medicoId : '';

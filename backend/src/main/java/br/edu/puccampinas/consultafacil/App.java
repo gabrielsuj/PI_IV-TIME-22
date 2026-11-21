@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 
 package br.edu.puccampinas.consultafacil;
 
@@ -34,12 +39,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 
-/**
- * @author Gabriel (criador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- * @author Vinicius (modificador)
- */
 
 public class App {
     public static void main(String[] args) throws IOException {
@@ -129,6 +128,8 @@ public class App {
         // Calendário operacional (#23): leitura das consultas do médico no período
         var consultaCalendarioHandler = new ConsultaCalendarioHandler(new ConsultaCalendarioService(
             consultaRepo, agendaRepo, medicos, nomes), acessoAgenda);
+        // Os indicadores reutilizam o controle de acesso da agenda para aplicar o
+        // mesmo vínculo de médico às leituras do painel.
         var indicadoresHandler = new IndicadoresHandler(new IndicadoresService(new IndicadoresMongoRepository(db), acessoAgenda));
 
         // Login e sessão (#9)

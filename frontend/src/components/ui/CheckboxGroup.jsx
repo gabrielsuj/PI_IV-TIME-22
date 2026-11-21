@@ -1,6 +1,13 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useId } from 'react';
 
 export default function CheckboxGroup({ label, name, options, value = [], onChange, disabled, required, error }) {
+  // A mensagem de erro recebe uma referência própria para ser anunciada junto ao grupo
+  // de opções.
   const id = useId();
   return (
     <fieldset className="field checkbox-group" disabled={disabled} aria-describedby={error ? `${id}-error` : undefined} aria-invalid={error ? true : undefined}>

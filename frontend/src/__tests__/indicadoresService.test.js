@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { beforeEach, expect, it, vi } from 'vitest';
 import { buscarIndicadores } from '../services/indicadoresService';
 import { entrarComo } from './sessaoTeste';
@@ -12,6 +17,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// O período e o médico retornados precisam corresponder ao pedido para impedir que
+// outra seleção seja aceita como resultado atual.
 it('busca indicadores completos com período, filtro e sessão preservando os valores recebidos', async () => {
   const dados = indicadores({ ...periodo, medicoId });
   const fetchMock = vi.fn(async () => json(dados));

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Rotas;
@@ -20,6 +25,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** HTTP e autorização reais; persistência em memória, sem acessar bancos do usuário. */
+// O servidor local usa repositórios em memória para conferir o contrato HTTP e as
+// permissões sem depender de uma instância MongoDB.
 class CadastroHandlerTest {
     private final ObjectMapper json = new ObjectMapper();
     private final Sessoes sessoes = new Sessoes(Duration.ofMinutes(60));

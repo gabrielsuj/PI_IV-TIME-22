@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { api } from './api';
 
 const METRICAS = ['ocupacao', 'faltas', 'cancelamento', 'confirmacao', 'preenchimentoFila'];
@@ -7,6 +12,8 @@ const QUALIDADE = ['medicosSemAgenda', 'consultasComProjecaoPendente', 'consulta
 const contagemValida = (valor) => Number.isSafeInteger(valor) && valor >= 0;
 const idValido = (valor) => typeof valor === 'string' && /^[a-f\d]{24}$/i.test(valor);
 
+// Valida a situação junto do percentual para não aceitar uma taxa numérica quando a
+// API informa ausência de base ou dados incompletos.
 function taxaValida(taxa) {
   if (!taxa || !contagemValida(taxa.numerador) || !contagemValida(taxa.denominador) || taxa.numerador > taxa.denominador) return false;
   if (taxa.situacao === 'DISPONIVEL') return taxa.denominador > 0 && typeof taxa.percentual === 'number'

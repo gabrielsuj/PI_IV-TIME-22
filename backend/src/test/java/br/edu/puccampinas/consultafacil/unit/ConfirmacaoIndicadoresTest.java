@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
@@ -24,6 +29,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Os eventos podem estar repetidos ou fora de ordem; a contagem deve continuar
+// vinculada às consultas distintas do período.
 class ConfirmacaoIndicadoresTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final Instant INICIO = Instant.parse("2026-11-20T12:00:00Z");

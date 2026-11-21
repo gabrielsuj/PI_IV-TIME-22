@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -32,6 +37,8 @@ public class EspecialidadeService {
     public EspecialidadeResponse atualizar(String id, EspecialidadeRequest request) {
         var atual = consultar(id);
         var nova = validar(atual.id(), request);
+        // Impede desativar a especialidade enquanto houver médicos ativos vinculados,
+        // preservando a consistência dos cadastros oferecidos.
         if (!nova.ativa() && medicos.existeAtivoComEspecialidade(new ObjectId(atual.id())))
             throw ApiException.conflict("Desvincule ou desative os médicos ativos antes de desativar a especialidade");
         return especialidades.atualizar(nova).orElseThrow(() -> ApiException.notFound("Especialidade não encontrada"));

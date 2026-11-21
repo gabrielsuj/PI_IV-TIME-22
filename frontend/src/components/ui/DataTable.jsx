@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useId } from 'react';
 import Alert from './Alert';
 import Button from './Button';
@@ -15,6 +20,8 @@ export default function DataTable({
   getRowKey = (row) => row.id || row._id,
 }) {
   const hintId = useId();
+  // Oculta as linhas durante carregamento ou falha para não apresentar resultados
+  // anteriores como se fossem a resposta atual.
   const exibidas = loading || error ? [] : rows;
   const acessoNegado = error?.status === 403;
   const tentarNovamente = error && !acessoNegado && onRetry && (

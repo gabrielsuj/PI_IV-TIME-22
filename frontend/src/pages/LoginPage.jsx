@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import Alert from '../components/ui/Alert';
@@ -8,6 +13,8 @@ import PageHeader from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 
 /** Para onde ir depois do login: a página que pediu o login, ou o início. */
+// Recupera o endereço que motivou o login e evita retornar à própria tela de acesso
+// após autenticar.
 function destinoDepoisDoLogin(location) {
   const from = location.state?.from;
   if (!from?.pathname || from.pathname === '/login') return '/';

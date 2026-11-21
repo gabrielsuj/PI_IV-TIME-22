@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.service.CalculadoraIndicadores;
@@ -19,6 +24,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Várias inscrições podem apontar para a mesma consulta; os cenários preservam a
+// contagem por reserva mantida.
 class PreenchimentoFilaIndicadoresTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final Instant INICIO = Instant.parse("2026-11-20T12:00:00Z");

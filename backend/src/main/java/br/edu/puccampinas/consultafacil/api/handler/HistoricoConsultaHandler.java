@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -45,6 +50,8 @@ public final class HistoricoConsultaHandler implements HttpHandler {
         return parametros;
     }
 
+    // Valida o cursor antes da leitura para não aceitar páginas com sequência
+    // negativa, formato ambíguo ou valor fora do limite inteiro.
     private static int inteiro(Map<String, String> parametros, String nome, int padrao) {
         String valor = parametros.get(nome);
         if (valor == null) return padrao;

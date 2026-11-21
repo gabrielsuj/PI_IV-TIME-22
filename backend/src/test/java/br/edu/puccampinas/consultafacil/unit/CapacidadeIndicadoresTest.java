@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.service.CalculadoraCapacidade;
@@ -19,6 +24,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Os intervalos sobrepostos exercitam a contagem por slot, evitando que duas reservas
+// aumentem a ocupação da mesma vaga.
 class CapacidadeIndicadoresTest {
     private static final LocalDate DIA = LocalDate.of(2026, 11, 23);
     private static final PeriodoIndicadores PERIODO = new PeriodoIndicadores(DIA, DIA);

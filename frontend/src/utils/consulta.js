@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { formatarHorarioAgendamento } from './horarioAgendamento';
 
 /** Fuso da clínica: a API devolve horários em UTC e as telas exibem neste fuso (mesmo padrão das agendas). */
@@ -19,6 +24,8 @@ export function acoesStatusDaConsulta(consulta, perfil, agora) {
   if (!['PACIENTE', 'MEDICO', 'SECRETARIA_ADMIN'].includes(perfil)) return [];
   const acoes = consulta.status === 'AGENDADA' ? ['CONFIRMADA'] : [];
   const fim = Date.parse(consulta.fim);
+  // As ações finais aparecem para a equipe após o fim previsto; a API ainda verifica
+  // vínculo, prazo e transição ao receber o pedido.
   if (perfil !== 'PACIENTE' && Number.isFinite(fim) && fim <= agora) {
     if (consulta.status === 'CONFIRMADA') acoes.push('CONCLUIDA');
     if (STATUS_ATIVOS.includes(consulta.status)) acoes.push('FALTA');

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 import br.edu.puccampinas.consultafacil.api.JsonComNulos;
@@ -9,6 +14,8 @@ import org.bson.types.ObjectId;
 @JsonAdapter(JsonComNulos.class)
 public record HistoricoAtorResponse(String perfil, String id, String nome) {
     public static HistoricoAtorResponse de(Document documento) {
+        // A falta de identificação em eventos antigos permanece explícita; não é
+        // atribuída automaticamente ao usuário que está consultando o histórico.
         if (documento == null) return new HistoricoAtorResponse(null, null, "Responsável não identificado");
         String perfil = documento.get("perfil") instanceof String texto ? texto : null;
         if ("SISTEMA".equals(perfil)) return new HistoricoAtorResponse(perfil, null, "Sistema");

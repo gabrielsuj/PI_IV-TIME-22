@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { describe, expect, it, vi } from 'vitest';
 import { api, API_BASE_URL, ApiError, buildUrl, request } from '../services/api';
 import { getHealth } from '../services/healthService';
@@ -16,6 +21,8 @@ function mockFetch(implementation) {
   return fetchMock;
 }
 
+// As respostas simuladas separam falha HTTP, rede e cancelamento para conferir como
+// cada situação chega às telas.
 describe('buildUrl', () => {
   it('usa a URL base definida em VITE_API_BASE_URL', () => {
     expect(API_BASE_URL).toBe('http://api.teste');

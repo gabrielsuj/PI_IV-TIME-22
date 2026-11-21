@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -25,6 +30,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// Os perfis usam a mesma interface de cadastro para conferir que consulta e edição
+// respeitam as permissões de cada sessão.
 describe('cadastros padronizados', () => {
   it('permite ao médico consultar pacientes sem oferecer cadastro ou edição', async () => {
     entrarComo({ id: 'u-medica', nome: 'Ana Martins', perfil: 'MEDICO' });

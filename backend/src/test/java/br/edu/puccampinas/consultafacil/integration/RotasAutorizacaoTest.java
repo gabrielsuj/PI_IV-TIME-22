@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Http;
@@ -41,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Os handlers de negócio são trocados por um eco que devolve 200 e o perfil de quem chamou,
  * então o teste verifica só a permissão, sem banco.
  */
+// A matriz percorre métodos, rotas e perfis para conferir que a autorização seja
+// aplicada antes do handler de destino.
 class RotasAutorizacaoTest {
     private final Sessoes sessoes = new Sessoes(Duration.ofMinutes(60));
     private final ObjectMapper json = new ObjectMapper();

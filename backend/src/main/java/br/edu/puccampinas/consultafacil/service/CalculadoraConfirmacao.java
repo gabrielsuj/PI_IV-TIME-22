@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.domain.enums.EventoHistorico;
@@ -47,6 +52,8 @@ public final class CalculadoraConfirmacao {
                 throw new IllegalArgumentException("Snapshots divergentes para a mesma consulta");
         }
 
+        // Conta consultas com evento de confirmação, preservando essa ocorrência após
+        // mudanças de status e sem somar eventos repetidos.
         Set<ObjectId> confirmadas = new HashSet<>();
         Set<ObjectId> comCriacao = new HashSet<>();
         for (Document evento : eventosProjetados) {

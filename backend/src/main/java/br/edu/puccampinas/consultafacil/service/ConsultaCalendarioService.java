@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -52,6 +57,8 @@ public class ConsultaCalendarioService {
             throw ApiException.badRequest("Período máximo de " + MAXIMO_DIAS + " dias");
         if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
 
+        // O painel pode pedir o dia da clínica explicitamente; chamadas sem esse
+        // parâmetro preservam a leitura no fuso da agenda.
         ZoneId fuso = fusoHorario != null ? ZoneId.of(fusoHorario) : agendas.buscarPorMedico(medicoId)
                 .map(a -> ZoneId.of(a.getString("fusoHorario")))
                 .orElse(ZoneId.of(AgendaService.FUSO_PADRAO));

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.repository;
 
 import br.edu.puccampinas.consultafacil.api.dto.EspecialidadeResponse;
@@ -22,6 +27,8 @@ public interface EspecialidadeRepository {
 
         public Mongo(MongoDatabase db) { col = db.getCollection("especialidades"); }
 
+        // Traduz a duplicidade do índice em conflito de cadastro, inclusive quando
+        // outro pedido grava o mesmo código simultaneamente.
         public EspecialidadeResponse cadastrar(EspecialidadeResponse e) {
             return MongoErros.traduzir(() -> {
                 col.insertOne(documento(e).append("_id", new ObjectId(e.id())));

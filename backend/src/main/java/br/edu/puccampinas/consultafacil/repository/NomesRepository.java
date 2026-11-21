@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.repository;
 
 import com.mongodb.client.MongoDatabase;
@@ -29,6 +34,8 @@ public interface NomesRepository {
         @Override public Map<ObjectId, String> pacientes(Collection<ObjectId> ids) { return nomes("pacientes", ids); }
         @Override public Map<ObjectId, String> especialidades(Collection<ObjectId> ids) { return nomes("especialidades", ids); }
         @Override public Map<ObjectId, String> medicos(Collection<ObjectId> ids) { return nomes("medicos", ids); }
+        // Os responsáveis são resolvidos por usuarios._id para não confundir o login
+        // do ator com o cadastro profissional ou do paciente.
         @Override public Map<ObjectId, String> usuarios(Collection<ObjectId> ids) { return nomes("usuarios", ids); }
 
         private Map<ObjectId, String> nomes(String colecao, Collection<ObjectId> ids) {

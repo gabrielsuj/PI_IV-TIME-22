@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { buscarPacientesAgendamento } from '../../services/pacienteAgendamentoService';
@@ -68,6 +73,8 @@ function SelecaoPaciente({ value, onChange, disabled }) {
 
 export default function PacienteAgendamento({ value, onChange, disabled = false }) {
   const { usuario } = useAuth();
+  // A secretaria escolhe o paciente; no acesso pessoal, o vínculo é resolvido pela
+  // sessão para não confundir usuário e cadastro.
   if (usuario?.perfil === 'SECRETARIA_ADMIN') return <SelecaoPaciente value={value} onChange={onChange} disabled={disabled} />;
   if (usuario?.perfil !== 'PACIENTE') return null;
 

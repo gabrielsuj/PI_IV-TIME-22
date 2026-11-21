@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.repository;
 
 import com.mongodb.MongoWriteException;
@@ -14,10 +19,6 @@ import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.gt;
 
-/**
- * @author Murilo Rigoni (criador)
- * @author Vinicius (modificador)
- */
 
 /** Apenas inserção. Repetir o mesmo evento é seguro; divergências não são ocultadas. */
 @FunctionalInterface
@@ -31,6 +32,8 @@ public interface HistoricoRepository {
         private final MongoCollection<Document> col;
         public Mongo(MongoDatabase db) { col = db.getCollection("historico"); }
 
+        // A sequência crescente mantém a continuidade entre páginas, independentemente
+        // da ordem em que os eventos foram inseridos na coleção.
         @Override public List<Document> listarPorConsulta(ObjectId consultaId, int aposSequencia, int limite) {
             if (consultaId == null) throw new IllegalArgumentException("Consulta é obrigatória para ler o histórico");
             if (aposSequencia < 0) throw new IllegalArgumentException("Sequência inicial não pode ser negativa");

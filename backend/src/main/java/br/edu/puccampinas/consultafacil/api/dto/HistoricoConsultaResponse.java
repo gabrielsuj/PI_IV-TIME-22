@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 import java.util.List;
@@ -12,6 +17,8 @@ public record HistoricoConsultaResponse(String consultaId, List<HistoricoEventoR
                                        int aposSequencia, int limite, boolean limiteAtingido,
                                        boolean temMais, Integer proximaSequencia, boolean atualizacaoPendente) {
     public HistoricoConsultaResponse {
+        // A cópia impede que mudanças posteriores na lista de origem alterem a página
+        // já preparada para a resposta.
         eventos = List.copyOf(eventos);
     }
 }

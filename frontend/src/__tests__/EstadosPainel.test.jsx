@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -90,6 +95,8 @@ it.each([
   expect(fetchMock.mock.calls.every(([, options]) => options.method === 'GET')).toBe(true);
 });
 
+// As respostas pendentes isolam cada seção para conferir que falha ou nova tentativa
+// não dispare leituras nas outras.
 it('respostas anteriores das três seções não substituem a seleção nova', async () => {
   const antigas = new Map(['/indicadores', '/consultas', '/consultas/lista'].map((rota) => [rota, pendente()]));
   const urlsAntigas = new Map();

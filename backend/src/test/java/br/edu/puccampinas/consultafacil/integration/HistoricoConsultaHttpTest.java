@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Http;
@@ -28,6 +33,8 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** HTTP e autorização reais; eventos gerados pelo registro auditado, sem depender de MongoDB. */
+// A leitura HTTP precisa informar atraso de projeção sem repetir a ação já salva nem
+// disparar recuperação durante o GET.
 class HistoricoConsultaHttpTest {
     private static final ObjectId PACIENTE = new ObjectId(), MEDICO = new ObjectId();
     private static final UsuarioLogado PACIENTE_LOGADO = usuario(Perfil.PACIENTE);

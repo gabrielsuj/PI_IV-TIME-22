@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef } from 'react';
 import { useHistoricoConsulta } from '../../hooks/useHistoricoConsulta';
 import { dataHoraDoHistorico, descricaoDaAlteracao, EVENTOS_HISTORICO, responsavelDoHistorico, statusDoHistorico } from '../../utils/historicoConsulta';
@@ -6,6 +11,8 @@ import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 
+// A chave da consulta e da revisão remonta a leitura para não misturar páginas do
+// histórico após trocar ou atualizar o atendimento.
 export default function HistoricoConsulta({ consultaId, revisao }) {
   return <ConteudoHistorico key={`${consultaId}|${revisao}`} consultaId={consultaId} />;
 }

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 import br.edu.puccampinas.consultafacil.api.JsonComNulos;
@@ -37,6 +42,8 @@ public record IndicadoresResponse(String de, String ate, String fusoHorario, Str
         }
     }
 
+    // As contagens de qualidade acompanham as taxas para explicar por que um
+    // percentual está ausente sem apresentar um zero artificial.
     public record Qualidade(long medicosSemAgenda, long consultasComProjecaoPendente,
                             long consultasSemBaseHistorica, long inscricoesComVinculoInvalido,
                             boolean capacidadeEstimada, String observacaoCapacidade) {}

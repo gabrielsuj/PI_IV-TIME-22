@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { api } from './api';
 
 /** Máximo de consultas devolvidas por GET /consultas/lista (ConsultaLeituraService.LIMITE). */
@@ -46,6 +51,8 @@ export async function buscarHistoricoConsulta(id, { aposSequencia = 0, limite = 
     || !Array.isArray(pagina.eventos) || pagina.eventos.length > limite || typeof pagina.temMais !== 'boolean'
     || typeof pagina.atualizacaoPendente !== 'boolean'
     || pagina.limiteAtingido !== (pagina.eventos.length === limite)) invalida();
+  // Confere identidades e sequências da página antes de incorporá-la ao histórico,
+  // evitando eventos repetidos ou uma continuação inconsistente.
   const ids = new Set();
   let ultima = aposSequencia;
   for (const evento of pagina.eventos) {

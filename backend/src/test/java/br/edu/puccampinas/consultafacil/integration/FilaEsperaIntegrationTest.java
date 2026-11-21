@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
@@ -72,11 +77,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
-/**
- * @author Gabriel (criador)
- * @author Murilo Rigoni (modificador)
- * @author Vinicius (modificador)
- */
 
 
 /**
@@ -196,6 +196,8 @@ class FilaEsperaIntegrationTest {
                 new AgendaService(agendas, medicos, afetadas, relogio, sinalizacao::revisarAgenda), acessoAgenda);
         var bloqueioHandler = new BloqueioHandler(
                 new BloqueioService(bloqueios, agendas, medicos, afetadas, sinalizacao::revisarAgenda), acessoAgenda);
+        // A montagem preserva os handlers de avisos e central; indicadores ficam
+        // ausentes por não participarem deste fluxo de fila.
         var router = Rotas.router(cors, autorizacao,
                 new Rotas.Handlers(null, null, agendaHandler, bloqueioHandler, null, null, null, null, avisos, central, null));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

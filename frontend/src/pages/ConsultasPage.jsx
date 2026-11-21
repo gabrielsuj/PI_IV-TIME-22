@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
@@ -47,6 +52,8 @@ export default function ConsultasPage() {
   const { usuario } = useAuth();
   const location = useLocation();
   const origem = origemPainel(location, usuario);
+  // Mantém o caminho de volta ao painel com os filtros da conta atual, sem interferir
+  // nos filtros próprios da listagem.
   const retorno = retornoPainel(location, usuario);
   const perfil = usuario?.perfil;
   const [params, setParams] = useSearchParams();

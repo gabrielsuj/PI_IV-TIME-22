@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.repository;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -44,6 +49,8 @@ public final class IndicadoresMongoRepository implements IndicadoresLeituraRepos
         try {
             var leitura = new LeituraConferida();
             Resumo resumo = agregar(periodo, medico, leitura);
+            // Confere novamente as fontes antes de devolver o resumo para recusar
+            // resultados montados enquanto os dados estavam mudando.
             leitura.conferir();
             return resumo;
         }

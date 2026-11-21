@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -19,6 +24,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// A fixture manual separa ausência de base de um zero calculável, permitindo conferir
+// cada taxa com seu denominador correto.
 class IndicadoresTest {
     private static final PeriodoIndicadores PERIODO = PeriodoIndicadores.de("2026-11-20", "2026-11-20");
 

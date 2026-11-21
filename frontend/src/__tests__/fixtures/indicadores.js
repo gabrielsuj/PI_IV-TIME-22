@@ -1,3 +1,10 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+// As cinco taxas compartilham contagens coerentes para que cada teste varie o cenário
+// sem fabricar percentuais incompatíveis.
 export function indicadores({ de = '2026-11-23', ate = de, medicoId = null } = {}) {
   return {
     de, ate, medicoId, fusoHorario: 'America/Sao_Paulo',

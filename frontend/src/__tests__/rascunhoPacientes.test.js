@@ -1,8 +1,15 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { describe, expect, it } from 'vitest';
 import { encerrarRascunhos, guardarRascunho, iniciarRascunhos, recuperarRascunho, removerRascunho, suspenderRascunhos } from '../services/rascunhoPacientes';
 
 const values = { nome: 'Teste', cpf: '01234567890', email: 'teste@example.com' };
 
+// A troca de conta e as respostas 401 repetidas exercitam a separação dos rascunhos
+// entre sessões e rotas.
 describe('isolamento dos rascunhos de pacientes', () => {
   it('exige reautenticação, isola a rota e suporta respostas 401 simultâneas', () => {
     iniciarRascunhos('u1');

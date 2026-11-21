@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import js from '@eslint/js';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -21,6 +26,8 @@ export default defineConfig([
     },
   },
   {
+    // Os globais do Vitest ficam restritos aos testes para que nomes indefinidos
+    // continuem sendo detectados no código da aplicação.
     files: ['src/__tests__/**/*.{js,jsx}'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.vitest },

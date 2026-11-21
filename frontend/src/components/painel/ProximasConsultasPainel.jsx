@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useAuth } from '../../hooks/useAuth';
 import { useProximasConsultas } from '../../hooks/useConsultasPainel';
 import { LIMITE_LISTAGEM } from '../../services/consultasService';
@@ -17,6 +22,8 @@ export default function ProximasConsultasPainel({ medicoId }) {
   const { permitido, carregando, dados, erro, atualizar } = useProximasConsultas(medicoId);
   if (!permitido) return null;
 
+  // O resumo exibe as primeiras consultas retornadas pelo serviço e mantém o acesso à
+  // listagem para consultar os demais registros.
   const colunas = [
     { key: 'data', label: 'Data', render: (c) => dataHoraDaConsulta(c).data },
     { key: 'horario', label: 'Horário', render: (c) => dataHoraDaConsulta(c).periodo },

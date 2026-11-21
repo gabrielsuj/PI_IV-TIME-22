@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.support;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -7,6 +12,8 @@ import org.bson.types.ObjectId;
 import java.util.*;
 
 /** Dublês para regras e HTTP; não substituem a verificação dos índices no MongoDB. */
+// O dublê reproduz conflitos e vínculos do cadastro para que as regras do serviço
+// possam ser exercitadas sem o driver MongoDB.
 public final class CadastrosEmMemoria {
     public final Map<String, MedicoResponse> medicos = new LinkedHashMap<>();
     public final Map<String, EspecialidadeResponse> especialidades = new LinkedHashMap<>();

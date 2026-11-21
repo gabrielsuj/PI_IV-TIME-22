@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -16,6 +21,8 @@ function Seletor() {
   return <HorariosDisponiveis {...base} value={value} onChange={setValue} />;
 }
 
+// Os instantes permanecem em UTC na seleção; o fuso da agenda determina o texto
+// mostrado ao usuário.
 describe('seleção de horários', () => {
   it('exibe os instantes no fuso informado pela agenda e conserva os dados na seleção', async () => {
     const onChange = vi.fn();

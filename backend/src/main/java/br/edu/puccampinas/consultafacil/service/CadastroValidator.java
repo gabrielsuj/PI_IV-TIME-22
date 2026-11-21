@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -5,6 +10,8 @@ import br.edu.puccampinas.consultafacil.api.ApiException;
 final class CadastroValidator {
     private CadastroValidator() {}
 
+    // Valida o tamanho após remover espaços externos para que o conteúdo efetivamente
+    // salvo respeite os limites do cadastro.
     static String texto(String valor, String campo, int minimo, int maximo) {
         if (valor == null) throw ApiException.badRequest(campo + " é obrigatório");
         String texto = valor.strip();

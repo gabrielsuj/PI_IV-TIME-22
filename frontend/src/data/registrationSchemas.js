@@ -1,3 +1,10 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+// A definição compartilhada reúne campos e colunas para que formulário, busca e
+// listagem usem o mesmo cadastro.
 export const registrationSchemas = {
   pacientes: {
     title: 'Pacientes',
