@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useApiHealth } from '../hooks/useApiHealth';
 import { API_BASE_URL } from '../services/api';
 import Badge from './ui/Badge';
@@ -17,6 +22,8 @@ const LABELS = {
  * @param {boolean} [props.detailed] mostra URL, latência e resposta completa
  */
 export default function ApiStatus({ detailed = false }) {
+  // A nova tentativa reutiliza a leitura de saúde, permitindo conferir a conexão sem
+  // recarregar a página.
   const { status, data, error, latencyMs, checkedAt, refresh } = useApiHealth();
 
   return (

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatarHorarioAgendamento } from '../../utils/horarioAgendamento';
 import Alert from '../ui/Alert';
@@ -6,12 +11,6 @@ import Card from '../ui/Card';
 import HorariosDisponiveis from './HorariosDisponiveis';
 import ResumoAgendamento from './ResumoAgendamento';
 
-/**
- * @author Vinicius (criador)
- * @author Gabriel (modificador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- */
 
 function dataValida(data) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) return false;
@@ -43,6 +42,8 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
   const [confirmando, setConfirmando] = useState(false);
   const [erroConfirmacao, setErroConfirmacao] = useState(null);
   const [confirmacao, setConfirmacao] = useState(null);
+  // Uma falha de comunicação pode ocorrer após a reserva ser gravada. O estado incerto
+  // evita tratar esse resultado como recusa definitiva.
   const [resultadoIncerto, setResultadoIncerto] = useState(false);
   const [vagaSinalizadaOcupada, setVagaSinalizadaOcupada] = useState(false);
   const emConfirmacao = useRef(false);

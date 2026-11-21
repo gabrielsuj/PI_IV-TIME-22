@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useId } from 'react';
 import { useIndicadores } from '../../hooks/useIndicadores';
 import Alert from '../ui/Alert';
@@ -12,6 +17,8 @@ const METRICAS = [
   { campo: 'confirmacao', titulo: 'Confirmações', apoio: (n, d) => `Com confirmação registrada: ${n} · Total de consultas: ${d}` },
   { campo: 'preenchimentoFila', titulo: 'Vagas preenchidas pela fila', apoio: (n, d) => `Pela fila: ${n} · Consultas não canceladas: ${d}` },
 ];
+// Ausência de percentual tem uma situação própria; assim, taxa sem base ou fonte
+// incompleta não é apresentada como 0%.
 const SITUACOES = {
   SEM_BASE: { rotulo: 'Sem base para cálculo', tone: 'neutral' },
   DADOS_PENDENTES: { rotulo: 'Atualização pendente', tone: 'warning' },

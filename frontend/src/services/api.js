@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 /**
  * Cliente HTTP centralizado da aplicação.
  *
@@ -60,6 +65,8 @@ export function buildUrl(path, params) {
 }
 
 async function parseBody(response) {
+  // Respostas sem conteúdo não precisam de leitura JSON; isso evita transformar uma
+  // operação bem-sucedida em erro de interpretação.
   if (response.status === 204) return null;
   const text = await response.text();
   if (!text) return null;

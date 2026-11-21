@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buscarPacientesAgendamento } from '../services/pacienteAgendamentoService';
 import { entrarComo } from './sessaoTeste';
@@ -10,6 +15,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// O paciente com CPF iniciado em zero permite conferir que a busca mantém documentos e
+// identificadores como texto.
 describe('busca de pacientes para agendamento', () => {
   it('usa a busca do endpoint existente com a sessão e mantém CPF e ID como textos', async () => {
     const fetchMock = vi.fn(async () => json([paciente]));

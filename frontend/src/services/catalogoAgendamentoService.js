@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { api } from './api';
 
 export async function buscarCatalogosAgendamento({ signal } = {}) {
@@ -11,6 +16,8 @@ export async function buscarCatalogosAgendamento({ signal } = {}) {
   }
 
   return {
+    // Oferece cadastros ativos no novo agendamento, preservando os identificadores
+    // recebidos para a confirmação na API.
     especialidades: especialidades.filter((especialidade) => especialidade.ativa === true),
     medicos: medicos.filter((medico) => medico.ativo === true),
   };

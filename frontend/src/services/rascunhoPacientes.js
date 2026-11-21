@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 // Somente memória desta aba. Nunca recebe senha/token nem grava dados em Web Storage.
 const rascunhos = new Map();
 let usuarioAtivo = null;
@@ -5,6 +10,8 @@ let usuarioSuspenso = null;
 
 export function iniciarRascunhos(usuarioId) {
   if (!usuarioId) return;
+  // A troca de conta apaga os formulários anteriores, impedindo que o preenchimento
+  // seja recuperado por outro usuário.
   if ((usuarioAtivo || usuarioSuspenso) !== usuarioId) rascunhos.clear();
   usuarioAtivo = usuarioId;
   usuarioSuspenso = null;

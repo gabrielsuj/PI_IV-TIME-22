@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -29,6 +34,8 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; } });
 });
 
+// Os dados com zero inicial no CPF permitem conferir a preservação do preenchimento
+// durante validação e recuperação do formulário.
 describe('UX de pacientes (#49)', () => {
   it.each([400, 409, 403, 500, 'rede'])('mantém os dados e o modal após erro %s, sem atribuir erro global a um campo', async (status) => {
     const fetchMock = vi.fn(async (_url, init) => {

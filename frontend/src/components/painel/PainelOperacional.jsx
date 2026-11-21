@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useSearchParams } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { FUSO_CLINICA } from '../../utils/consulta';
@@ -17,6 +22,8 @@ export default function PainelOperacional({ hoje, medicos, medicoSelecionado, ve
   const [params, setParams] = useSearchParams();
   if (!permitido) return null;
 
+  // O filtro de médico é compartilhado pelas seções; no perfil médico, o próprio
+  // vínculo continua sendo resolvido pelo servidor.
   const selecionado = secretaria ? (params.get('medicoId') ?? '').toLowerCase() : '';
   const medicoValido = !selecionado || /^[a-f\d]{24}$/i.test(selecionado);
   const medicoId = selecionado.toLowerCase() || undefined;

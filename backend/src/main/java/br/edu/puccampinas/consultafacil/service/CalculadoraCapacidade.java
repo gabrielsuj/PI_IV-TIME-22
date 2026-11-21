@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.domain.enums.StatusConsulta;
@@ -29,6 +34,8 @@ public final class CalculadoraCapacidade {
         Objects.requireNonNull(consultas, "Consultas completas são obrigatórias");
         if (agenda.isEmpty()) return new Resultado(true, 0, 0);
 
+        // A capacidade inclui os slots do período, mesmo passados; a ocupação conta
+        // cada slot uma vez quando existe reserva não cancelada.
         List<Vaga> capacidade = slotsNoPeriodo(agenda.get(), periodo, bloqueios);
         List<Document> mantidas = consultas.stream()
                 .filter(consulta -> StatusConsulta.valueOf(consulta.getString("status")) != StatusConsulta.CANCELADA)

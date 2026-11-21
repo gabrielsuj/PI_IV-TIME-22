@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 export function dataPainelValida(valor) {
   if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor) || valor.startsWith('0000')) return false;
   const data = new Date(`${valor}T00:00:00Z`);
@@ -22,6 +27,8 @@ function buscaPainel(busca, perfil) {
 
 export function origemPainel(location, usuario) {
   if (!usuario?.id || !['MEDICO', 'SECRETARIA_ADMIN'].includes(usuario.perfil)) return undefined;
+  // A origem fica vinculada à conta que abriu o painel, evitando recuperar filtros de
+  // navegação deixados por outro usuário.
   const anterior = location.state?.origemPainel;
   const busca = location.pathname === '/' ? location.search
     : anterior?.usuarioId === usuario.id && typeof anterior.busca === 'string' ? anterior.busca : null;

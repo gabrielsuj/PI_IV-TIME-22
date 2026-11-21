@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useId, useRef } from 'react';
 import Button from './Button';
 
@@ -8,6 +13,8 @@ export default function Modal({ title, description, onClose, busy = false, retur
 
   useEffect(() => {
     const dialog = ref.current;
+    // Guarda o foco de origem para restaurá-lo ao fechar; o controle de retorno cobre
+    // o caso de o elemento original desaparecer.
     const previousFocus = document.activeElement;
     const fallbackFocus = returnFocusRef?.current;
     const previousOverflow = document.body.style.overflow;

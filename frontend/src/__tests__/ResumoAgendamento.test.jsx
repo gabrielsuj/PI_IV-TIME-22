@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -16,6 +21,8 @@ const base = {
   horario, fusoHorario: 'America/Sao_Paulo',
 };
 
+// O ID de login não substitui o cadastro do paciente; a confirmação pessoal depende da
+// identidade resolvida pela sessão.
 describe('resumo do agendamento', () => {
   it('apresenta paciente, médico, especialidade e o mesmo período exibido na seleção', () => {
     render(<ResumoAgendamento {...base} />);

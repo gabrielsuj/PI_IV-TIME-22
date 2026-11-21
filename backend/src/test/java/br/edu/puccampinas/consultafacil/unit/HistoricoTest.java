@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -22,11 +27,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * @author Murilo Rigoni (criador)
- * @author Vinicius (modificador)
- */
 
+// As falhas são provocadas entre persistência e reconhecimento para conferir que a
+// recuperação não desfaça a consulta nem duplique eventos.
 class HistoricoTest {
     private final Memoria consultas = new Memoria();
     private final Map<ObjectId, Document> eventos = new LinkedHashMap<>();

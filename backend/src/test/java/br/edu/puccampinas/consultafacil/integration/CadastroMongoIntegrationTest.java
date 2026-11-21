@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -15,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** Opt-in: -DmongoTests=true. Banco fixo consultafacil_test; limpa somente IDs criados pelo teste. */
+// A verificação usa índices reais para cobrir conflitos de cadastro que também podem
+// ocorrer entre pedidos simultâneos.
 class CadastroMongoIntegrationTest {
     private MongoConnection mongo;
     private MedicoRepository medicoRepo;

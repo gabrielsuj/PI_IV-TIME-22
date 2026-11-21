@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.domain.enums.StatusConsulta;
@@ -43,6 +48,9 @@ public final class CalculadoraPreenchimentoFila {
                 mantidas.add(entrada.getKey());
         }
 
+        // O indicador mede consultas mantidas, não a quantidade de inscrições
+        // atendidas. O conjunto reúne os vínculos por consulta para impedir
+        // que o mesmo agendamento aumente o numerador mais de uma vez.
         Set<ObjectId> preenchidas = new HashSet<>();
         long invalidos = 0;
         for (Document inscricao : documentosUnicos(inscricoes).values()) {

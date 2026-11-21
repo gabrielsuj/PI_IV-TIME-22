@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -17,6 +22,8 @@ import java.util.*;
 import static br.edu.puccampinas.consultafacil.support.FontesIndicadoresEmMemoria.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+// As fontes mudam entre coleta e conferência para verificar que o resumo seja recusado
+// quando perde coerência.
 class IndicadoresMongoRepositoryTest {
     @ParameterizedTest
     @ValueSource(strings = {"medicos", "novaConsulta", "remarcacao", "versao", "pendencias", "agenda", "bloqueio", "ocupante", "historico", "fila", "vinculo"})

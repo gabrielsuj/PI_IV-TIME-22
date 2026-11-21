@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Rotas;
@@ -145,6 +150,8 @@ class ReservasConcorrenciaIntegrationTest {
         var sessoes = new Sessoes(Duration.ofMinutes(60));
         token = sessoes.criar(SECRETARIA).token();
         var autz = new Autorizacao(new Autenticador(sessoes));
+        // O handler de indicadores permanece ausente para que a disputa exercite as
+        // rotas de vagas e reserva usadas pelo cenário.
         var router = Rotas.router(new Cors(List.of()), autz, new Rotas.Handlers(NAO_USADO, NAO_USADO, NAO_USADO,
                 NAO_USADO, NAO_USADO, new VagasHandler(agendamento), new ConsultaHandler(agendamento), NAO_USADO, NAO_USADO, null, null));
 

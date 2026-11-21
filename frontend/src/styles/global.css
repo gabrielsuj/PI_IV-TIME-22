@@ -1,15 +1,18 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 @font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/inter-regular.ttf') format('truetype'); }
 @font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/inter-medium.ttf') format('truetype'); }
 @font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/inter-semibold.ttf') format('truetype'); }
 @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/plus-jakarta-sans-medium.ttf') format('truetype'); }
 @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/plus-jakarta-sans-semibold.ttf') format('truetype'); }
-/**
- * @author Vinicius (criador)
- * @author Gabriel (modificador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- */
 
+/*
+As variáveis compartilhadas mantêm cores, fontes e medidas consistentes entre os
+componentes.
+*/
 :root {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-display: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;

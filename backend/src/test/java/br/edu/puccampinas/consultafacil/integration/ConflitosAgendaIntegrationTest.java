@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
@@ -199,6 +204,8 @@ class ConflitosAgendaIntegrationTest {
             var acesso = new AcessoAgenda(new MedicoDoUsuarioRepository(db));
             var calendario = new ConsultaCalendarioService(new ConsultaRepository(db), new AgendaRepository(db),
                     new MedicoRepository(db), new NomesRepository.Mongo(db));
+            // O handler de indicadores fica ausente nesta montagem para preservar o
+            // foco do cenário nas rotas de agenda e bloqueio.
             var handlers = new Rotas.Handlers(null, null, new AgendaHandler(agendas, acesso),
                     new BloqueioHandler(bloqueios, acesso), null, null, null, new ConsultaCalendarioHandler(calendario, acesso), null, null, null);
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

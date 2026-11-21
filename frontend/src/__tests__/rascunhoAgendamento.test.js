@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { describe, expect, it } from 'vitest';
 import {
   encerrarRascunhoAgendamento, guardarRascunhoAgendamento, iniciarRascunhoAgendamento,
@@ -10,6 +15,8 @@ const dados = {
   paciente: { id: 'p1', nome: 'Maria Teste', cpf: '01234567890' },
 };
 
+// A retomada usa a identidade da sessão para conferir que filtros e paciente não sejam
+// recuperados por outra conta.
 describe('rascunho do agendamento em memória', () => {
   it('recupera somente após reautenticar a mesma conta e preserva no desmonte por 401', () => {
     iniciarRascunhoAgendamento(usuario);

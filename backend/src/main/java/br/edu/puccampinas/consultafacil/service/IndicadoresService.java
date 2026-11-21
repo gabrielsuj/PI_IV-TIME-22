@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -41,6 +46,8 @@ public final class IndicadoresService {
         var calculados = CalculadoraIndicadores.calcular(periodo, base);
         Taxa ocupacao = capacidade.medicosSemAgenda() > 0
                 ? Taxa.indefinida(calculados.ocupacao(), Situacao.DADOS_INCOMPLETOS) : Taxa.de(calculados.ocupacao());
+        // Pendência de projeção e falta de histórico têm situações distintas; em ambos
+        // os casos, o percentual permanece ausente até haver base confiável.
         Taxa taxaConfirmacao = confirmacao.comProjecaoPendente() > 0
                 ? Taxa.indefinida(calculados.confirmacao(), Situacao.DADOS_PENDENTES)
                 : confirmacao.semBaseHistorica() > 0

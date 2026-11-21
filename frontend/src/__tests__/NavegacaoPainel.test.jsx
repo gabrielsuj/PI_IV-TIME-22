@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -80,6 +85,8 @@ it.each([
   expect(fetchMock.mock.calls.every(([, options]) => options.method === 'GET')).toBe(true);
 });
 
+// A busca original acompanha a ida e a volta entre telas, permitindo conferir a
+// preservação dos filtros do painel.
 it('atalho do calendário leva médico e dia e preserva o retorno após trocar a visualização', async () => {
   mockApi();
   const user = userEvent.setup();

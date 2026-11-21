@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api;
 
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
@@ -87,6 +92,8 @@ public final class Rotas {
     /** /consultas/{id}/cancelamento: o {id} vem no caminho. Só o que vem depois da barra fica aqui. */
     private static final Pattern CANCELAMENTO = Pattern.compile("^/consultas/[^/]+/cancelamento$");
     private static final Pattern STATUS = Pattern.compile("^/consultas/[^/]+/status$");
+    // O histórico tem uma subrota própria para aplicar a autorização da consulta antes
+    // de entregar seus eventos.
     private static final Pattern HISTORICO = Pattern.compile("^/consultas/[^/]+/historico$");
     /** /consultas/lista (#30) ou /consultas/{id} (#30): um segmento só depois de /consultas/. */
     private static final Pattern UM_SEGMENTO = Pattern.compile("^/consultas/[^/]+$");

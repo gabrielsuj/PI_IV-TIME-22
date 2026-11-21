@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.*;
@@ -30,6 +35,8 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Os cenários com fusos distintos conferem o dia da clínica solicitado pelo painel e
+// preservam o comportamento das chamadas sem filtro de fuso.
 class CalendarioFusoHttpTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO = new ObjectId(), PACIENTE = new ObjectId(), ESPECIALIDADE = new ObjectId();
     private static final UsuarioLogado SECRETARIA = ator(Perfil.SECRETARIA_ADMIN), MEDICO_LOGADO = ator(Perfil.MEDICO), PACIENTE_LOGADO = ator(Perfil.PACIENTE);

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.repository;
 
 import br.edu.puccampinas.consultafacil.api.dto.MedicoResponse;
@@ -49,6 +54,8 @@ public class MedicoRepository implements MedicoCadastroRepository {
         return col.find().sort(ascending("nome", "_id")).map(this::resposta).into(new ArrayList<>());
     }
 
+    // O documento de atualização contém os dados profissionais, preservando o vínculo
+    // de usuário já armazenado no cadastro.
     private Document documento(MedicoResponse medico) {
         return new Document("nome", medico.nome()).append("crmNumero", medico.crmNumero())
                 .append("crmUf", medico.crmUf()).append("ativo", medico.ativo())

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
@@ -340,6 +345,8 @@ class SinalizacaoFilaIntegrationTest {
         assertEquals(new BigDecimal("0.00"), aposCancelar.preenchimentoFila().orElseThrow().percentual());
     }
 
+    // O indicador usa consultas efetivamente vinculadas à fila; um aviso de vaga
+    // isolado não comprova preenchimento.
     private CalculadoraPreenchimentoFila.Resultado indicadorPreenchimentoFila() {
         var consultas = db.getCollection("consultas").find(Filters.in("medicoId", MEDICO, OUTRO_MEDICO)).into(new ArrayList<>());
         var fila = db.getCollection("filaEspera").find(Filters.in("pacienteId", PACIENTES)).into(new ArrayList<>());

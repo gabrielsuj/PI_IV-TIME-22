@@ -1,19 +1,20 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 /** Nome de exibição de cada perfil devolvido pela API. */
 export const NOME_PERFIL = {
   SECRETARIA_ADMIN: 'Secretaria / Administrador',
   MEDICO: 'Médico',
   PACIENTE: 'Paciente',
 };
-/**
- * @author Gabriel (criador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- * @author Vinicius (modificador)
- */
 
 const TODOS = ['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'];
 const EQUIPE = ['SECRETARIA_ADMIN', 'MEDICO'];
 const SECRETARIA = ['SECRETARIA_ADMIN'];
+// O acesso a Nova consulta acompanha os perfis que podem agendar, mantendo o atalho
+// visível para secretaria e paciente.
 const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
 
 /**

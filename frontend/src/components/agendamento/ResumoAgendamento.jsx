@@ -1,9 +1,13 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { formatarHorarioAgendamento } from '../../utils/horarioAgendamento';
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 
-// Necessita issue #21 para fornecer a confirmação real do agendamento.
 export default function ResumoAgendamento({ usuario, paciente, especialidade, medico, horario, fusoHorario, onVoltar, onConfirmar, confirmando = false, error }) {
   const pessoal = usuario?.perfil === 'PACIENTE';
   const permitido = pessoal || usuario?.perfil === 'SECRETARIA_ADMIN';
@@ -12,6 +16,8 @@ export default function ResumoAgendamento({ usuario, paciente, especialidade, me
   const valido = permitido && Boolean(nomePaciente && (pessoal || paciente?.id) && especialidade?.id && especialidade.ativa === true
     && medico?.id && medico.ativo === true && medico.especialidadeIds?.includes(especialidade.id) && exibicao);
   const conflito = error?.status === 409;
+  // Um conflito bloqueia a confirmação daquele horário; o usuário precisa voltar à
+  // seleção para conferir a disponibilidade atual.
   const podeConfirmar = valido && !confirmando && !conflito && typeof onConfirmar === 'function';
 
   function confirmar(event) {

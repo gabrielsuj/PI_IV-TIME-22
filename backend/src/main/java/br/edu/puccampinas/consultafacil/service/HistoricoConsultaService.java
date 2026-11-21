@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -43,6 +48,8 @@ public final class HistoricoConsultaService {
         if (limite < 1 || limite > HistoricoLeituraRepository.LIMITE_MAXIMO)
             throw ApiException.badRequest("limite deve ser um inteiro de 1 a " + HistoricoLeituraRepository.LIMITE_MAXIMO);
         var consulta = consultas.buscar(consultaId).orElseThrow(() -> ApiException.notFound("Consulta não encontrada"));
+        // Confere o vínculo antes de buscar eventos e nomes, evitando carregar
+        // detalhes de uma consulta que o usuário não pode acessar.
         acesso.verificar(consulta, ator);
         var eventos = historico.listarPorConsulta(consultaId, aposSequencia, limite).stream().map(HistoricoEventoResponse::de).toList();
         boolean limiteAtingido = eventos.size() == limite;

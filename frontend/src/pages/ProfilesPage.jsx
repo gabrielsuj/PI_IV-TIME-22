@@ -1,7 +1,14 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 
+// Os perfis apresentados são informativos; as permissões continuam vinculadas à conta
+// autenticada.
 const PROFILES = [
   { name: 'Secretaria / Administrador', tone: 'teal', description: 'Organização da rotina da clínica.', permissions: ['Gerenciar cadastros de pacientes e médicos', 'Organizar agendas e consultas', 'Acompanhar cancelamentos e fila de espera'] },
   { name: 'Médico', tone: 'info', description: 'Acompanhamento dos próprios atendimentos.', permissions: ['Consultar a própria agenda', 'Acompanhar as consultas', 'Atualizar o status dos atendimentos'] },

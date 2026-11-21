@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -19,6 +24,8 @@ function Formulario({ initialValue = { especialidadeId: '', medicoId: '', data: 
   return <FiltrosAgendamento especialidades={especialidades} medicos={medicos} value={value} onChange={setValue} {...props} />;
 }
 
+// A seleção controlada permite conferir que trocar a especialidade limpa o médico sem
+// descartar a data já preenchida.
 describe('filtros do agendamento', () => {
   it('libera os campos em sequência e mostra apenas médicos da especialidade', async () => {
     const user = userEvent.setup();

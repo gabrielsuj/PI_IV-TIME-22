@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
@@ -19,12 +24,6 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { retornoPainel } from '../utils/painel';
 
-/**
- * @author Vinicius (criador)
- * @author Gabriel (modificador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- */
 
 // Converte uma data ISO para a data local de São Paulo.
 function dataLocalBrasil(iso) {
@@ -53,6 +52,8 @@ export default function NovaConsultaPage({
 
   // Dados recebidos da fila de espera.
   const location = useLocation();
+  // Preserva o retorno ao painel da conta atual para que a navegação mantenha os
+  // filtros escolhidos antes do agendamento.
   const retorno = retornoPainel(location, usuario);
   const origemFila = location.state?.origemFila;
 

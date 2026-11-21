@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import org.bson.Document;
@@ -41,6 +46,8 @@ public final class CalculadoraDisponibilidade {
         return vagas;
     }
 
+    // Os indicadores reutilizam a grade completa da jornada; os filtros de passado e
+    // reservas continuam separados na busca de disponibilidade.
     public static List<Vaga> capacidadeDoDia(Document agenda, LocalDate data, List<Document> bloqueios) {
         ZoneId fuso = ZoneId.of(agenda.getString("fusoHorario"));
         Integer duracao = agenda.getInteger("duracaoMinutos");

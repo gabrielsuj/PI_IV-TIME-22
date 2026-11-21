@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { useRecords } from '../hooks/useRecords';
 import { api } from '../services/api';
@@ -50,6 +55,8 @@ export default function RegistrationForm({ resource, schema, record, initialValu
 
   async function submit(event) {
     event.preventDefault();
+    // Bloqueia um segundo envio antes da próxima renderização, evitando cadastros
+    // repetidos por cliques rápidos.
     if (sending.current) return;
     const nextErrors = resource === 'pacientes' ? validarPaciente(values) : {};
     if (resource !== 'pacientes') {

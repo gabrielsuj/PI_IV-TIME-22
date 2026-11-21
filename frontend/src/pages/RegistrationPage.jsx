@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { registrationSchemas } from '../data/registrationSchemas';
@@ -19,6 +24,8 @@ export default function RegistrationPage({ resource, searchState }) {
   const location = useLocation();
   const rota = `${location.pathname}${location.search}`;
   const createButton = useRef(null);
+  // Vincula o rascunho de paciente à conta e à rota, permitindo retomar o formulário
+  // no contexto em que foi preenchido.
   const draftContext = resource === 'pacientes' ? { usuarioId: usuario?.id, rota } : null;
   const schema = registrationSchemas[resource];
   const { records, loading, error, refresh } = useRecords(resource);

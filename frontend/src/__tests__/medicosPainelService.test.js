@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { beforeEach, expect, it, vi } from 'vitest';
 import { buscarMedicosPainel } from '../services/medicosPainelService';
 import { entrarComo } from './sessaoTeste';
@@ -7,6 +12,8 @@ const json = (dados, status = 200) => new Response(JSON.stringify(dados), { stat
 const medico = { id: MEDICO_PAINEL, nome: 'Ana Médica', ativo: true };
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
+// IDs e nomes inválidos são tratados como falha de contrato, mantendo a distinção
+// entre catálogo vazio e resposta incorreta.
 it('lê os médicos com a sessão e retorna somente os campos usados pelo painel', async () => {
   const fetchMock = vi.fn(async () => json([{ ...medico, crmNumero: '123', crmUf: 'SP', usuarioId: 'outro-id' }]));
   vi.stubGlobal('fetch', fetchMock);

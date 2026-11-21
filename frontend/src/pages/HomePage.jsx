@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useState } from 'react';
 import { useLocation } from 'react-router';
 import ApiStatus from '../components/ApiStatus';
@@ -33,6 +38,8 @@ export default function HomePage() {
   const location = useLocation();
   const [hoje] = useState(() => agoraNoFuso().slice(0, 10));
   const perfil = usuario?.perfil;
+  // A equipe recebe o painel operacional; o paciente mantém os atalhos dos próprios
+  // atendimentos e avisos.
   const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
   const medicos = useMedicosPainel();
   const medicoId = perfil === 'SECRETARIA_ADMIN' && new URLSearchParams(location.search).get('medicoId')?.toLowerCase();

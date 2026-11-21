@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../services/api';
 
@@ -6,6 +11,8 @@ export function useRecords(resource) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [revision, setRevision] = useState(0);
+  // A revisão dispara outra leitura do mesmo recurso após salvar ou tentar novamente,
+  // mantendo a atualização centralizada no hook.
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {

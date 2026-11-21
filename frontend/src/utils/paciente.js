@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 // Mesmos formatos e dígitos verificadores de PacienteValidator; documentos continuam textos.
 const EMAIL = /^[A-Za-z0-9!#$%&'*+/=?^_{|}~.-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
 
@@ -28,6 +33,8 @@ export function validarPaciente(values) {
   return errors;
 }
 
+// O CPF continua como texto durante a normalização para preservar zeros à esquerda ao
+// remover a pontuação.
 export function normalizarPaciente(values) {
   return { nome: values.nome.trim(), cpf: values.cpf.trim().replace(/[.-]/g, ''), email: values.email.trim().toLowerCase() };
 }

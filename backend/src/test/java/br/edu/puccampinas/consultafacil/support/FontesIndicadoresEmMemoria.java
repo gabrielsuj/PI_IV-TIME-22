@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.support;
 
 import br.edu.puccampinas.consultafacil.repository.IndicadoresMongoRepository.Fontes;
@@ -8,6 +13,8 @@ import org.bson.types.ObjectId;
 import java.time.Instant;
 import java.util.*;
 
+// As chamadas e janelas ficam registradas para conferir o recorte consultado e
+// detectar leituras repetidas ou fora do período.
 public class FontesIndicadoresEmMemoria implements Fontes {
     public static final ObjectId MEDICO = new ObjectId();
     public static final PeriodoIndicadores PERIODO = PeriodoIndicadores.de("2026-11-23", "2026-11-23");

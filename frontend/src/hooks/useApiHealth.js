@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useCallback, useEffect, useState } from 'react';
 import { getHealth } from '../services/healthService';
 
@@ -50,6 +55,8 @@ export function useApiHealth() {
         });
       });
 
+    // Cancela a verificação anterior ao sair da tela ou iniciar outra tentativa,
+    // evitando tratar o cancelamento como falha de conexão.
     return () => controller.abort();
   }, [attempt]);
 

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -8,6 +13,8 @@ export default defineConfig({
   envDir: '..',
   server: {
     port: 5173,
+    // Mantém a porta previsível para que a origem do frontend continue alinhada à
+    // configuração de acesso da API.
     strictPort: true,
   },
   test: {

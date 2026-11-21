@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Http;
@@ -46,6 +51,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** HTTP, sessão e serviços reais da #28, com persistência isolada em memória (sem MongoDB). */
+// O ator vem da sessão simulada para conferir que o corpo da requisição não possa
+// assumir a identidade de outro responsável.
 class StatusConsultaHttpTest {
     private static final Instant FIM = Instant.parse("2026-11-18T12:30:00Z");
     private static final String ORIGEM = "http://localhost:5173";

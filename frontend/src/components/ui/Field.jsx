@@ -1,8 +1,15 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useId } from 'react';
 
 export default function Field({ label, error, hint, as: Control = 'input', id, className = '', required, children, ...props }) {
   const generatedId = useId();
   const controlId = id || generatedId;
+  // O campo compartilha a referência de descrição entre ajuda e erro, permitindo que
+  // leitores de tela anunciem a mensagem vigente.
   const descriptionId = `${controlId}-description`;
 
   return (

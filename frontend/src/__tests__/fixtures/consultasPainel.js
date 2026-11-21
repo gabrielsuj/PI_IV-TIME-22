@@ -1,3 +1,10 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+// A agenda do dia usa horário local; as próximas consultas usam UTC para exercitar os
+// contratos distintos das duas leituras.
 export const MEDICO_PAINEL = '000000000000000000000001';
 export const OUTRO_MEDICO_PAINEL = '000000000000000000000002';
 

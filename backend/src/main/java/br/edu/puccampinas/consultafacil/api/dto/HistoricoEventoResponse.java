@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 import org.bson.Document;
@@ -18,6 +23,8 @@ public record HistoricoEventoResponse(String id, int sequencia, String evento,
 
     public static HistoricoEventoResponse de(Document documento) {
         String tipo = documento.getString("evento");
+        // Detalhes de alteração acompanham seu tipo de evento, evitando publicar
+        // campos que não pertencem àquela ocorrência.
         List<HistoricoAlteracaoResponse> alteracoes = "ALTERACAO".equals(tipo)
                 ? documento.getList("alteracoes", Document.class, List.of()).stream()
                     .map(HistoricoAlteracaoResponse::de).flatMap(Optional::stream).toList() : null;

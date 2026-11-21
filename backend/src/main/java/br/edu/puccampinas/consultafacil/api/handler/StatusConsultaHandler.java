@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -37,6 +42,8 @@ public final class StatusConsultaHandler implements HttpHandler {
         Http.sendJson(ex, 200, service.alterar(id, pedido.status(), Autorizacao.usuario(ex)));
     }
 
+    // Recusa campos extras e valores malformados antes de chamar o serviço, mantendo o
+    // pedido restrito à alteração de status.
     private StatusConsultaRequest lerCorpo(HttpExchange ex) throws IOException {
         byte[] corpo = ex.getRequestBody().readNBytes(MAX_BODY + 1);
         if (corpo.length > MAX_BODY) throw ApiException.badRequest("Dados excedem o tamanho permitido (16 KiB)");

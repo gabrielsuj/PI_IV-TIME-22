@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.*;
@@ -37,6 +42,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// As fontes em memória passam pelas calculadoras reais para conferir o contrato HTTP
+// sem fabricar percentuais nas respostas.
 class IndicadoresHttpTest {
     private static final ObjectId MEDICO = new ObjectId(), OUTRO_MEDICO = new ObjectId();
     private static final UsuarioLogado SECRETARIA = usuario(Perfil.SECRETARIA_ADMIN), MEDICO_LOGADO = usuario(Perfil.MEDICO), PACIENTE = usuario(Perfil.PACIENTE);

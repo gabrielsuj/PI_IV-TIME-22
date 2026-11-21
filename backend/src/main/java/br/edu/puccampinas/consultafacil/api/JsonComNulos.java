@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api;
 
 import com.google.gson.Gson;
@@ -15,6 +20,8 @@ public final class JsonComNulos implements TypeAdapterFactory {
         TypeAdapter<T> delegate = gson.getDelegateAdapter(this, tipo);
         return new TypeAdapter<>() {
             @Override public void write(JsonWriter out, T valor) throws IOException {
+                // Restaura a opção do escritor após o DTO para que a presença de nulos
+                // neste contrato não altere outras respostas.
                 boolean anterior = out.getSerializeNulls();
                 out.setSerializeNulls(true);
                 try { delegate.write(out, valor); }

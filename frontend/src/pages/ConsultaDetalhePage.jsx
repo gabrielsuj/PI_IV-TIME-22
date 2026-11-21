@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router';
 import HistoricoConsulta from '../components/consultas/HistoricoConsulta';
@@ -95,6 +100,8 @@ export default function ConsultaDetalhePage() {
 function DetalheConsulta({ id }) {
   const { usuario } = useAuth();
   const location = useLocation();
+  // O retorno ao painel usa o contexto da conta atual, preservando os filtros sem
+  // reaproveitar a origem de outro usuário.
   const retorno = retornoPainel(location, usuario);
   const { consulta, erro, carregando, recarregar, chave, revisao } = useConsulta(id);
   const [cancelando, setCancelando] = useState(false);

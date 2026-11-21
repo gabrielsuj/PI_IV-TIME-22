@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -16,11 +21,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.util.*;
 import java.util.function.Consumer;
-/**
- * @author Murilo Rigoni (criador)
- * @author Gabriel (modificador)
- * @author Vinicius (modificador)
- */
 
 /**
  * Porta de gravação auditada para os futuros serviços de consultas.
@@ -107,6 +107,8 @@ public final class RegistroConsultaService {
             aposGravar(id);
             return resposta(antes);
         }
+        // Separar as operações mantém o evento de status distinto das mudanças nos
+        // dados do atendimento, preservando o significado do histórico.
         if (tipo != EventoHistorico.ALTERACAO && modificados.keySet().stream().anyMatch(DADOS::contains))
             throw ApiException.badRequest("Altere os dados e o status em operações separadas");
         if (modificados.containsKey("motivoCancelamento") && tipo != EventoHistorico.CANCELAMENTO)

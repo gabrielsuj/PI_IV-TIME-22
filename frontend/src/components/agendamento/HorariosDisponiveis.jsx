@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useId } from 'react';
 import { formatarHorarioAgendamento } from '../../utils/horarioAgendamento';
 import Alert from '../ui/Alert';
@@ -22,6 +27,8 @@ function prepararHorarios(horarios, fusoHorario) {
 export default function HorariosDisponiveis({ status = 'aguardando', horarios = [], fusoHorario, value, onChange, error, onRetry, disabled = false }) {
   const groupId = useId();
   const opcoes = status === 'sucesso' && horarios.length > 0 ? prepararHorarios(horarios, fusoHorario) : [];
+  // Horários inválidos viram falha de leitura, evitando oferecer uma opção cujo
+  // intervalo ou fuso não pode ser apresentado com segurança.
   const erroDados = status === 'sucesso' && horarios.length > 0 && opcoes === null;
   const falha = status === 'erro' || erroDados;
 

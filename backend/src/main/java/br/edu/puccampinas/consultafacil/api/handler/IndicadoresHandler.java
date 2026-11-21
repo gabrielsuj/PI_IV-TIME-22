@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -23,6 +28,8 @@ public final class IndicadoresHandler implements HttpHandler {
         try { parametros = Query.params(ex); }
         catch (IllegalArgumentException e) { throw ApiException.badRequest("Parâmetros de consulta inválidos"); }
         String query = ex.getRequestURI().getRawQuery();
+        // A lista fechada de filtros evita aceitar parâmetros ignorados que fariam a
+        // tela interpretar um recorte diferente do calculado.
         if (!PARAMETROS.containsAll(parametros.keySet())) throw ApiException.badRequest("Parâmetro de consulta não permitido");
         if (query != null && !query.isBlank() && query.split("&", -1).length != parametros.size())
             throw ApiException.badRequest("Parâmetros repetidos ou vazios não são permitidos");

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { createBrowserRouter, Outlet } from 'react-router';
 import AppLayout from '../components/AppLayout';
 import RequireAuth from '../components/RequireAuth';
@@ -21,12 +26,6 @@ import RegistrationPage from '../pages/RegistrationPage';
 import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
 import FilaEsperaPage from '../pages/FilaEsperaPage';
 
-/**
- * @author Vinicius (criador)
- * @author Gabriel (modificador)
- * @author Murilo Moraes (modificador)
- * @author Murilo Rigoni (modificador)
- */
 /**
  * Tabela de rotas da aplicação.
  *
@@ -84,6 +83,8 @@ export const routes = [
   },
 ];
 
+// A tabela compartilhada concentra os destinos para manter o layout e a proteção de
+// acesso consistentes na navegação.
 export function createAppRouter() {
   return createBrowserRouter(routes);
 }

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -49,6 +54,8 @@ function abrir(query = '') {
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
+// As chamadas são conferidas por endpoint para garantir que o médico e as datas
+// cheguem às seções com o significado esperado.
 it('aplica o mesmo médico às três seções com datas e significados explícitos', async () => {
   const fetchMock = mockApi();
   abrir(`&medicoId=${MEDICO_PAINEL}`);

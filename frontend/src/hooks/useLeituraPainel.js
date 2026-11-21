@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './useAuth';
 
@@ -27,6 +32,9 @@ export function useLeituraPainel(ler, parametros, habilitado = true) {
       }
     }
     carregar();
+    // Cancela a leitura quando os filtros ou a sessão mudam, para que uma
+    // resposta antiga não substitua os dados da seleção atual. A mesma
+    // proteção evita atualizar o estado depois de desmontar o painel.
     return () => controller.abort();
   }, [ler, ativo, filtros, chave]);
 

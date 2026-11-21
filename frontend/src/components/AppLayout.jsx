@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { itensDoMenu, podeAbrir } from '../data/menu';
@@ -19,16 +24,13 @@ import {
   ContactRound
 } from 'lucide-react';
 
-/**
- * @author Vinicius (criador)
- * @author Gabriel (modificador)
- * @author Murilo Rigoni (modificador)
- */
 
 export default function AppLayout() {
   const { usuario } = useAuth();
   const location = useLocation();
   const { pathname } = location;
+  // O endereço inicial recupera os filtros do painel da mesma conta, preservando o
+  // contexto ao voltar de outra tela.
   const inicio = retornoPainel(location, usuario) || '/';
   const conteudo = useRef(null);
   

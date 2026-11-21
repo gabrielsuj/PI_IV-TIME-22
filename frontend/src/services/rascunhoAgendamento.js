@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 // Somente memória desta aba; horários, senha e token não fazem parte do rascunho.
 let usuarioAtivo = null;
 let usuarioSuspenso = null;
@@ -10,6 +15,8 @@ function identidade(usuario) {
 
 export function iniciarRascunhoAgendamento(usuario) {
   const chave = identidade(usuario);
+  // O rascunho pode ser retomado pela mesma conta após reautenticar; a troca de
+  // identidade encerra o preenchimento anterior.
   if (!chave || (usuarioAtivo || usuarioSuspenso) !== chave) encerrarRascunhoAgendamento();
   usuarioAtivo = chave;
   usuarioSuspenso = null;

@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { buscarAgenda } from './agendaService';
 import { listarConsultas as listarCalendario } from './calendarioService';
 import { LIMITE_LISTAGEM, listarConsultas } from './consultasService';
@@ -51,6 +56,8 @@ export async function buscarProximasConsultas({ medicoId } = {}, { signal } = {}
   if (consultas.length > LIMITE_LISTAGEM || consultas.some((consulta) =>
     !STATUS_ATIVOS.includes(consulta.status) || medicoId && consulta.medicoId !== medicoId))
     throw new Error('A listagem de próximas consultas recebida é inválida. Tente novamente.');
+  // Ordena por início antes de limitar o resumo a cinco consultas, usando o
+  // identificador para desempatar horários iguais.
   const ordenadas = [...consultas].sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio) || a.id.localeCompare(b.id));
   return { consultas: ordenadas.slice(0, LIMITE_PROXIMAS_PAINEL), totalRecebido: consultas.length,
     limiteAtingido: consultas.length === LIMITE_LISTAGEM };

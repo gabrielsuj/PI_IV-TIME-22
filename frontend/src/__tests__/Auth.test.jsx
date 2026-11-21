@@ -1,4 +1,9 @@
-﻿import { act, render, screen, waitFor, within } from '@testing-library/react';
+﻿/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -20,6 +25,8 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
+// O endereço solicitado acompanha o redirecionamento ao login para conferir a retomada
+// da navegação após autenticar.
 describe('sessão e rotas protegidas', () => {
   it('manda para o login quando ninguém entrou', async () => {
     const router = renderAt('/pacientes');

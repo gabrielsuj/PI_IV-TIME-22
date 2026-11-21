@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buscarCatalogosAgendamento } from '../services/catalogoAgendamentoService';
 import { entrarComo } from './sessaoTeste';
@@ -17,6 +22,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// Mistura cadastros ativos e inativos para conferir o filtro sem perder os
+// identificadores necessários à confirmação.
 describe('catálogos para agendamento', () => {
   it('consulta os endpoints reais com a sessão e retorna somente ativos, preservando IDs e CRM', async () => {
     const fetchMock = vi.fn(async (url) => json(url.endsWith('/especialidades') ? especialidades : medicos));

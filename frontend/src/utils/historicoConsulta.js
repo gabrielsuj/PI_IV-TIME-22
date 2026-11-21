@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { FUSO_CLINICA, STATUS_CONSULTA } from './consulta';
 
 export const EVENTOS_HISTORICO = {
@@ -21,6 +26,8 @@ export function dataHoraDoHistorico(valor) {
 
 export const statusDoHistorico = (valor) => STATUS_CONSULTA[valor]?.rotulo || 'Não informado';
 
+// Eventos antigos podem não identificar o responsável; os textos de ausência preservam
+// essa distinção sem inventar um nome.
 export function responsavelDoHistorico(ator) {
   if (ator?.perfil === 'SISTEMA') return 'Sistema';
   const nome = typeof ator?.nome === 'string' && ator.nome.trim() ? ator.nome.trim() : 'Responsável não identificado';

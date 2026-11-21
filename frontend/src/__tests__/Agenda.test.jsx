@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -49,6 +54,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// Os cadastros simulados preservam IDs e especialidades para conferir os vínculos
+// usados na seleção dos profissionais.
 describe('conversões de horário', () => {
   it('converte entre minutos e horas', () => {
     expect(minutosParaHora(480)).toBe('08:00');

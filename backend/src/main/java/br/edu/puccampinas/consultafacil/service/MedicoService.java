@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -39,6 +44,8 @@ public class MedicoService {
                 .orElseThrow(() -> ApiException.notFound("Médico não encontrado"));
     }
 
+    // As referências são conferidas no cadastro de especialidades para impedir
+    // vínculos vazios, repetidos ou indisponíveis.
     private MedicoResponse validar(String id, MedicoRequest r) {
         if (r == null) throw ApiException.badRequest("Dados do médico são obrigatórios");
         String nome = CadastroValidator.texto(r.nome(), "Nome", 3, 120);

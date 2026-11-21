@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { lerUsuario, limparSessao, salvarSessao, SESSAO_EXPIRADA } from '../services/sessao';
@@ -11,6 +16,8 @@ export default function AuthProvider({ children }) {
 
   useEffect(() => {
     if (usuario) {
+      // Ao reconhecer a conta, os rascunhos retomam seu contexto; dados de outro
+      // usuário são descartados pelos serviços de memória.
       iniciarRascunhos(usuario.id);
       iniciarRascunhoAgendamento(usuario);
     }

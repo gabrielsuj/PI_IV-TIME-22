@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.unit;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -12,6 +17,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
+// Os vínculos permanecem na fixture ao desativar cadastros, permitindo conferir
+// consistência sem confundir desativação com exclusão.
 class CadastroServiceTest {
     private final CadastrosEmMemoria dados = new CadastrosEmMemoria();
     private final MedicoService medicos = new MedicoService(dados.medicoRepo, dados.especialidadeRepo);

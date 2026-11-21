@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -40,6 +45,8 @@ public final class StatusConsultaService {
         alterar(id, StatusConsulta.CONFIRMADA, ator, horario);
     }
 
+    // Restringe este fluxo às transições de comparecimento; o cancelamento mantém suas
+    // próprias regras e notificações.
     private ConsultaResponse alterar(ObjectId consultaId, StatusConsulta destino, UsuarioLogado ator, java.util.Date horarioLembrete) {
         if (ator == null || ator.perfil() == null || ator.id() == null || !ObjectId.isValid(ator.id()))
             throw ApiException.unauthorized("Usuário autenticado é obrigatório para alterar o status");

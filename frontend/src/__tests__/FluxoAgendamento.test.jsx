@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
@@ -21,6 +26,8 @@ const pacientes = [
 ];
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
+// A vaga pré-selecionada usa o fluxo real da tela para conferir sua integração sem
+// substituir as validações do agendamento.
 describe('integração da vaga sinalizada com o agendamento', () => {
   const propriedades = {
     usuario: { id: 'u1', nome: 'Paciente Teste', perfil: 'PACIENTE' }, especialidade: { id: 'e1', nome: 'Cardiologia', ativa: true },

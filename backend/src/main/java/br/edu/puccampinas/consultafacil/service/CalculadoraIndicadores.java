@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.service;
 
 import java.math.BigDecimal;
@@ -35,6 +40,9 @@ public final class CalculadoraIndicadores {
         }
 
         public BigDecimal percentual() {
+            // Sem denominador, a taxa não tem base de cálculo. Retornar null
+            // permite à interface distinguir esse caso de um percentual de 0%
+            // calculado sobre consultas ou vagas existentes.
             return denominador == 0 ? null : BigDecimal.valueOf(numerador).multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(denominador), 2, RoundingMode.HALF_UP);
         }

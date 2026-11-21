@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 package br.edu.puccampinas.consultafacil.api.handler;
 
 import br.edu.puccampinas.consultafacil.api.ApiException;
@@ -21,6 +26,8 @@ import java.util.function.Supplier;
 /** Rotas de coleção e por ID dos cadastros #13, fora do Router de caminhos exatos. */
 public final class CadastroHandler<T, R> implements HttpHandler {
     private static final int MAX_BODY = 16384;
+    // A leitura estrita recusa conteúdo adicional após o JSON para não aceitar uma
+    // requisição parcialmente interpretada.
     private final ObjectMapper json = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private final String rota;
     private final Set<String> campos;

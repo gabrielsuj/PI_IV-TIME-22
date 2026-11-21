@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -53,6 +58,8 @@ function abrir() {
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
+// A navegação por teclado mantém os filtros na URL para conferir acessibilidade e
+// continuidade do contexto no mesmo fluxo.
 it('permite pular a navegação pelo teclado e entrar nas ações do painel sem alterar os filtros', async () => {
   mockApi();
   const user = userEvent.setup();

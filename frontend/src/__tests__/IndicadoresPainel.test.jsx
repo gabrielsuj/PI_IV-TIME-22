@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { StrictMode } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -23,6 +28,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+// Os valores recebidos são comparados à apresentação para conferir que a tela formata
+// os percentuais sem refazer o cálculo.
 it('exibe os cinco percentuais e as contagens da API', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => json(indicadores())));
   render(contexto());

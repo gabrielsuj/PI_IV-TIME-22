@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
@@ -46,6 +51,8 @@ beforeEach(() => {
   entrarComo();
 });
 
+// Os catálogos simulados mantêm vínculos de médico e especialidade para que o teste
+// percorra as escolhas válidas da tela.
 describe('tela de nova consulta', () => {
   it.each(['SECRETARIA_ADMIN', 'PACIENTE'])('permite a escolha do atendimento para %s usando os catálogos reais', async (perfil) => {
     entrarComo({ id: 'u-teste', nome: 'Teste', perfil });

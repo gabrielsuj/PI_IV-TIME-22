@@ -1,3 +1,8 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
 import { useLocation } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgendaDoDia } from '../../hooks/useConsultasPainel';
@@ -17,6 +22,8 @@ export default function AgendaDiaPainel({ dia, medicoId: filtro, medicoInativo, 
   const location = useLocation();
   const origem = origemPainel(location, usuario);
   const propria = usuario?.perfil === 'MEDICO';
+  // O médico consulta seu próprio vínculo; a secretaria usa o cadastro escolhido no
+  // filtro compartilhado do painel.
   const medicoId = propria ? 'meu' : filtro;
   const podeConsultar = medicoId && !medicoInativo;
   const { permitido, carregando: buscandoAgenda, dados, erro, atualizar } = useAgendaDoDia(
