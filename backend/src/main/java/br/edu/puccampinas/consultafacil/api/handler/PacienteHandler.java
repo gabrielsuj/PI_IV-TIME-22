@@ -13,6 +13,9 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 public class PacienteHandler implements HttpHandler {
     private final PacienteService service;

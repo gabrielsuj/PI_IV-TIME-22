@@ -15,6 +15,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
 import java.util.function.Supplier;
+/**
+ * @author Gabriel (criador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
 
 public class ConsultaRepository implements PendenciasConsultaRepository {
     public static final int LIMITE_PENDENCIAS = 50;

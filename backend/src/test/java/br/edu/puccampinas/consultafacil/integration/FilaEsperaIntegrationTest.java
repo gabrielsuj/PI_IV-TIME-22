@@ -66,6 +66,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+/**
+ * @author Gabriel (criador)
+ * @author Murilo Rigoni (modificador)
+ * @author Vinicius (modificador)
+ */
+
 
 /**
  * Fila de espera (#31) e avisos (#57) pela API, com o MongoDB real e os validadores do banco.

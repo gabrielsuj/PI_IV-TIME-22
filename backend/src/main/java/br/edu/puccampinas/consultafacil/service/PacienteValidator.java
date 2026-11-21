@@ -4,6 +4,9 @@ import br.edu.puccampinas.consultafacil.api.dto.PacienteRequest;
 import br.edu.puccampinas.consultafacil.domain.exception.ValidacaoException;
 import java.util.Locale;
 import java.util.regex.Pattern;
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 public class PacienteValidator {
     private static final Pattern EMAIL = Pattern.compile(

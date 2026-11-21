@@ -22,6 +22,12 @@ import { buscarVagas, confirmarAgendamento } from '../services/agendamentoServic
 import FilaEsperaPage from '../pages/FilaEsperaPage';
 
 /**
+ * @author Vinicius (criador)
+ * @author Gabriel (modificador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
+/**
  * Tabela de rotas da aplicação.
  *
  * /login fica fora do layout (sem menu lateral). Todas as outras telas exigem

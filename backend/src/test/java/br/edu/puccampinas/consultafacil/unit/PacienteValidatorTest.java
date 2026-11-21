@@ -9,6 +9,10 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Murilo Rigoni (criador)
+ */
+
 class PacienteValidatorTest {
     private final PacienteValidator validator = new PacienteValidator();
 

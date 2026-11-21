@@ -1,5 +1,6 @@
 # Recria somente o banco selecionado. Execute com o container Mongo em funcionamento.
 # Exemplo: .\scripts\recriar-banco.ps1 consultafacil_demo
+# Autor: Murilo Rigoni (criador)
 param(
     [ValidateSet('consultafacil', 'consultafacil_test', 'consultafacil_demo')]
     [string]$Banco = 'consultafacil_demo'

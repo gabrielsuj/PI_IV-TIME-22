@@ -7,6 +7,9 @@ import br.edu.puccampinas.consultafacil.repository.PacienteRepository;
 import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.Optional;
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 public class PacienteService {
     private final PacienteRepository repository;

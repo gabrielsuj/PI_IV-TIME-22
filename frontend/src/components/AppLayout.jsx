@@ -17,6 +17,12 @@ import {
   ContactRound
 } from 'lucide-react';
 
+/**
+ * @author Vinicius (criador)
+ * @author Gabriel (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 export default function AppLayout() {
   const { usuario } = useAuth();
   const { pathname } = useLocation();

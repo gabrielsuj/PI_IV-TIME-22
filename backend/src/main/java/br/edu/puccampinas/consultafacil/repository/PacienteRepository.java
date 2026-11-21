@@ -16,6 +16,10 @@ import java.util.regex.Pattern;
 import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Indexes.ascending;
 
+/**
+ * @author Murilo Rigoni (criador)
+ */
+
 public interface PacienteRepository {
     Paciente cadastrar(Paciente paciente);
     Optional<Paciente> atualizar(Paciente paciente);

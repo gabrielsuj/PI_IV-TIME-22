@@ -4,6 +4,9 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.Optional;
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 /** Persistência da consulta e de sua caixa de eventos; não conhece HTTP ou sessões. */
 public interface PendenciasConsultaRepository {

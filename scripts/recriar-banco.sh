@@ -6,6 +6,7 @@
 #   scripts/recriar-banco.sh                      # consultafacil (desenvolvimento)
 #   scripts/recriar-banco.sh consultafacil_test   # testes (sem dados de exemplo)
 #   scripts/recriar-banco.sh consultafacil_demo   # demonstração
+# Autor: Gabriel (criador), Murilo Rigoni (modificador)
 set -euo pipefail
 
 BANCO="${1:-consultafacil}"
