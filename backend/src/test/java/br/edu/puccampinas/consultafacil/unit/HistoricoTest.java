@@ -22,6 +22,11 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Vinicius (modificador)
+ */
+
 class HistoricoTest {
     private final Memoria consultas = new Memoria();
     private final Map<ObjectId, Document> eventos = new LinkedHashMap<>();

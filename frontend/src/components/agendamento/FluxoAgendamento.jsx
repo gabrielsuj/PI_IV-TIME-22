@@ -6,6 +6,13 @@ import Card from '../ui/Card';
 import HorariosDisponiveis from './HorariosDisponiveis';
 import ResumoAgendamento from './ResumoAgendamento';
 
+/**
+ * @author Vinicius (criador)
+ * @author Gabriel (modificador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 function dataValida(data) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) return false;
   const instante = Date.parse(`${data}T00:00:00Z`);

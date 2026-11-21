@@ -1,4 +1,7 @@
 import { api } from './api';
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 // Contrato: backend/.../api/handler/FilaEsperaHandler.java
 // GET sem filtro de status retorna apenas AGUARDANDO e SINALIZADA.

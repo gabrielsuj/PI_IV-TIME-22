@@ -1,4 +1,5 @@
 # Registro de histórico no backend Java
+# Autor: Murilo Rigoni (criador)
 
 ## Escopo e integração
 

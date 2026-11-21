@@ -3,6 +3,12 @@
 @font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/inter-semibold.ttf') format('truetype'); }
 @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/plus-jakarta-sans-medium.ttf') format('truetype'); }
 @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/plus-jakarta-sans-semibold.ttf') format('truetype'); }
+/**
+ * @author Vinicius (criador)
+ * @author Gabriel (modificador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
 
 :root {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;

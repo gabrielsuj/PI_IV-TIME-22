@@ -4,6 +4,12 @@ export const NOME_PERFIL = {
   MEDICO: 'Médico',
   PACIENTE: 'Paciente',
 };
+/**
+ * @author Gabriel (criador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ * @author Vinicius (modificador)
+ */
 
 const TODOS = ['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'];
 const EQUIPE = ['SECRETARIA_ADMIN', 'MEDICO'];

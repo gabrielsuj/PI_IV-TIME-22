@@ -34,6 +34,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 
+/**
+ * @author Gabriel (criador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ * @author Vinicius (modificador)
+ */
+
 public class App {
     public static void main(String[] args) throws IOException {
 

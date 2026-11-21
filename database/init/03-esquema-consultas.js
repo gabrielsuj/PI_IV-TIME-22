@@ -1,5 +1,10 @@
 const ATIVOS = ["AGENDADA", "CONFIRMADA"];
 
+/**
+ * @author Gabriel (criador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 const validator = {
   $jsonSchema: {
     bsonType: "object",

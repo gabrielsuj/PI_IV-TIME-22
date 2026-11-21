@@ -14,6 +14,11 @@ import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.gt;
 
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Vinicius (modificador)
+ */
+
 /** Apenas inserção. Repetir o mesmo evento é seguro; divergências não são ocultadas. */
 @FunctionalInterface
 public interface HistoricoRepository {

@@ -12,6 +12,10 @@ import java.net.*;
 import java.net.http.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Murilo Rigoni (criador)
+ */
+
 class PacienteHandlerTest {
     private HttpServer server;
     private HttpClient client;

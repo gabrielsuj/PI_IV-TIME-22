@@ -16,6 +16,11 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.util.*;
 import java.util.function.Consumer;
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Gabriel (modificador)
+ * @author Vinicius (modificador)
+ */
 
 /**
  * Porta de gravação auditada para os futuros serviços de consultas.

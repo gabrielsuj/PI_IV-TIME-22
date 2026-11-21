@@ -13,6 +13,11 @@
 // validador retorna o código 121 (API: 400); violação de índice único, 11000 (API: 409).
 // =============================================================================
 
+/**
+ * @author Davi Vitoreti (criador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 const OPCOES_VALIDACAO = { validationLevel: "strict", validationAction: "error" };
 
 function aplicarEsquema(nome, validator) {

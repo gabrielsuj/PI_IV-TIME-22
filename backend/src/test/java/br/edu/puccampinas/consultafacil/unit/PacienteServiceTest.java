@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Murilo Rigoni (criador)
+ */
+
 public class PacienteServiceTest {
     private final EmMemoria repository = new EmMemoria();
     private final PacienteService service = new PacienteService(repository, new PacienteValidator());

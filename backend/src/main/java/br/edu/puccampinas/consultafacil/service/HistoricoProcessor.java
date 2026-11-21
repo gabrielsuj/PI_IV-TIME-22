@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+/**
+ * @author Murilo Rigoni (criador)
+ */
 
 /** Executado pelo chamador, sem thread, agendador ou conexão própria. */
 public final class HistoricoProcessor {

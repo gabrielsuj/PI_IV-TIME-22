@@ -19,6 +19,13 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { retornoPainel } from '../utils/painel';
 
+/**
+ * @author Vinicius (criador)
+ * @author Gabriel (modificador)
+ * @author Murilo Moraes (modificador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 // Converte uma data ISO para a data local de São Paulo.
 function dataLocalBrasil(iso) {
   if (!iso || !Number.isFinite(Date.parse(iso))) return '';

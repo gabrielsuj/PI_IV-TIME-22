@@ -14,6 +14,11 @@ import java.util.concurrent.*;
 import static com.mongodb.client.model.Filters.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Vinicius (modificador)
+ */
+
 /** Opt-in: HISTORICO_MONGO_URI; usa apenas consultafacil_historico_test com os schemas aplicados. */
 class HistoricoPersistenceIntegrationTest {
     private static MongoConnection mongo;

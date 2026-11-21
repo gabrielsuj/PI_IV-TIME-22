@@ -5,6 +5,10 @@
 // usuarioId liga o login ao cadastro e permite o paciente agendar sozinho (#21).
 // Paulo: login de 02-usuarios.js. Carla e Diego: logins usr(14) e usr(15) de 05-usuarios-equipe.js
 // (o vínculo pode ser gravado antes de o login existir, porque os IDs são fixos).
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Murilo Moraes (modificador)
+ */
 const pacientesDemo = [
   { _id: ObjectId("400000000000000000000001"), nome: "Paulo Paciente — Fictício",
     cpf: "39053344705", email: "paciente@consultafacil.demo",

@@ -11,6 +11,11 @@ import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import { cancelarInscricaoFila, inscreverFilaEspera, listarFilaEspera } from '../services/filaEsperaService';
 
+/**
+ * @author Murilo Rigoni (criador)
+ * @author Gabriel (modificador)
+ */
+
 const ROTULOS = {
   AGUARDANDO: ['Aguardando', 'warning'],
   SINALIZADA: ['Vaga oferecida', 'info'],

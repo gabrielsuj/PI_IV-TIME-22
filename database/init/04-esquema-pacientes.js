@@ -2,6 +2,11 @@
 // Para uma base existente, executar este arquivo no mongosh da base consultafacil.
 // Não remove ou corrige dados existentes; duplicidades devem ser resolvidas antes.
 // Usa o banco selecionado pelo mongosh (desenvolvimento, teste ou demonstração).
+/**
+ * @author a confirmar (criador)
+ * @author Murilo Rigoni (modificador)
+ */
+
 const pacienteValidator = { $jsonSchema: {
   bsonType: "object",
   required: ["nome", "cpf", "email"],
