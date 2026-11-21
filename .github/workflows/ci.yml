@@ -46,6 +46,17 @@ jobs:
             done
           done
 
+      - name: Carregar e conferir a carga de demonstração
+        env:
+          MONGO_CONTAINER: ${{ job.services.mongo.id }}
+        shell: bash
+        run: |
+          # Usada pelo IndicadoresDemonstracaoIntegrationTest (#48).
+          for script in database/init/*.js database/seed/*.js; do
+            docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < "$script" > /dev/null
+          done
+          docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+
       - name: Preparar o Maven Wrapper
         working-directory: backend
         shell: bash
@@ -61,6 +72,7 @@ jobs:
         working-directory: backend
         env:
           HISTORICO_MONGO_URI: mongodb://localhost:27017/?serverSelectionTimeoutMS=3000
+          DEMO_MONGO_DB: consultafacil_demo
         run: ./mvnw --batch-mode --no-transfer-progress -DmongoTests=true test
 
   frontend:

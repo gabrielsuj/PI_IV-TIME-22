@@ -60,7 +60,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 
 **Fora do MVP:** WhatsApp e SMS reais, teleconsulta, prontuário eletrônico, pagamentos e convênios, relatórios avançados, previsão de faltas por inteligência artificial e aplicativo móvel.
 
-### Situação atual (19/11/2026)
+### Situação atual (20/11/2026)
 
 | Funcionalidade | Situação |
 |---|---|
@@ -78,10 +78,12 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Confirmação, conclusão e falta pela interface | ✅ #28 |
 | Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
 | Central de notificações, leitura e confirmação de presença pelo lembrete | ✅ #35 |
-| Geração e envio periódico dos lembretes | 🚧 #34 |
-| Indicadores e painel operacional | 🚧 #36 e #37 |
+| Confirmação de agendamento, aviso de cancelamento e lembretes com envio periódico (e-mail de teste opcional) | ✅ #34 |
+| API de indicadores, conferida com a carga de demonstração | ✅ Validada (#36 e #48) |
+| Painel operacional: agenda do dia, próximas consultas e indicadores por perfil | ✅ #37 (refinamento visual na #47) |
+| Aceite ponta a ponta do MVP | ✅ Aceite manual local (#38); evidência final na #45 |
 
-O [roteiro de entrega](docs/operacao/entrega-mvp.md) reúne os cenários de demonstração e o passo a passo para publicar a versão final.
+A validação local sobre a `develop` em `89f8fb0`, com as correções do aceite da #38, aprovou 874 testes do backend com MongoDB 7 e 481 testes do frontend. O lint e o build do frontend passaram, o backend e o módulo `server/` geraram seus JARs com Java 21 e o backup restaurou as 10 coleções da demonstração. Os resultados detalhados e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
 
 ---
 
@@ -298,6 +300,9 @@ Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bas
 | `SERVER_PORT` | Porta da API | `3000` |
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
 | `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
+| `NOTIFICACOES_ANTECEDENCIA_HORAS` | Quantas horas antes da consulta o lembrete é enviado (#34) | `24` |
+| `NOTIFICACOES_INTERVALO_SEGUNDOS` | Intervalo do agendador que gera e envia os lembretes | `60` |
+| `NOTIFICACOES_EMAIL_TESTE` | `true` grava uma cópia de cada notificação do paciente no canal `EMAIL_TESTE`, "enviada" para o log do servidor com o e-mail mascarado | `false` |
 | `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:3000` |
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.

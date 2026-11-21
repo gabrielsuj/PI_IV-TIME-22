@@ -74,6 +74,18 @@ describe('cadastros padronizados', () => {
     expect(await screen.findByRole('link', { name: patient.nome })).toBeInTheDocument();
   });
 
+  it('oferece nova tentativa quando o detalhe retorna sem os dados do paciente', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(response(patient)));
+    const user = userEvent.setup();
+    renderAt('/pacientes/p1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('A API não retornou os dados do paciente.');
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByRole('heading', { name: patient.nome })).toBeInTheDocument();
+  });
+
   it('permite à secretaria editar pelo detalhe e mostra os dados salvos', async () => {
     const fetchMock = vi.fn(async (_url, options) => response(options.method === 'PUT'
       ? { id: patient.id, ...JSON.parse(options.body) } : patient));

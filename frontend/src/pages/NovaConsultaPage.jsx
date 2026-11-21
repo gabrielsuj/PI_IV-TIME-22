@@ -17,6 +17,7 @@ import {
 } from '../services/rascunhoAgendamento';
 
 import { useAuth } from '../hooks/useAuth';
+import { retornoPainel } from '../utils/painel';
 
 /**
  * @author Vinicius (criador)
@@ -52,6 +53,7 @@ export default function NovaConsultaPage({
 
   // Dados recebidos da fila de espera.
   const location = useLocation();
+  const retorno = retornoPainel(location, usuario);
   const origemFila = location.state?.origemFila;
 
   // Recuperação do rascunho (develop).
@@ -229,11 +231,11 @@ export default function NovaConsultaPage({
         description="Escolha a especialidade, o médico e a data para o atendimento."
         action={
           <Button
-            to={origemAtiva ? '/fila-espera' : '/'}
+            to={origemAtiva ? '/fila-espera' : retorno || '/'}
             variant="outline"
             disabled={confirmando}
           >
-            {origemAtiva ? 'Voltar à fila' : 'Voltar ao início'}
+            {origemAtiva ? 'Voltar à fila' : retorno ? 'Voltar ao painel' : 'Voltar ao início'}
           </Button>
         }
       />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import { LIMITE_LISTAGEM, listarConsultas } from '../services/consultasService';
 import { dataHoraDaConsulta, STATUS_CONSULTA } from '../utils/consulta';
+import { origemPainel, retornoPainel } from '../utils/painel';
 
 const idDe = (registro) => registro.id || registro._id;
 
@@ -30,7 +31,11 @@ function useConsultas(filtros) {
   useEffect(() => {
     const controller = new AbortController();
     listarConsultas(JSON.parse(chave), { signal: controller.signal })
-      .then((consultas) => setEstado({ chave: chaveAtual, consultas: consultas ?? [], erro: null }))
+      .then((consultas) => {
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(consultas)) throw new Error('Não foi possível ler a lista de consultas.');
+        setEstado({ chave: chaveAtual, consultas, erro: null });
+      })
       .catch((erro) => { if (!controller.signal.aborted) setEstado({ chave: chaveAtual, consultas: [], erro }); });
     return () => controller.abort();
   }, [chave, chaveAtual]);
@@ -40,6 +45,9 @@ function useConsultas(filtros) {
 
 export default function ConsultasPage() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
+  const retorno = retornoPainel(location, usuario);
   const perfil = usuario?.perfil;
   const [params, setParams] = useSearchParams();
   const periodo = params.get('periodo') === 'anteriores' ? 'anteriores' : 'proximas';
@@ -47,12 +55,14 @@ export default function ConsultasPage() {
   const medicoId = perfil === 'MEDICO' ? '' : params.get('medicoId') ?? '';
 
   const lista = useConsultas({ periodo, status, medicoId });
-  const medicos = useRecords('medicos');
+  const mostraFiltroMedico = perfil !== 'MEDICO';
+  const medicos = useRecords(mostraFiltroMedico ? 'medicos' : null);
+  const medicoSelecionadoForaDaLista = medicoId && !medicos.records.some((medico) => idDe(medico) === medicoId);
   const textos = TEXTOS[perfil] ?? TEXTOS.SECRETARIA_ADMIN;
 
   const filtrar = (mudancas) => {
     const proximo = { periodo, status, medicoId, ...mudancas };
-    setParams(Object.fromEntries(Object.entries(proximo).filter(([chave, valor]) => valor && !(chave === 'periodo' && valor === 'proximas'))));
+    setParams(Object.fromEntries(Object.entries(proximo).filter(([chave, valor]) => valor && !(chave === 'periodo' && valor === 'proximas'))), { state: origem });
   };
 
   const colunas = [
@@ -68,7 +78,7 @@ export default function ConsultasPage() {
     {
       key: 'acoes', label: 'Ações', align: 'right',
       render: (c) => (
-        <Button to={`/consultas/${c.id}`} variant="outline" size="sm"
+        <Button to={`/consultas/${encodeURIComponent(c.id)}`} state={origem} variant="outline" size="sm"
           aria-label={`Ver detalhes da consulta de ${dataHoraDaConsulta(c).data}, ${dataHoraDaConsulta(c).periodo}`}>
           Ver detalhes
         </Button>
@@ -81,7 +91,10 @@ export default function ConsultasPage() {
   return (
     <div className="page">
       <PageHeader title={textos.titulo} description={textos.descricao}
-        action={perfil !== 'MEDICO' && <Button to="/nova-consulta">Nova consulta</Button>} />
+        action={(retorno || perfil !== 'MEDICO') && <div className="cal-nav">
+          {retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>}
+          {perfil !== 'MEDICO' && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>}
+        </div>} />
 
       <Card className="search-card">
         <div className="cal-controles">
@@ -95,24 +108,28 @@ export default function ConsultasPage() {
             <option value="">Todos</option>
             {Object.entries(STATUS_CONSULTA).map(([valor, { rotulo }]) => <option key={valor} value={valor}>{rotulo}</option>)}
           </Field>
-          {perfil !== 'MEDICO' && (
-            <Field as="select" label="Médico" value={medicoId} disabled={medicos.loading}
+          {mostraFiltroMedico && (
+            <Field as="select" label="Médico" value={medicoId} disabled={medicos.loading || Boolean(medicos.error)}
               onChange={(event) => filtrar({ medicoId: event.target.value })}>
-              <option value="">{medicos.loading ? 'Carregando médicos…' : 'Todos'}</option>
+              <option value="">{medicos.loading ? 'Carregando médicos…' : medicos.error ? 'Médicos indisponíveis' : 'Todos'}</option>
               {medicos.records.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
+              {medicoSelecionadoForaDaLista && <option value={medicoId}>Médico selecionado</option>}
             </Field>
           )}
         </div>
+        {mostraFiltroMedico && medicos.error && (
+          <Alert action={medicos.error.status !== 403 && (
+            <Button variant="outline" size="sm" onClick={medicos.refresh}>Tentar carregar médicos novamente</Button>
+          )}>
+            Não foi possível carregar a lista de médicos. {medicos.error.message}
+          </Alert>
+        )}
       </Card>
 
       <Card className="table-card">
-        {!lista.carregando && lista.erro && lista.erro.status === 403 ? (
-          <Alert>{lista.erro.message}</Alert>
-        ) : (
-          <DataTable caption={textos.titulo} columns={colunas} rows={lista.consultas} loading={lista.carregando}
-            error={lista.erro} onRetry={lista.recarregar} emptyMessage={vazio} />
-        )}
-        {lista.consultas.length >= LIMITE_LISTAGEM && (
+        <DataTable caption={textos.titulo} columns={colunas} rows={lista.consultas} loading={lista.carregando}
+          error={lista.erro} onRetry={lista.recarregar} emptyMessage={vazio} />
+        {!lista.carregando && lista.consultas.length >= LIMITE_LISTAGEM && (
           <Alert tone="info">Mostrando as {LIMITE_LISTAGEM} primeiras consultas. Use os filtros para encontrar as demais.</Alert>
         )}
       </Card>

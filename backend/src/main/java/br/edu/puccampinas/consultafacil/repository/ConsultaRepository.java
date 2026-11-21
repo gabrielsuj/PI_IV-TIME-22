@@ -79,6 +79,17 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
         return col.find(Filters.and(filtros)).limit(1).first() != null;
     }
 
+    /** Consultas ativas (de qualquer médico) que começam depois de "de" e até "ate", em ordem de início. Lembretes (#34). */
+    public List<Document> ativasComInicioEntre(Date de, Date ate, int limite) {
+        return col.find(Filters.and(
+                        Filters.in("status", StatusConsulta.ATIVOS),
+                        Filters.gt("inicio", de),
+                        Filters.lte("inicio", ate)))
+                .sort(Sorts.ascending("inicio", "_id"))
+                .limit(limite)
+                .into(new ArrayList<>());
+    }
+
     /** Todas as consultas do médico (qualquer status) que tocam a janela, em ordem de início. Usada pelo calendário (#23). */
     public List<Document> doMedicoNoPeriodo(ObjectId medicoId, Date inicio, Date fim) {
         return col.find(Filters.and(

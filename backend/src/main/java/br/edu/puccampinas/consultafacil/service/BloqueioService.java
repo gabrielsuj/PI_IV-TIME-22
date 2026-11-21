@@ -20,19 +20,27 @@ import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class BloqueioService {
     private final BloqueioRepository bloqueios;
     private final AgendaRepository agendas;
     private final MedicoRepository medicos;
     private final ConsultasAfetadas afetadas;
+    private final Consumer<ObjectId> aposAlteracao;
 
     public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos,
                            ConsultasAfetadas afetadas) {
+        this(bloqueios, agendas, medicos, afetadas, id -> {});
+    }
+
+    public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos,
+                           ConsultasAfetadas afetadas, Consumer<ObjectId> aposAlteracao) {
         this.bloqueios = bloqueios;
         this.agendas = agendas;
         this.medicos = medicos;
         this.afetadas = afetadas;
+        this.aposAlteracao = aposAlteracao;
     }
 
     public BloqueioResponse criar(BloqueioRequest r) { return criar(r, false); }
@@ -70,7 +78,9 @@ public class BloqueioService {
                     .append("fim", Date.from(fim));
             if (r.motivo() != null && !r.motivo().isBlank()) d.append("motivo", r.motivo().strip());
 
-            return paraResposta(bloqueios.inserir(d), fuso);
+            var bloqueio = paraResposta(bloqueios.inserir(d), fuso);
+            aposAlteracao.accept(medicoId);
+            return bloqueio;
         }
     }
 

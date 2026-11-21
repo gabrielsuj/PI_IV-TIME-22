@@ -58,8 +58,13 @@ export default function RegistrationPage({ resource, searchState }) {
       </Card>
       {schema.cards ? (
         <>
-          {error && <Alert action={<Button variant="outline" size="sm" onClick={refresh}>Tentar novamente</Button>}>Não foi possível carregar os cadastros. {error.message}</Alert>}
-          {loading ? <Card><p role="status">Carregando registros…</p></Card> : !error && visible.length === 0 ? <Card><p className="empty-state" role="status">Nenhum registro encontrado.</p></Card> : (
+          {error && (
+            <Alert action={error.status !== 403 && <Button variant="outline" size="sm" onClick={refresh}>Tentar novamente</Button>}>
+              Não foi possível carregar os cadastros. {error.message}
+            </Alert>
+          )}
+          {loading && <Card><p role="status">Carregando registros…</p></Card>}
+          {!loading && !error && (visible.length === 0 ? <Card><p className="empty-state" role="status">Nenhum registro encontrado.</p></Card> : (
             <div className="record-grid">
               {visible.map((record) => (
                 <Card key={record.id || record._id} className="record-card">
@@ -79,7 +84,7 @@ export default function RegistrationPage({ resource, searchState }) {
                 </Card>
               ))}
             </div>
-          )}
+          ))}
         </>
       ) : (
         <Card className="table-card">

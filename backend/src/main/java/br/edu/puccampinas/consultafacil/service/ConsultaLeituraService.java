@@ -42,13 +42,19 @@ public class ConsultaLeituraService {
         this.relogio = relogio;
     }
 
+    public List<ConsultaDetalheResponse> listar(String periodo, String status, String medicoId, UsuarioLogado ator) {
+        return listar(periodo, status, medicoId, false, ator);
+    }
+
     /**
      * @param periodo "proximas" (padrão: ainda não terminaram, da mais próxima para a mais distante)
      *                ou "anteriores" (já terminaram, da mais recente para a mais antiga)
      * @param status  opcional, um dos status da consulta
      * @param medicoId opcional
+     * @param somenteAtivas inclui apenas AGENDADA e CONFIRMADA quando verdadeiro
      */
-    public List<ConsultaDetalheResponse> listar(String periodo, String status, String medicoId, UsuarioLogado ator) {
+    public List<ConsultaDetalheResponse> listar(String periodo, String status, String medicoId,
+                                               boolean somenteAtivas, UsuarioLogado ator) {
         List<Bson> filtros = new ArrayList<>();
         Bson restricao = acesso.restricao(ator);
         if (restricao != null) filtros.add(restricao);
@@ -59,6 +65,7 @@ public class ConsultaLeituraService {
             throw ApiException.badRequest("periodo deve ser proximas ou anteriores");
         filtros.add(proximas ? Filters.gt("fim", agora) : Filters.lte("fim", agora));
 
+        if (somenteAtivas) filtros.add(Filters.in("status", StatusConsulta.ATIVOS));
         if (status != null && !status.isBlank()) filtros.add(Filters.eq("status", statusValido(status)));
         if (medicoId != null && !medicoId.isBlank()) filtros.add(Filters.eq("medicoId", Query.objectId(medicoId, "medicoId")));
 

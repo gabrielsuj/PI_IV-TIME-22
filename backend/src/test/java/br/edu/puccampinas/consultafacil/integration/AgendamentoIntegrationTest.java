@@ -290,6 +290,35 @@ class AgendamentoIntegrationTest {
         assertEquals(13, iniciosDasVagas(SEGUNDA).size());
     }
 
+    @Test
+    void buscaEConfirmacaoRecalculamDuracaoEDescontamBloqueioParcial() {
+        String inicio = "2026-10-26T11:00:00Z";
+        var vagaAnterior = new VagaDto(inicio, "2026-10-26T11:30:00Z");
+        String medicoId = MEDICO.toHexString();
+        String especialidadeId = ESPECIALIDADE.toHexString();
+        assertTrue(service.buscarVagas(medicoId, especialidadeId, SEGUNDA, SEGUNDA).horarios().contains(vagaAnterior));
+
+        var db = mongo.database();
+        var afetadas = new ConsultasAfetadas(new ConsultaRepository(db), new NomesRepository.Mongo(db));
+        var agenda = new AgendaService(new AgendaRepository(db), new MedicoRepository(db), afetadas,
+                Clock.fixed(AGORA, ZoneOffset.UTC));
+        agenda.salvar(MEDICO, new AgendaRequest(45, "America/Sao_Paulo",
+                List.of(new JornadaDto(1, List.of(new FaixaDto(480, 720), new FaixaDto(780, 1020))))));
+
+        var primeiraVaga = new VagaDto(inicio, "2026-10-26T11:45:00Z");
+        var vagas = service.buscarVagas(medicoId, especialidadeId, SEGUNDA, SEGUNDA).horarios();
+        assertEquals(primeiraVaga, vagas.getFirst());
+        assertFalse(vagas.contains(vagaAnterior));
+        assertFalse(vagas.contains(new VagaDto("2026-10-26T11:45:00Z", "2026-10-26T12:30:00Z")),
+                "O bloqueio começa às 12:00Z e toca parte da vaga");
+        assertStatus(409, () -> service.agendar(pedido(PACIENTE, vagaAnterior.inicio(), vagaAnterior.fim()), SECRETARIA));
+        assertStatus(409, () -> service.agendar(pedido(PACIENTE, "2026-10-26T11:45:00Z", "2026-10-26T12:30:00Z"), SECRETARIA));
+
+        ConsultaResponse reserva = service.agendar(pedido(PACIENTE, primeiraVaga.inicio(), primeiraVaga.fim()), SECRETARIA);
+        assertEquals(primeiraVaga.fim(), reserva.fim());
+        assertFalse(service.buscarVagas(medicoId, especialidadeId, SEGUNDA, SEGUNDA).horarios().contains(primeiraVaga));
+    }
+
     /** Cenário do Quadro 4: reserva em período bloqueado é recusada. */
     @Test
     void deveImpedirReservaEmPeriodoBloqueado() {

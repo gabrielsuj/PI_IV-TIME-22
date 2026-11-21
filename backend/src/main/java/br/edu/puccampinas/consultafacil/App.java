@@ -74,21 +74,7 @@ public class App {
         var consultasAfetadas = new ConsultasAfetadas(consultaRepo, new NomesRepository.Mongo(db));
         var medicoDoUsuario = new MedicoDoUsuarioRepository(db);
         var acessoAgenda = new AcessoAgenda(medicoDoUsuario);
-        var agendaHandler = new AgendaHandler(
-            new AgendaService(agendaRepo, medicos, consultasAfetadas, Clock.systemUTC()), acessoAgenda
-        );
-
-        // Bloqueios (develop)
         var bloqueioRepo = new BloqueioRepository(db);
-        var bloqueioHandler = new BloqueioHandler(
-            new BloqueioService(
-                bloqueioRepo,
-                agendaRepo,
-                medicos,
-                consultasAfetadas
-            ), acessoAgenda
-        );
-
         var relogio = Clock.systemUTC();
         var fila = new FilaEsperaRepository(db);
         var notificacoes = new NotificacaoRepository(db);
@@ -98,22 +84,35 @@ public class App {
         var historicoRepo = new HistoricoRepository.Mongo(db);
         var historico = new HistoricoProcessor(consultaRepo, historicoRepo);
         // Fila de espera (#32): ao cancelar, avisa os interessados compatíveis e registra SINALIZACAO_FILA
-        var sinalizacaoFila = new SinalizacaoFilaService(fila, notificacoes, consultaRepo, nomes, historico, relogio);
-        // e, quando uma vaga sinalizada é agendada, atualiza a fila (ATENDIDA / volta a AGUARDANDO)
-        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, relogio,
-            sinalizacaoFila::sinalizar, sinalizacaoFila::consultaAgendada);
         var disponibilidade = new DisponibilidadeService(agendaRepo, bloqueioRepo, consultaRepo, relogio);
+        var sinalizacaoFila = new SinalizacaoFilaService(fila, notificacoes, consultaRepo, nomes, historico, relogio,
+            disponibilidade);
+        var agendaHandler = new AgendaHandler(
+            new AgendaService(agendaRepo, medicos, consultasAfetadas, relogio, sinalizacaoFila::revisarAgenda), acessoAgenda);
+        var bloqueioHandler = new BloqueioHandler(
+            new BloqueioService(bloqueioRepo, agendaRepo, medicos, consultasAfetadas, sinalizacaoFila::revisarAgenda), acessoAgenda);
+        // Lembretes e notificações simuladas (#34): confirmação e lembrete ao agendar, aviso ao cancelar
+        var notificacoesService = new NotificacoesService(notificacoes, consultaRepo, nomes,
+            new EntregaEmailTeste.NoLog(db), config.notificacoes(), relogio);
+        // e, quando uma vaga sinalizada é agendada, atualiza a fila (ATENDIDA / volta a AGUARDANDO).
+        // notificacoesService.consultaAgendada não lança exceção, então não impede a atualização da fila.
+        var registroConsultas = new RegistroConsultaService(consultaRepo, historico, relogio,
+            sinalizacaoFila::sinalizar, consulta -> {
+                notificacoesService.consultaAgendada(consulta);
+                sinalizacaoFila.consultaAgendada(consulta);
+            });
         var agendamento = new AgendamentoService(disponibilidade, medicos, especialidades,
             pacienteRepo, pacienteDoUsuario, registroConsultas);
         var avisosVaga = new AvisoVagaHandler(new AvisoVagaService(notificacoes, fila, consultaRepo,
             pacienteDoUsuario, sinalizacaoFila, agendamento, relogio));
 
-        // Cancelamento (#27). A fila é avisada pelo RegistroConsultaService (#32); o AposCancelamento não é usado.
+        // Cancelamento (#27). A fila é avisada pelo RegistroConsultaService (#32); o AposCancelamento avisa
+        // paciente/médico e descarta os lembretes pendentes (#34).
         // Quem vê/mexe em qual consulta: paciente as próprias, médico as dele, secretaria todas (#27, #30)
         var acessoConsulta = new AcessoConsulta(
             pacienteDoUsuario::buscar, medicoDoUsuario::buscar);
         var cancelamentoHandler = new CancelamentoHandler(new CancelamentoService(consultaRepo,
-            acessoConsulta, registroConsultas, AposCancelamento.NENHUM, relogio));
+            acessoConsulta, registroConsultas, notificacoesService::consultaCancelada, relogio));
         var statusConsulta = new StatusConsultaService(consultaRepo, acessoConsulta, registroConsultas, relogio);
         var statusConsultaHandler = new StatusConsultaHandler(statusConsulta);
         var central = new CentralNotificacoesHandler(new CentralNotificacoesService(notificacoes, consultaRepo,
@@ -169,6 +168,14 @@ public class App {
         server.start();
         var recuperacaoFila = Executors.newSingleThreadScheduledExecutor();
         recuperacaoFila.scheduleWithFixedDelay(sinalizacaoFila::recuperarPendentes, 0, 15, java.util.concurrent.TimeUnit.SECONDS);
+        // Agendador dos lembretes (#34): intervalo em NOTIFICACOES_INTERVALO_SEGUNDOS, antecedência em
+        // NOTIFICACOES_ANTECEDENCIA_HORAS. scheduleWithFixedDelay nunca sobrepõe duas execuções.
+        var agendadorNotificacoes = Executors.newSingleThreadScheduledExecutor();
+        agendadorNotificacoes.scheduleWithFixedDelay(notificacoesService::executarCiclo, 5,
+            config.notificacoes().intervaloSegundos(), java.util.concurrent.TimeUnit.SECONDS);
+        System.out.println("Lembretes: " + config.notificacoes().antecedenciaHoras() + "h antes, verificação a cada "
+            + config.notificacoes().intervaloSegundos() + "s, e-mail de teste "
+            + (config.notificacoes().emailTeste() ? "ligado" : "desligado"));
 
         System.out.println(
             "Servidor rodando na porta " + config.serverPort()
@@ -176,6 +183,7 @@ public class App {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             recuperacaoFila.shutdownNow();
+            agendadorNotificacoes.shutdownNow();
             server.stop(0);
             mongo.close();
         }));

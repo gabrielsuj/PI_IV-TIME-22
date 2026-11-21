@@ -1,8 +1,10 @@
+import { useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { itensDoMenu, podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
 import AccessDeniedPage from '../pages/AccessDeniedPage';
 import UserMenu from './UserMenu';
+import { retornoPainel } from '../utils/painel';
 import {
   House,
   Bell,
@@ -25,7 +27,10 @@ import {
 
 export default function AppLayout() {
   const { usuario } = useAuth();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const inicio = retornoPainel(location, usuario) || '/';
+  const conteudo = useRef(null);
   
  const icones = {
   '/': House,
@@ -43,10 +48,13 @@ export default function AppLayout() {
 };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${pathname === '/' ? ' app-shell--inicio' : ''}`}>
+      <a className="skip-link" href="#conteudo-principal" onClick={(event) => { event.preventDefault(); conteudo.current?.focus(); }}>
+        Ir para o conteúdo principal
+      </a>
       <header className="app-header">
         <div className="app-header__inner">
-          <NavLink to="/" className="app-brand">
+          <NavLink to={inicio} className="app-brand">
             <span className="app-brand__mark" aria-hidden="true">+</span>
             <span>ConsultaFácil<small>Agendamento de consultas médicas</small></span>
           </NavLink>
@@ -61,7 +69,7 @@ export default function AppLayout() {
 
               return (
                 <li key={to}>
-                  <NavLink to={to} end={end} className="app-nav__link">
+                  <NavLink to={to === '/' ? inicio : to} end={end} className="app-nav__link">
                     {Icone && <Icone size={18} aria-hidden="true" />}
                     <span>{label}</span>
                   </NavLink>
@@ -70,7 +78,7 @@ export default function AppLayout() {
             })}
           </ul>
         </nav>
-        <main className="app-main">
+        <main className="app-main" id="conteudo-principal" tabIndex={-1} ref={conteudo}>
           {podeAbrir(pathname, usuario?.perfil) ? <Outlet /> : <AccessDeniedPage />}
         </main>
       </div>

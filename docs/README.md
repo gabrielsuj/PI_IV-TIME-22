@@ -22,24 +22,26 @@ Os validadores (`$jsonSchema`) e índices ficam em [`database/init/`](../databas
 | [historico.md](modelagem/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
 | [historico-implementacao.md](modelagem/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
 | [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
-| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos de vaga, lembretes simulados e ações da central do paciente, #35 e #57) |
+| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos de vaga, lembretes simulados e dados da central) |
 | [carga-demonstracao.md](modelagem/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
 
 ## API REST
 
-Todas as rotas, com os perfis autorizados, estão resumidas em `backend/.../api/Rotas.java` e testadas em `RotasAutorizacaoTest`.
+As rotas e os perfis autorizados estão em [Rotas.java](../backend/src/main/java/br/edu/puccampinas/consultafacil/api/Rotas.java) e são verificados em [RotasAutorizacaoTest.java](../backend/src/test/java/br/edu/puccampinas/consultafacil/integration/RotasAutorizacaoTest.java).
 
 | Documento | Rotas |
 |---|---|
 | [medicos-especialidades.md](api/medicos-especialidades.md) | `/medicos`, `/especialidades` (cadastro, edição, desativação) |
 | [agendamento.md](api/agendamento.md) | `GET /vagas` (disponibilidade) e `POST /consultas` (agendamento) |
 | [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as rotas de alteração de status e histórico |
+| [Calendário de consultas](api/consultas.md#7-get-consultas-calendário) | `GET /consultas` com período, escopo por médico e `fusoHorario` opcional |
 | [cancelamento.md](api/cancelamento.md) | `POST /consultas/{id}/cancelamento` (cancelamento por paciente, médico ou secretaria) |
 | [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` e `GET/POST /avisos-vaga` |
-| [Central de notificações](modelagem/notificacoes.md) | `GET /notificacoes`, `POST /notificacoes/lida` e `POST /notificacoes/confirmar` |
-| [alteracoes-agenda.md](api/alteracoes-agenda.md) | `PUT /agendas` e `POST /bloqueios` quando atingem consultas marcadas (409 + `?confirmar=true`) |
+| [Indicadores](api/indicadores.md) | `GET /indicadores` com período, escopo por perfil, contagens e taxas |
+| [Central de notificações](api/notificacoes.md) | `GET /notificacoes`, `POST /notificacoes/lida` e `POST /notificacoes/confirmar` |
+| [alteracoes-agenda.md](api/alteracoes-agenda.md) | `GET/PUT /agendas` e `GET/POST/DELETE /bloqueios`, incluindo confirmação quando a mudança atinge consultas marcadas |
 
-Rotas sem documento próprio: `/health`, `/auth/login`, `/auth/logout`, `/auth/me`, `/pacientes`, `GET /agendas`, `GET/DELETE /bloqueios` e `GET /consultas` (calendário). O formato de cada uma está nos testes de integração correspondentes ([testes](testes/estrategia-de-testes.md)).
+As rotas sem documento próprio são `/health`, `/auth/login`, `/auth/logout`, `/auth/me` e `/pacientes`. Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localizar os testes de integração correspondentes.
 
 ## Operação
 

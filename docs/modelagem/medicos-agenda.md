@@ -216,7 +216,7 @@ Com a agenda da Ana (segunda 08h–12h, consultas de 30 min) e o bloqueio de 26/
 08:00, 08:30, 10:00, 10:30, 11:00 e 11:30
 ```
 
-Este cenário considera apenas jornada e bloqueio. Quando as consultas existentes forem incluídas, os horários ocupados também devem sair da lista. Ele serve de base para o teste de unidade `deveImpedirReservaEmPeriodoBloqueado()`.
+Neste cenário, horários ocupados por consultas ativas também saem da lista. O teste de integração `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado()` verifica a recusa de uma reserva no intervalo bloqueado. A [API de agenda e bloqueios](../api/alteracoes-agenda.md) descreve as requisições e respostas, e a [API de agendamento](../api/agendamento.md) detalha como a jornada e os bloqueios entram na busca de vagas e na confirmação.
 
 ---
 

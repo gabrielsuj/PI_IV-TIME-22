@@ -201,6 +201,19 @@ class IndicadoresMongoRepositoryTest {
                 && j.fim().equals(Instant.parse("2026-11-24T03:30:00Z"))));
     }
 
+    @Test void medicoSemAgendaESemConsultaNoPeriodoNaoDeixaAOcupacaoDaClinicaIncompleta() {
+        var f = fixture();
+        f.medicos.add(new ObjectId()); // ex.: médico inativo da carga de demonstração (#48)
+        var r = new IndicadoresMongoRepository(f).ler(PERIODO, Optional.empty());
+        assertEquals(0, r.capacidade().medicosSemAgenda());
+        var comConsulta = fixture();
+        ObjectId outro = new ObjectId();
+        comConsulta.medicos.add(outro);
+        comConsulta.consultas.add(new Document(comConsulta.consultas.getFirst()).append("_id", new ObjectId()).append("medicoId", outro));
+        assertEquals(1, new IndicadoresMongoRepository(comConsulta).ler(PERIODO, Optional.empty()).capacidade().medicosSemAgenda(),
+                "com consulta e sem agenda a ocupação continua incompleta");
+    }
+
     @Test void agendaAusenteNaoViraAgendaConfiguradaVazia() {
         var f = fixture();
         f.agendas.clear();

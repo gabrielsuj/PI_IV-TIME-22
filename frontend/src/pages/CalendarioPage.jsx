@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -11,9 +11,11 @@ import { useRecords } from '../hooks/useRecords';
 import { buscarAgenda, listarBloqueios } from '../services/agendaService';
 import { listarConsultas } from '../services/calendarioService';
 import {
-  agoraNoFuso, diasDaSemana, horariosDoCalendario, rotuloDia, rotuloDiaCompleto, somarDias,
+  agoraNoFuso, diasDaAgendaNoDiaClinica, diasDaSemana, horariosDoCalendario, rotuloDia, rotuloDiaCompleto, somarDias,
 } from '../utils/calendario';
+import { FUSO_CLINICA } from '../utils/consulta';
 import { hoje } from '../utils/horario';
+import { dataPainelValida, origemPainel, retornoPainel } from '../utils/painel';
 
 const ESTADOS = {
   livre: { rotulo: 'Livre', tom: 'success' },
@@ -25,29 +27,36 @@ const ESTADOS = {
 /** Complemento de "Indisponível" para horários que já passaram. */
 const DESFECHO = { CONCLUIDA: 'concluída', FALTA: 'falta', CANCELADA: 'cancelada', AGENDADA: 'aguardando baixa', CONFIRMADA: 'aguardando baixa' };
 const STATUS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', CONCLUIDA: 'Concluída', FALTA: 'Falta', CANCELADA: 'Cancelada' };
-const DATA_VALIDA = /^\d{4}-\d{2}-\d{2}$/;
 const idDe = (registro) => registro.id || registro._id;
 const dataBr = (data) => data.split('-').reverse().join('/');
 
 /** Agenda, bloqueios e consultas do médico no período, recarregados quando o período muda. */
-function useDadosDoCalendario(medicoId, de, ate) {
+function useDadosDoCalendario(medicoId, de, ate, diaClinica) {
   const [revisao, setRevisao] = useState(0);
-  const chave = `${medicoId}|${de}|${ate}|${revisao}`;
+  const chave = `${medicoId}|${de}|${ate}|${diaClinica}|${revisao}`;
   const [dados, setDados] = useState({ chave: null, erro: null, agenda: null, bloqueios: [], consultas: [] });
 
   useEffect(() => {
     if (!medicoId) return undefined;
     const controller = new AbortController();
     const opcoes = { signal: controller.signal };
-    Promise.all([
-      buscarAgenda(medicoId, opcoes),
-      listarBloqueios(medicoId, { de, ate, ...opcoes }),
-      listarConsultas(medicoId, { de, ate, ...opcoes }),
-    ])
-      .then(([agenda, bloqueios, consultas]) => setDados({ chave, erro: null, agenda, bloqueios: bloqueios ?? [], consultas: consultas ?? [] }))
-      .catch((erro) => { if (!controller.signal.aborted) setDados({ chave, erro, agenda: null, bloqueios: [], consultas: [] }); });
+    async function carregar() {
+      try {
+        const pedidoAgenda = buscarAgenda(medicoId, opcoes);
+        const diasLocais = diaClinica ? diasDaAgendaNoDiaClinica(diaClinica, (await pedidoAgenda)?.fusoHorario ?? FUSO_CLINICA) : null;
+        if (controller.signal.aborted) return;
+        const periodo = { de: diasLocais?.[0] ?? de, ate: diasLocais?.at(-1) ?? ate, ...opcoes };
+        const [agenda, bloqueios, consultas] = await Promise.all([
+          pedidoAgenda, listarBloqueios(medicoId, periodo), listarConsultas(medicoId, periodo),
+        ]);
+        if (!controller.signal.aborted) setDados({ chave, erro: null, agenda, bloqueios: bloqueios ?? [], consultas: consultas ?? [], diasLocais });
+      } catch (erro) {
+        if (!controller.signal.aborted) setDados({ chave, erro, agenda: null, bloqueios: [], consultas: [] });
+      }
+    }
+    carregar();
     return () => controller.abort();
-  }, [medicoId, de, ate, chave]);
+  }, [medicoId, de, ate, diaClinica, chave]);
 
   return { ...dados, carregando: Boolean(medicoId) && dados.chave !== chave, recarregar: () => setRevisao((r) => r + 1) };
 }
@@ -142,48 +151,74 @@ function Dia({ horarios, canceladas }) {
   );
 }
 
+function Dias({ dias, porDia, consultas, diaClinica }) {
+  const multiplosDias = dias.length > 1;
+  return (
+    <>
+      {multiplosDias && <p className="page__lead">O dia {dataBr(diaClinica)} no fuso da clínica abrange os dias abaixo no fuso da agenda.</p>}
+      {dias.map((dia) => (
+        <Fragment key={dia}>
+          {multiplosDias && <h2>{rotuloDiaCompleto(dia)}</h2>}
+          <Dia horarios={porDia[dia]} canceladas={consultas.filter((consulta) => consulta.status === 'CANCELADA' && consulta.inicio.startsWith(dia))} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 export default function CalendarioPage() {
   const [params, setParams] = useSearchParams();
   const { usuario } = useAuth();
+  const location = useLocation();
+  const origem = origemPainel(location, usuario);
+  const retorno = retornoPainel(location, usuario);
   const agendaPropria = usuario.perfil === 'MEDICO';
   const medicoId = agendaPropria ? 'meu' : params.get('medicoId') ?? '';
   const visao = params.get('visao') === 'dia' ? 'dia' : 'semana';
-  const data = DATA_VALIDA.test(params.get('data') ?? '') ? params.get('data') : hoje();
+  const data = dataPainelValida(params.get('data')) ? params.get('data') : hoje();
+  const diaClinica = visao === 'dia' && params.get('diaClinica') === '1' ? data : null;
   const dias = useMemo(() => visao === 'semana' ? diasDaSemana(data) : [data], [data, visao]);
   const de = dias[0];
   const ate = dias[dias.length - 1];
 
   const medicos = useRecords(agendaPropria ? null : 'medicos');
   const ativos = medicos.records.filter((m) => m.ativo !== false);
-  const dados = useDadosDoCalendario(medicoId, de, ate);
+  const selecionavel = ativos.some((m) => idDe(m) === medicoId);
+  const dados = useDadosDoCalendario(medicoId, de, ate, diaClinica);
+  const diasAgenda = dados.carregando ? dias : dados.diasLocais ?? dias;
 
   const ir = (mudancas) => {
-    const proximo = { medicoId: agendaPropria ? undefined : medicoId, visao, data, ...mudancas };
-    setParams(Object.fromEntries(Object.entries(proximo).filter(([, valor]) => valor)));
+    const proximo = { medicoId: agendaPropria ? undefined : medicoId, visao, data,
+      diaClinica: diaClinica && mudancas.visao !== 'semana' ? '1' : undefined, ...mudancas };
+    setParams(Object.fromEntries(Object.entries(proximo).filter(([, valor]) => valor)), { state: origem });
   };
   const passo = visao === 'semana' ? 7 : 1;
 
   const porDia = useMemo(() => {
+    if (dados.carregando) return {};
     const agora = agoraNoFuso(dados.agenda?.fusoHorario);
-    return Object.fromEntries(dias.map((dia) => [
+    return Object.fromEntries(diasAgenda.map((dia) => [
       dia, horariosDoCalendario(dados.agenda, dia, dados.consultas, dados.bloqueios, agora),
     ]));
-  }, [dados.agenda, dados.consultas, dados.bloqueios, dias]);
+  }, [dados.carregando, dados.agenda, dados.consultas, dados.bloqueios, diasAgenda]);
 
   const contagem = Object.values(porDia).flat().reduce((total, h) => ({ ...total, [h.estado]: (total[h.estado] ?? 0) + 1 }), {});
   const periodo = visao === 'semana' ? `${dataBr(de).slice(0, 5)} a ${dataBr(ate)}` : rotuloDiaCompleto(data);
 
   return (
     <div className="page">
-      <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados." />
+      <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados."
+        action={retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>} />
+      {medicoId && !dados.carregando && dados.agenda && <p className="page__lead">Horários no fuso da agenda: {dados.agenda.fusoHorario}.</p>}
 
       <Card className="search-card">
         <div className="cal-controles">
           {!agendaPropria && (
-            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading}
+            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading || ativos.length === 0}
               onChange={(event) => ir({ medicoId: event.target.value })}>
-              <option value="">{medicos.loading ? 'Carregando médicos…' : 'Selecione um médico'}</option>
+              <option value="">Selecione um médico</option>
               {ativos.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
+              {medicoId && !selecionavel && <option value={medicoId}>Médico {medicoId}</option>}
             </Field>
           )}
           <div className="cal-nav" role="group" aria-label="Visualização">
@@ -191,19 +226,32 @@ export default function CalendarioPage() {
             <Button variant={visao === 'dia' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'dia'} onClick={() => ir({ visao: 'dia' })}>Dia</Button>
           </div>
         </div>
-        {medicos.error && <Alert tone="info">Não foi possível carregar a lista de médicos ({medicos.error.message}).</Alert>}
+        {!agendaPropria && (
+          <>
+            {medicos.loading && <p role="status">Carregando lista de médicos…</p>}
+            {medicos.error && (
+              <Alert action={<Button variant="outline" size="sm" onClick={medicos.refresh}>Tentar novamente</Button>}>
+                Não foi possível carregar a lista de médicos. {medicos.error.message}
+              </Alert>
+            )}
+            {!medicos.loading && !medicos.error && ativos.length === 0 && (
+              <p className="empty-state" role="status">Nenhum médico ativo disponível para seleção.</p>
+            )}
+          </>
+        )}
       </Card>
 
       {!medicoId ? (
-        <Card><p className="empty-state" role="status">Selecione um médico para ver o calendário.</p></Card>
+        !medicos.loading && !medicos.error && ativos.length > 0 &&
+          <Card><p className="empty-state" role="status">Selecione um médico para ver o calendário.</p></Card>
       ) : (
         <Card>
           <div className="cal-cabecalho">
             <div className="cal-nav">
               <Button variant="outline" size="sm" onClick={() => ir({ data: somarDias(data, -passo) })}>‹ Anterior</Button>
-              <Button variant="ghost" size="sm" onClick={() => ir({ data: hoje() })}>Hoje</Button>
+              <Button variant="ghost" size="sm" onClick={() => ir({ data: diaClinica ? agoraNoFuso(FUSO_CLINICA).slice(0, 10) : hoje() })}>Hoje</Button>
               <Button variant="outline" size="sm" onClick={() => ir({ data: somarDias(data, passo) })}>Próximo ›</Button>
-              <span className="cal-periodo" aria-live="polite">{periodo}</span>
+              <span className="cal-periodo" aria-live="polite">{periodo}{diaClinica && ' no fuso da clínica'}</span>
             </div>
             <div className="cal-legenda" aria-label="Legenda">
               {Object.entries(ESTADOS).map(([estado, info]) => (
@@ -223,7 +271,7 @@ export default function CalendarioPage() {
           )}
           {!dados.carregando && !dados.erro && dados.agenda && (visao === 'semana'
             ? <Semana dias={dias} porDia={porDia} aoAbrirDia={(dia) => ir({ visao: 'dia', data: dia })} />
-            : <Dia horarios={porDia[data]} canceladas={dados.consultas.filter((c) => c.status === 'CANCELADA' && c.inicio.startsWith(data))} />)}
+            : <Dias dias={diasAgenda} porDia={porDia} consultas={dados.consultas} diaClinica={diaClinica} />)}
         </Card>
       )}
     </div>

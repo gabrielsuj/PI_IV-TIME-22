@@ -1,9 +1,15 @@
+import { useState } from 'react';
+import { useLocation } from 'react-router';
 import ApiStatus from '../components/ApiStatus';
+import PainelOperacional from '../components/painel/PainelOperacional';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { podeAbrir } from '../data/menu';
 import { useAuth } from '../hooks/useAuth';
+import { useMedicosPainel } from '../hooks/useMedicosPainel';
+import { agoraNoFuso } from '../utils/calendario';
+import { atalhosPainel, origemPainel } from '../utils/painel';
 
 const SHORTCUTS = [
   { to: '/pacientes', title: 'Pacientes', description: 'Informações de identificação e contato.', resource: 'pacientes' },
@@ -11,14 +17,54 @@ const SHORTCUTS = [
   { to: '/especialidades', title: 'Especialidades', description: 'Áreas de atendimento da clínica.', resource: 'especialidades' },
 ];
 
+const OPERATIONAL_SHORTCUTS = [
+  { to: '/calendario', title: 'Calendário', description: 'Visualize os horários e os atendimentos no fuso da agenda do médico.', label: 'Abrir calendário' },
+  { to: '/consultas', title: 'Consultas', description: 'Acompanhe as consultas e abra os detalhes dos atendimentos.', label: 'Ver consultas' },
+];
+
+const PATIENT_SHORTCUTS = [
+  { to: '/consultas', title: 'Minhas consultas', description: 'Acompanhe seus agendamentos e os detalhes de cada consulta.', label: 'Ver minhas consultas' },
+  { to: '/avisos-vaga', title: 'Avisos de vaga', description: 'Confira as vagas disponíveis para suas inscrições na fila de espera.', label: 'Ver avisos de vaga' },
+  { to: '/notificacoes', title: 'Notificações', description: 'Consulte os avisos sobre seus atendimentos.', label: 'Ver notificações' },
+];
+
 export default function HomePage() {
   const { usuario } = useAuth();
-  const shortcuts = SHORTCUTS.filter(({ to }) => podeAbrir(to, usuario?.perfil));
-  const action = usuario?.perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
+  const location = useLocation();
+  const [hoje] = useState(() => agoraNoFuso().slice(0, 10));
+  const perfil = usuario?.perfil;
+  const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
+  const medicos = useMedicosPainel();
+  const medicoId = perfil === 'SECRETARIA_ADMIN' && new URLSearchParams(location.search).get('medicoId')?.toLowerCase();
+  const medicoSelecionado = medicos.records.find((medico) => (medico.id || medico._id)?.toLowerCase() === medicoId);
+  const verificandoMedico = Boolean(medicoId && medicos.carregamentoInicial);
+  const medicoInativo = medicoSelecionado?.ativo === false;
+  const destinos = atalhosPainel(location.search, perfil, hoje);
+  const origem = origemPainel(location, usuario);
+  const acessos = (operacional ? OPERATIONAL_SHORTCUTS : PATIENT_SHORTCUTS).filter(({ to }) => podeAbrir(to, perfil));
+  const shortcuts = SHORTCUTS.filter(({ to }) => podeAbrir(to, perfil));
+  const action = perfil === 'SECRETARIA_ADMIN' ? 'Gerenciar' : 'Consultar';
+  const description = operacional
+    ? perfil === 'MEDICO'
+      ? 'Consulte sua agenda e acompanhe seus atendimentos.'
+      : 'Organize a agenda e acompanhe os atendimentos da clínica.'
+    : 'Agende consultas e acompanhe seus atendimentos e avisos de vaga.';
+
   return (
-    <div className="page">
-      <PageHeader title="ConsultaFácil" description="Centralize os cadastros e organize a rotina de atendimento da clínica."
-        action={podeAbrir('/nova-consulta', usuario?.perfil) && <Button to="/nova-consulta">Nova consulta</Button>} />
+    <div className="page home-page">
+      <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
+        action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>} />
+      {operacional && <PainelOperacional hoje={hoje} medicos={medicos} medicoSelecionado={medicoSelecionado} verificandoMedico={verificandoMedico} />}
+      <div className="record-grid">
+        {acessos.map(({ to, title, description, label }) => {
+          const calendario = to === '/calendario';
+          const destino = operacional ? destinos[calendario ? 'calendario' : 'consultas'] : to;
+          const bloqueado = !destino || (calendario && (medicoInativo || verificandoMedico));
+          return <Card key={to} title={title} description={description}>
+            <Button to={bloqueado ? undefined : destino} disabled={bloqueado} state={origem} variant="outline">{label}</Button>
+          </Card>
+        })}
+      </div>
       {shortcuts.length > 0 && <div className="record-grid">
         {shortcuts.map(({ to, title, description, resource }) => (
           <Card key={to} title={title} description={description}><Button to={to} variant="outline">{action} {resource}</Button></Card>
@@ -27,7 +73,7 @@ export default function HomePage() {
 
       <ApiStatus />
 
-      {podeAbrir('/status', usuario?.perfil) && <div><Button to="/status" variant="ghost">Ver detalhes da conexão</Button></div>}
+      {podeAbrir('/status', perfil) && <div><Button to="/status" variant="ghost">Ver detalhes da conexão</Button></div>}
     </div>
   );
 }

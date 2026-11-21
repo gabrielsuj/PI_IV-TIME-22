@@ -30,7 +30,11 @@ function DetalhePaciente({ id }) {
   useEffect(() => {
     const controller = new AbortController();
     api.get(`/pacientes/${encodeURIComponent(id)}`, { signal: controller.signal })
-      .then((dados) => { if (!controller.signal.aborted) setPaciente(dados); })
+      .then((dados) => {
+        if (controller.signal.aborted) return;
+        if (!dados || typeof dados.nome !== 'string') throw new Error('A API não retornou os dados do paciente.');
+        setPaciente(dados);
+      })
       .catch((falha) => { if (!controller.signal.aborted) setErro(falha); });
     return () => controller.abort();
   }, [id, tentativa]);
@@ -50,7 +54,7 @@ function DetalhePaciente({ id }) {
       <PageHeader title="Detalhes do paciente" action={<Button to="/pacientes" variant="outline">Voltar à lista</Button>} />
       {aviso && <Alert tone="success">{aviso}</Alert>}
       {erro ? (
-        <Alert action={erro.status !== 404 && <Button variant="outline" onClick={tentarNovamente}>Tentar novamente</Button>}>
+        <Alert action={![403, 404].includes(erro.status) && <Button variant="outline" onClick={tentarNovamente}>Tentar novamente</Button>}>
           {erro.status === 404 ? 'Paciente não encontrado.' : `Não foi possível carregar o paciente. ${erro.message}`}
         </Alert>
       ) : paciente ? (
