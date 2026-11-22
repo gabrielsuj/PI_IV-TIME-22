@@ -19,7 +19,9 @@ public class ValidadorCpfTcp implements ValidadorCpf {
 
     @Override
     public void validar(String cpf) {
-        try (Cliente cliente = new Cliente(host, porta)) {
+        Cliente cliente = null;
+        try {
+            cliente = new Cliente(host, porta);
 
             ValidarCPFRequest request = new ValidarCPFRequest(cpf);
 
@@ -33,6 +35,8 @@ public class ValidadorCpfTcp implements ValidadorCpf {
             throw e;
         }  catch (Exception e) {
     throw new ServidorCpfIndisponivelException(e);
+} finally {
+    if (cliente != null) cliente.close();
 }
     }
 }

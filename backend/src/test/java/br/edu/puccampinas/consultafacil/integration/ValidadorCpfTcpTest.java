@@ -6,11 +6,16 @@ import br.edu.puccampinas.consultafacil.client.Cliente;
 import br.edu.puccampinas.consultafacil.service.ValidadorCpfTcp;
 import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
 import br.edu.puccampinas.consultafacil.domain.exception.ValidacaoException;
+import br.edu.puccampinas.consultafacil.handler.ValidarCPFRequest;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.net.ServerSocket;
+import java.net.InetAddress;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.concurrent.*;
 
 class ValidadorCpfTcpTest {
@@ -41,33 +46,45 @@ class ValidadorCpfTcpTest {
 
 
 @Test
-void deveFalharQuandoServidorNaoResponde() throws Exception {
+@Timeout(10)
+void deveFalharQuandoServidorFechaConexaoSemResponder() throws Exception {
 
-    try (ServerSocket servidor = new ServerSocket(0)) {
+    try (ServerSocket servidor = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+        servidor.setSoTimeout(3000);
 
         ExecutorService executor =
-            Executors.newSingleThreadExecutor();
+            Executors.newFixedThreadPool(2);
+        CountDownLatch recebeu = new CountDownLatch(1), fechar = new CountDownLatch(1);
 
-        Future<?> tarefa = executor.submit(() -> {
+        Future<Void> tarefa = executor.submit(() -> {
             try (var conexao = servidor.accept()) {
-                Thread.sleep(5000);
-            } catch (Exception e) {
-                // Encerra a conexao simulada.
+                conexao.setSoTimeout(3000);
+                try (ObjectOutputStream saida = new ObjectOutputStream(conexao.getOutputStream());
+                     ObjectInputStream entrada = new ObjectInputStream(conexao.getInputStream())) {
+                    assertInstanceOf(ValidarCPFRequest.class, entrada.readObject());
+                    recebeu.countDown();
+                    assertTrue(fechar.await(3, TimeUnit.SECONDS));
+                }
             }
+            return null;
         });
 
         try {
             ValidadorCpfTcp validador = new ValidadorCpfTcp(
-                "127.0.0.1",
+                servidor.getInetAddress().getHostAddress(),
                 servidor.getLocalPort()
             );
 
-            assertThrows(
-                ServidorCpfIndisponivelException.class,
-                () -> validador.validar("52998224725")
-            );
+            Future<ServidorCpfIndisponivelException> falha = executor.submit(() -> assertThrows(
+                    ServidorCpfIndisponivelException.class, () -> validador.validar("52998224725")));
+            assertTrue(recebeu.await(3, TimeUnit.SECONDS));
+            assertThrows(TimeoutException.class, () -> falha.get(100, TimeUnit.MILLISECONDS));
+            fechar.countDown();
+            assertNotNull(falha.get(3, TimeUnit.SECONDS).getCause());
+            tarefa.get(3, TimeUnit.SECONDS);
 
         } finally {
+            fechar.countDown();
             servidor.close();
             executor.shutdownNow();
             tarefa.cancel(true);

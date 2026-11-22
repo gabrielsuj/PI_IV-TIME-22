@@ -6,15 +6,13 @@ import br.edu.puccampinas.consultafacil.connection.TratadoraDeComunicadoDeDeslig
 import br.edu.puccampinas.consultafacil.handler.ValidarCPFRequest;
 import br.edu.puccampinas.consultafacil.handler.ValidarCPFResponse;
 import br.edu.puccampinas.consultafacil.protocol.Comunicado;
+import br.edu.puccampinas.consultafacil.protocol.ComunicadoDeDesligamento;
 import br.edu.puccampinas.consultafacil.protocol.Parceiro;
-import br.edu.puccampinas.consultafacil.protocol.PedidoParaSair;
 
 import java.net.*;
 import java.io.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
-public class Cliente implements AutoCloseable {
+public class Cliente {
 	public static final String HOST_PADRAO  = "localhost";
 	public static final int    PORTA_PADRAO = 3001;
 
@@ -25,30 +23,16 @@ public class Cliente implements AutoCloseable {
     private final Parceiro servidor;
 
     private final TratadoraDeComunicadoDeDesligamento tratadoraDeComunicadoDeDesligamento;
-    private final BlockingQueue<Comunicado> respostas = new LinkedBlockingQueue<>();
-
     
     public Cliente(String host, int porta) throws Exception {
-        this(host, porta, 3000, 3000);
-    }
-
-    public Cliente(String host, int porta, int timeoutConexao, int timeoutLeitura) throws Exception {
-        Socket conexao = new Socket();
-
-        try {
-            conexao.connect(new InetSocketAddress(host, porta), timeoutConexao);
-            conexao.setSoTimeout(timeoutLeitura);
-        } catch(Exception erro) {
-            try { conexao.close(); } catch(Exception ignored) {}
-            throw new Exception("Erro ao conectar com o servidor", erro);
-        }
-
+        Socket conexao = new Socket(host, porta);
         try {
             this.transmissor = new ObjectOutputStream(conexao.getOutputStream());
             this.receptor    = new ObjectInputStream(conexao.getInputStream());
             this.servidor    = new Parceiro(conexao, receptor, transmissor);
-            this.tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento(servidor, respostas);
+            this.tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento(servidor);
             this.conexao = conexao;
+            this.tratadoraDeComunicadoDeDesligamento.start();
         } catch(Exception erro) {
             try { conexao.close(); } catch(Exception ignored) {}
             throw erro;
@@ -59,19 +43,23 @@ public class Cliente implements AutoCloseable {
     public Cliente() throws Exception { this(HOST_PADRAO, PORTA_PADRAO); }
 
     public synchronized ValidarCPFResponse validarCPF(ValidarCPFRequest cpf) throws Exception {
-        servidor.receba(cpf);
-
-        Comunicado resposta = null;
-        do {
-            resposta = servidor.envie();
-        } while(!(resposta instanceof ValidarCPFResponse));
-
-        return (ValidarCPFResponse)(resposta);
+        try {
+            servidor.iniciarOperacao();
+            servidor.receba(cpf);
+            Comunicado resposta = servidor.espie();
+            if (resposta instanceof ComunicadoDeDesligamento)
+                throw new IOException("Servidor de CPF desligado");
+            if (!(resposta instanceof ValidarCPFResponse))
+                throw new IOException("Resposta inesperada do servidor de CPF");
+            ValidarCPFResponse resultado = (ValidarCPFResponse) servidor.envie();
+            servidor.concluirOperacao();
+            return resultado;
+        } catch (Exception erro) {
+            throw new Exception("Erro de comunicacao com o servidor de CPF", servidor.indisponivel(erro));
+        }
     }
 
-    @Override
-    public synchronized void close() {
-        try { servidor.receba(new PedidoParaSair()); } catch (Exception ignored) {}
-        try { servidor.adeus(); } catch (Exception ignored) {}
+    public void close() {
+        try { servidor.encerrar(); } catch (Exception ignored) {}
     }
 }
