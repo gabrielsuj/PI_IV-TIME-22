@@ -10,7 +10,7 @@ import br.edu.puccampinas.consultafacil.protocol.Parceiro;
 import java.util.*;
 
 public class Servidor {
-	public static final String PORTA_PADRAO = "3000";
+	public static final String PORTA_PADRAO = "3001"; // 3000 fica com a API (SERVER_PORT)
 	
     public static void main(String[] args) {
         if(args.length>1) {

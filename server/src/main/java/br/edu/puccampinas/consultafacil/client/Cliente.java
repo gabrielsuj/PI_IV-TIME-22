@@ -16,7 +16,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class Cliente implements AutoCloseable {
 	public static final String HOST_PADRAO  = "localhost";
-	public static final int    PORTA_PADRAO = 3000;
+	public static final int    PORTA_PADRAO = 3001;
 
     private final Socket conexao;
     private final ObjectOutputStream transmissor;
