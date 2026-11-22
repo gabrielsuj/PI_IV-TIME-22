@@ -289,6 +289,40 @@ class AcessoPacientesMongoIntegrationTest {
             assertEquals(1, pacientesDoTeste());
         }
 
+        /**
+         * A consulta prévia do serviço não basta quando dois pedidos chegam juntos: quem garante um
+         * único registro é o índice único {@code uk_paciente_cpf} do MongoDB.
+         */
+        @Test void cadastrosSimultaneosComOMesmoCpfGravamUmSo() throws Exception {
+            String sofia = token("sofia");
+            int pedidos = 8;
+            var largada = new CountDownLatch(1);
+            var respostas = new ArrayList<CompletableFuture<HttpResponse<String>>>();
+            try (var disparo = Executors.newFixedThreadPool(pedidos)) {
+                for (int i = 0; i < pedidos; i++) {
+                    var corpo = paciente("Ana Lima " + i, CPF_ANA, "ana" + i);
+                    respostas.add(CompletableFuture.supplyAsync(() -> {
+                        try { largada.await(); return enviar("POST", "/pacientes", sofia, corpo); }
+                        catch (Exception e) { throw new IllegalStateException(e); }
+                    }, disparo));
+                }
+                largada.countDown();
+                var status = new ArrayList<Integer>();
+                for (var r : respostas) {
+                    var resposta = r.get(15, TimeUnit.SECONDS);
+                    status.add(resposta.statusCode());
+                    if (resposta.statusCode() != 201) {
+                        assertEquals(400, resposta.statusCode(), resposta.body());
+                        String msg = mensagemDeErro(resposta);
+                        assertTrue(msg.equals("CPF já cadastrado para outro paciente.")
+                                || msg.equals("CPF ou e-mail já cadastrado para outro paciente."), msg);
+                    }
+                }
+                assertEquals(1, status.stream().filter(c -> c == 201).count(), "status: " + status);
+            }
+            assertEquals(1, db.getCollection("pacientes").countDocuments(Filters.eq("cpf", CPF_ANA)));
+        }
+
         @Test void edicaoParaCpfDeOutroPacienteERecusada() throws Exception {
             String sofia = token("sofia");
             criar(sofia, "Ana Lima", CPF_ANA, "ana");
