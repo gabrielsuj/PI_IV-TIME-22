@@ -129,8 +129,22 @@ As rotas exigem token de paciente vinculado a um cadastro. ID malformado retorna
 
 Depois de salvar um bloqueio ou uma alteração de jornada, a API revalida as ofertas do médico com as regras de disponibilidade do agendamento. Se o intervalo já não puder ser reservado, o aviso aparece como `EXPIRADO`. A inscrição ainda válida volta a `AGUARDANDO` na posição original. A leitura e a confirmação do aviso também revalidam o intervalo.
 
-A lista devolve `id`, `medicoNome`, `inicio`, `fim`, `validoAte`, `status` e, quando agendado, `consultaAgendadaId`. Os horários estão em ISO 8601 UTC. A validade termina no início da vaga ou no vencimento da inscrição, o que ocorrer primeiro.
+A lista devolve `id`, `medicoNome`, `medicoId`, `especialidadeId`, `inicio`, `fim`, `validoAte`, `status`, `motivo` e, quando agendado, `consultaAgendadaId`. Os horários estão em ISO 8601 UTC. A validade termina no início da vaga ou no vencimento da inscrição, o que ocorrer primeiro.
 
 - **`DISPONIVEL`**: o paciente pode tentar agendar. A confirmação revalida a jornada, os bloqueios e a ocupação.
 - **`AGENDADO`**: o paciente ficou com a vaga. A inscrição passa a `ATENDIDA`.
 - **`EXPIRADO`**: a vaga venceu, outra pessoa a ocupou ou a inscrição deixou de corresponder ao aviso. Ao perder a vaga para outro paciente, a inscrição volta a `AGUARDANDO` e mantém a posição.
+
+### 7.1 Motivo da expiração (#58)
+
+Quando `status = EXPIRADO`, o campo `motivo` diz à tela qual mensagem mostrar. Nos outros status ele vem `null`.
+
+| `motivo` | Quando acontece | O que a tela mostra |
+|---|---|---|
+| `VAGA_OCUPADA` | Outra consulta ativa já ocupa o horário (outro paciente confirmou antes, ou a secretaria agendou). | Avisa que a vaga já foi ocupada e oferece **Buscar outra vaga**. |
+| `PRAZO_ENCERRADO` | Chegou o horário da vaga ou venceu a inscrição na fila (`validoAte`). | Avisa que o prazo do aviso terminou. |
+| `OPORTUNIDADE_DESATUALIZADA` | A agenda mudou (bloqueio ou jornada), a inscrição foi cancelada ou recebeu outro aviso mais novo. | Avisa que a oferta ficou desatualizada e oferece **Buscar outra vaga**. |
+
+A ordem de avaliação é `VAGA_OCUPADA` → `PRAZO_ENCERRADO` → `OPORTUNIDADE_DESATUALIZADA`: se o horário já tem dono, essa é a informação mais útil, mesmo que o prazo também tenha passado.
+
+`medicoId` e `especialidadeId` vêm da consulta de origem e servem para abrir **Nova consulta** já filtrada pelo mesmo médico e especialidade.
