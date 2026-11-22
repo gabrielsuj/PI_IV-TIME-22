@@ -3,6 +3,7 @@ package br.edu.puccampinas.consultafacil.integration;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.service.*;
 import br.edu.puccampinas.consultafacil.unit.PacienteServiceTest.EmMemoria;
+import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.*;
@@ -25,14 +26,40 @@ class PacienteHandlerTest {
             {"nome":"Ana Silva","cpf":"529.982.247-25","email":"ANA@EXEMPLO.COM"}
             """;
 
-    @BeforeEach void iniciar() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    
+    @BeforeEach
+    void iniciar() throws Exception {
+        iniciarComValidador(cpf -> {});
+    }
+
+    private void iniciarComValidador(ValidadorCpf validadorCpf)
+            throws Exception {
+
+        if (server != null) {
+            server.stop(0);
+        }
+
+        server = HttpServer.create(
+            new InetSocketAddress("127.0.0.1", 0), 0
+        );
+
         server.createContext("/pacientes", new PacienteHandler(
-                new PacienteService(new EmMemoria(), new PacienteValidator())));
+            new PacienteService(
+                new EmMemoria(),
+                new PacienteValidator(),
+                validadorCpf
+            )
+        ));
+
         server.start();
-        base = "http://127.0.0.1:" + server.getAddress().getPort();
+
+        base = "http://127.0.0.1:"
+            + server.getAddress().getPort();
+
         client = HttpClient.newHttpClient();
     }
+
+       
 
     @AfterEach void encerrar() {
         if (client != null) client.close();
@@ -98,6 +125,37 @@ class PacienteHandlerTest {
         validarErro(resposta, 405);
         assertEquals("GET, POST", resposta.headers().firstValue("Allow").orElseThrow());
     }
+
+    @Test
+    void servidorCpfIndisponivelRetorna503() throws Exception {
+
+        ValidadorCpf indisponivel = cpf -> {
+            throw new ServidorCpfIndisponivelException(
+                new ConnectException("Connection refused")
+            );
+        };
+
+        iniciarComValidador(indisponivel);
+
+        var resposta = enviar("POST", "/pacientes", ANA);
+
+        assertEquals(503, resposta.statusCode());
+
+        var corpo = json.readTree(resposta.body());
+
+        assertEquals(
+            "Serviço de validação de CPF temporariamente indisponível.",
+            corpo.get("mensagem").asText()
+        );
+
+        assertFalse(resposta.body().contains("Connection refused"));
+
+        var consulta = enviar("GET", "/pacientes", "");
+
+        assertEquals(200, consulta.statusCode());
+        assertEquals(0, json.readTree(consulta.body()).size());
+    }
+
 
     private HttpResponse<String> enviar(String metodo, String rota, String body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create(base + rota))

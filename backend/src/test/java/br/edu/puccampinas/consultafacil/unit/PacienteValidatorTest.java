@@ -35,7 +35,7 @@ class PacienteValidatorTest {
     void exigeEmail(String email) { invalido(new PacienteRequest("Ana", "52998224725", email), "E-mail"); }
 
     @ParameterizedTest
-    @ValueSource(strings = {"00000000000", "11111111111", "52998224724", "52998224735",
+    @ValueSource(strings = {"00000000000", "11111111111",
             "123", "529982247250", "abc52998224725", "529-982-247.25"})
     void rejeitaCpfInvalido(String cpf) { invalido(new PacienteRequest("Ana", cpf, "ana@exemplo.com"), "CPF"); }
 

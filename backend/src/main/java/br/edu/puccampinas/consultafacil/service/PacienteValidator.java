@@ -20,8 +20,11 @@ public class PacienteValidator {
         if (!cpf.matches("[0-9]{11}|[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}"))
             throw new ValidacaoException("CPF inválido. Informe 11 dígitos ou use 000.000.000-00.");
         cpf = cpf.replace(".", "").replace("-", "");
-        if (cpf.chars().distinct().count() == 1 || !digitosValidos(cpf))
-            throw new ValidacaoException("CPF inválido: confira os dígitos verificadores.");
+        if (cpf.chars().distinct().count() == 1)
+        throw new ValidacaoException(
+            "CPF inválido: dígitos repetidos."
+        );
+        
         String local = email.substring(0, Math.max(0, email.indexOf('@')));
         if (email.length() > 254 || local.length() > 64 || !EMAIL.matcher(email).matches()
                 || local.startsWith(".") || local.endsWith(".") || local.contains(".."))
@@ -34,14 +37,4 @@ public class PacienteValidator {
         return valor.strip();
     }
 
-    private boolean digitosValidos(String cpf) {
-        for (int tamanho = 9; tamanho <= 10; tamanho++) {
-            int soma = 0;
-            for (int i = 0; i < tamanho; i++) soma += (cpf.charAt(i) - '0') * (tamanho + 1 - i);
-            int digito = (soma * 10) % 11;
-            if (digito == 10) digito = 0;
-            if (digito != cpf.charAt(tamanho) - '0') return false;
-        }
-        return true;
-    }
 }

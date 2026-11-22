@@ -3,6 +3,7 @@ package br.edu.puccampinas.consultafacil.api.handler;
 import br.edu.puccampinas.consultafacil.api.dto.PacienteRequest;
 import br.edu.puccampinas.consultafacil.domain.exception.ValidacaoException;
 import br.edu.puccampinas.consultafacil.service.PacienteService;
+import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,13 +54,23 @@ public class PacienteHandler implements HttpHandler {
                 }
                 default -> metodoInvalido(exchange, colecao);
             }
-        } catch (ValidacaoException e) {
-            responder(exchange, 400, erro(e.getMessage()));
-        } catch (JsonProcessingException e) {
-            responder(exchange, 400, erro("JSON inválido. Envie um objeto com nome, cpf e email."));
-        } catch (RuntimeException e) {
-            responder(exchange, 500, erro("Não foi possível processar a solicitação."));
-        } finally { exchange.close(); }
+        
+            } catch (ValidacaoException e) {
+                responder(exchange, 400, erro(e.getMessage()));
+
+            } catch (ServidorCpfIndisponivelException e) {
+                responder(exchange, 503,
+                    erro("Serviço de validação de CPF temporariamente indisponível."));
+
+            } catch (JsonProcessingException e) {
+                responder(exchange, 400,
+                    erro("JSON inválido. Envie um objeto com nome, cpf e email."));
+
+            } catch (RuntimeException e) {
+                responder(exchange, 500,
+                    erro("Não foi possível processar a solicitação."));
+            } finally { exchange.close(); }
+            
     }
 
     private PacienteRequest lerRequest(HttpExchange exchange) throws IOException {

@@ -43,6 +43,11 @@
       <version>5.11.4</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+    <groupId>br.edu.puccampinas.consultafacil</groupId>
+    <artifactId>server</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    </dependency>
   </dependencies>
 
   <build>
