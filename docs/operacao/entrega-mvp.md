@@ -40,6 +40,17 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 2. Entre com o login de um médico. Confira se o painel mostra seus próprios atendimentos e indicadores. Abra o detalhe de uma consulta pelo painel e volte para conferir se os filtros foram preservados.
 3. No aceite da #38, confira também a mensagem da agenda ao selecionar um médico inativo, o efeito de consultas canceladas nas próximas consultas e o dia que o atalho abre no calendário quando o fuso da agenda difere do fuso do painel.
 
+### Revisão de interface (#41, #47 e #52)
+
+O [protótipo do ConsultaFácil](https://build-memo-72014177.figma.site/) orienta a hierarquia do painel e a leitura da agenda. As telas consultam os dados e respeitam os perfis da API do MVP.
+
+| Divergência observada | Ajuste e forma de conferir |
+|---|---|
+| O período dos indicadores e o dia da agenda apareciam como campos de mesmo grupo. | Os campos do período estão agrupados. O escopo fica visível e a ação **Voltar aos filtros de hoje** restaura a data da clínica e o escopo padrão. |
+| Os cinco indicadores usavam a mesma grade dos cadastros e a leitura dos números ficava dispersa. | Os cartões agora usam uma grade compacta que se adapta à largura. Cada percentual mantém a descrição da base de cálculo e o aviso quando a taxa está indisponível. **Nova consulta** continua destacada no cabeçalho para perfis autorizados. |
+| A seleção de médico e a leitura de estados divergiam entre a configuração e o calendário. | As duas telas usam o mesmo seletor com nome e CRM. O calendário tem filtro por data, estados textuais na semana e mensagens distintas para ausência de jornada, falta de atendimento e falta de vagas. |
+| Erros de data e horário de bloqueio apareciam longe do campo e era difícil conferir o intervalo. | A validação aponta o campo e move o foco. A prévia mostra o período e o motivo. Se houver falha no envio, o preenchimento permanece disponível para correção ou nova tentativa. |
+
 ## Resultado do aceite manual (#38)
 
 Em 20/11/2026, o aceite rodou no navegador e foi repetido após as três correções do painel, sobre a `develop` em `89f8fb0` com as alterações locais. O ambiente usou a API local, MongoDB 7 descartável e a carga fictícia de demonstração. Secretaria, médica e pacientes usaram sessões separadas.
@@ -75,6 +86,20 @@ Em 20/11/2026, a validação local rodou sobre a `develop` em `89f8fb0ecf85c8071
 
 As contagens correspondem à carga gerada nessa execução. Os links da CI são das revisões anteriores às correções locais da #38. [CI do PR #115](https://github.com/gabrielsuj/PI_IV-TIME-22/actions/runs/44795697693) · [Workflow de backup no PR #116](https://github.com/gabrielsuj/PI_IV-TIME-22/actions/runs/44788728570) · [Procedimento de backup e recuperação](backup-recuperacao.md)
 
+### Revalidação local em 22/11/2026
+
+A execução usou a árvore da `develop` em `fe78ca2` com as alterações locais de interface e documentação. O ambiente usou Java 21, Node 26 e MongoDB 7.0.45, com bancos descartáveis exclusivos para teste, histórico e demonstração. O servidor TCP de CPF foi iniciado na porta 3000 para os testes de integração.
+
+| Verificação | Resultado |
+|---|---|
+| Backend com todos os testes de integração | `./mvnw -DmongoTests=true clean verify` com `HISTORICO_MONGO_URI` e `DEMO_MONGO_DB`. 881 testes aprovados, sem falhas, erros ou ignorados. JAR gerado. |
+| Frontend | `npm test` aprovou 498 testes em 31 arquivos. `npm run lint` e `npm run build` passaram. |
+| Módulo `server/` | `mvn clean install` aprovou o `ClienteTest` e instalou o JAR necessário ao backend. |
+| Carga e modelagem | `verificar-carga.js` e `verificar-modelagem.js` passaram. A carga continha 845 consultas e 1.967 eventos de histórico. |
+| Recuperação | `testar-recuperacao.sh consultafacil_demo` recuperou as 10 coleções com hashes, contagens, índices e validadores iguais aos da origem. `scripts/testes/restaurar-banco.test.sh` também passou, incluindo os casos de falha e retorno. |
+
+O resultado é da execução local. A versão publicada deve registrar o SHA da `main` e a CI da revisão integrada, conforme o procedimento abaixo.
+
 ### Agenda e disponibilidade (#53)
 
 O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de duração com bloqueio parcial passaram. A busca e a confirmação usam a disponibilidade da agenda, e os testes de fila aprovados cobrem a expiração do aviso após bloqueio ou mudança de jornada. Os contratos e a modelagem estão documentados. [API de agenda e bloqueios](../api/alteracoes-agenda.md) · [API de agendamento](../api/agendamento.md) · [Modelo de agendas e bloqueios](../modelagem/medicos-agenda.md)
@@ -84,9 +109,9 @@ O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de dur
 - [x] **Lembretes (#34).** A geração, o envio sem duplicidade em dois ciclos e o descarte no cancelamento passaram na suíte integrada. A confirmação pela central foi coberta com registro no histórico.
 - [x] **API de indicadores (#36 e #48).** Os testes do serviço usado em `GET /indicadores` validaram as contagens e taxas da clínica e de cada médico com a carga de demonstração.
 - [x] **Painel operacional (#37).** O painel já está integrado ao `GET /indicadores` e aos serviços de agenda e consultas. Os testes automatizados cobrem filtros, navegação e estados da tela.
-- [ ] **Refinamento do painel (#47).** Conferir a hierarquia visual, os filtros e a consistência com o protótipo e com as demais telas.
+- [x] **Refinamento do painel (#47).** Ajustes de hierarquia e filtros registrados na revisão de interface, com testes de filtros, navegação e acessibilidade.
 - [x] **Aceite manual local (#38).** Os fluxos operacionais e os três casos do painel passaram na repetição com as correções locais aplicadas sobre `89f8fb0`.
-- [ ] **Evidência final da #45.** Na revisão com todas as entregas, repetir as suítes, lint, build, aceite e recuperação. Registrar o SHA, a data, os resultados e o link da CI correspondente.
+- [ ] **Evidência final da #45.** Após a integração, conferir o aceite e a CI do commit que receberá a tag. Registrar o SHA, a data e os links. Os resultados locais estão na revalidação acima.
 
 ## Versão final (#45)
 
@@ -95,3 +120,21 @@ O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de dur
 3. Gere o backup do banco de demonstração e confira dados, índices e validadores com o [procedimento de recuperação](backup-recuperacao.md). Guarde o backup fora do Git.
 4. Abra o PR do `develop` para a `main`. Depois do merge, crie a tag no commit aprovado e publique a release associada a ela.
 5. Nas notas da release, registre o SHA, as funcionalidades demonstradas, o resultado dos testes e da restauração e os links para o README, o relatório e este roteiro.
+
+### Evidências para a tag/release
+
+Use a [validação completa](../testes/estrategia-de-testes.md#validação-completa-como-na-ci) e registre os dados abaixo para o commit efetivamente associado à tag. Os resultados históricos deste documento continuam identificados pela revisão em que foram obtidos.
+
+| Evidência | Informação a registrar na revisão final |
+|---|---|
+| Identidade da versão | Nome da tag, SHA completo e data da validação |
+| Ambiente | Java, Node/npm e MongoDB usados; banco fictício de demonstração |
+| Backend e módulo `server/` | Comandos, testes aprovados/ignorados e resultado do build |
+| Frontend | Testes, lint e build; URL da API usada para gerar o frontend |
+| Aceite por perfil | Cadastro, jornada/bloqueio, calendário, reserva concorrente, cancelamento/fila, notificações e painel |
+| Recuperação | Arquivo do backup guardado fora do Git, comando executado e conferência de documentos, conteúdo, índices e validadores |
+| Publicação | Links do PR de integração, CI do SHA final e release publicada |
+
+O README, os contratos em [API REST](../README.md#api-rest), a [modelagem](../README.md#modelagem-do-banco-mongodb), o relatório consolidado e este roteiro compõem os materiais de entrega. Não inclua `.env`, tokens, dependências instaladas ou dumps do banco no código-fonte da release. Se distribuir `frontend/dist`, gere-o com a URL da API que será demonstrada; o JAR simples do backend não inclui sozinho todas as dependências para `java -jar`, portanto a execução documentada continua sendo pelo Maven.
+
+Para restaurar o backup entregue em um comando, use `bash scripts/restaurar-banco.sh backups/<arquivo-exibido-no-backup>.archive.gz consultafacil_demo`. O comando valida o arquivo e pede confirmação; `--sim` dispensa somente a pergunta. Pare os escritores antes e siga o [procedimento de retorno em caso de falha](backup-recuperacao.md#falha-durante-a-substituição-do-destino). A publicação da tag/release só é concluída depois de registrar o SHA e os links reais correspondentes.

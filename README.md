@@ -83,7 +83,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Painel operacional: agenda do dia, próximas consultas e indicadores por perfil | ✅ #37 (refinamento visual na #47) |
 | Aceite ponta a ponta do MVP | ✅ Aceite manual local (#38); evidência final na #45 |
 
-A validação local sobre a `develop` em `89f8fb0`, com as correções do aceite da #38, aprovou 874 testes do backend com MongoDB 7 e 481 testes do frontend. O lint e o build do frontend passaram, o backend e o módulo `server/` geraram seus JARs com Java 21 e o backup restaurou as 10 coleções da demonstração. Os resultados detalhados e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
+A revalidação local de 22/11/2026 sobre a `develop` em `fe78ca2` e as alterações de interface aprovou 881 testes do backend com MongoDB 7 e 498 testes do frontend. O lint e o build do frontend passaram, o backend e o módulo `server/` geraram seus JARs com Java 21 e o backup restaurou as 10 coleções da demonstração. Os resultados detalhados e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
 
 ---
 
@@ -154,7 +154,9 @@ cp .env.example .env
 # para apresentar com os dados de demonstração, troque MONGODB_DATABASE para consultafacil_demo
 ```
 
-O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT`.
+O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Execute os comandos de cada módulo a partir das respectivas pastas, como abaixo: o backend procura o `.env` no diretório pai. Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT` e reinicie os processos depois de alterar o arquivo.
+
+O `.env.example` usa a porta 3000 para a API e para o validador de CPF. Para rodar os dois na mesma máquina, ajuste `CPF_SERVER_PORT=3001` no `.env` e mantenha `SERVER_PORT=3000` e `VITE_API_BASE_URL=http://localhost:3000`. Sem `SERVER_PORT` no ambiente ou no `.env`, a API usa a porta 8080. Somente as variáveis prefixadas com `VITE_` são incorporadas ao frontend no build.
 
 ### 3. Subir o banco de dados (MongoDB)
 
@@ -164,7 +166,7 @@ Com Docker Compose:
 docker compose up -d mongo
 ```
 
-Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices. Eles só rodam com o volume vazio; para recriar o banco local, use `docker compose down -v` antes do `up`.
+Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices no banco `consultafacil`, definido pelo Compose. Eles só rodam automaticamente com o volume vazio e não carregam os seeds. Para recriar um banco específico com dados de exemplo, use os scripts abaixo; mudar `MONGODB_DATABASE` no `.env` não inicializa o novo banco no Docker.
 
 > **Atualizar um banco que já existe.** Quando um PR muda algum arquivo de `database/init/` (validadores ou índices), o Docker **não** reaplica esses scripts num volume que já tem dados. Rode, com o container no ar, para cada banco que você usa:
 >
@@ -248,6 +250,15 @@ Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
 ### 4. Executar o backend
 
+Na raiz do repositório, instale o módulo Java de validação de CPF e deixe seu servidor rodando em um terminal:
+
+```bash
+(cd server && mvn install)
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor 3001
+```
+
+Em outro terminal, inicie a API:
+
 ```bash
 cd backend
 ./mvnw compile exec:java     # inicia a API em http://localhost:3000 (SERVER_PORT do .env)
@@ -265,11 +276,11 @@ npm install                  # instala as dependências
 npm run dev                  # inicia em http://localhost:5173
 ```
 
-A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API e indicam se ela está disponível. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build) e `npm run lint` (ESLint).
+A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API e indicam se o servidor HTTP responde; esse endpoint não faz um novo ping no banco. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build) e `npm run lint` (ESLint). O build incorpora `VITE_API_BASE_URL`; se a URL da API mudar, gere novamente o build. Para usar o preview padrão em `http://localhost:4173`, inclua essa origem em `CORS_ALLOWED_ORIGINS` e reinicie a API.
 
 ### 6. Executar os testes
 
-Com o MongoDB no ar:
+Com o MongoDB no ar e o [módulo de CPF instalado e rodando na porta 3000](docs/testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf):
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem dados
@@ -277,7 +288,7 @@ bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem
 (cd frontend && npm ci && npm test && npm run lint && npm run build)
 ```
 
-A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md).
+A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md), incluindo o [comando completo equivalente à CI](docs/testes/estrategia-de-testes.md#validação-completa-como-na-ci). A execução básica acima não ativa a persistência opcional de histórico, os cadastros com schema real nem a conferência dos indicadores com a carga.
 
 Em cada pull request, o [workflow de CI](.github/workflows/ci.yml) roda o JUnit com MongoDB 7 e os checks do frontend com `npm test`, `npm run lint` e `npm run build`.
 
@@ -298,6 +309,8 @@ Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bas
 | `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017/?serverSelectionTimeoutMS=5000` |
 | `MONGODB_DATABASE` | Banco usado pela API (ver "Bancos por ambiente") | `consultafacil` |
 | `SERVER_PORT` | Porta da API | `3000` |
+| `CPF_SERVER_HOST` | Endereço do servidor TCP de validação de CPF | `localhost` |
+| `CPF_SERVER_PORT` | Porta do servidor TCP. Use 3001 para executar a aplicação com a API na porta 3000. | `3001` |
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
 | `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
 | `NOTIFICACOES_ANTECEDENCIA_HORAS` | Quantas horas antes da consulta o lembrete é enviado (#34) | `24` |
@@ -315,9 +328,9 @@ O índice completo está em [`docs/README.md`](docs/README.md):
 
 - **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite).
 - **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
-- **API:** médicos e especialidades, agendamento, consultas, cancelamento, fila de espera e alterações de agenda.
+- **API:** autenticação e health, pacientes, médicos e especialidades, agendamento, consultas, cancelamento, fila de espera, notificações, indicadores e alterações de agenda.
 - **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva e comandos.
-- **Operação:** backup e recuperação.
+- **Operação:** backup e recuperação, roteiros por perfil, evidências de validação e preparação da tag/release.
 
 ---
 
@@ -344,6 +357,7 @@ consultafacil/
 │       ├── services/        # cliente HTTP centralizado (api.js) e serviços por recurso
 │       ├── styles/          # estilos globais
 │       └── __tests__/       # testes (Vitest + Testing Library)
+├── server/                  # Módulo Java separado de comunicação/validação de CPF
 ├── database/
 │   ├── init/                # Coleções, validadores ($jsonSchema) e índices
 │   └── seed/                # Dados fictícios de demonstração

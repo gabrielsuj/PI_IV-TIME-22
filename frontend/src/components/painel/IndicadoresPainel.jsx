@@ -40,7 +40,7 @@ export default function IndicadoresPainel({ de, ate, medicoId }) {
   if (!permitido) return null;
 
   return (
-    <section className="page" aria-labelledby={tituloId} aria-busy={carregando}>
+    <section className="painel-indicadores" aria-labelledby={tituloId} aria-busy={carregando}>
       <header className="page__header">
         <div>
           <h2 id={tituloId}>Indicadores</h2>
@@ -52,12 +52,12 @@ export default function IndicadoresPainel({ de, ate, medicoId }) {
       {erro && <Alert action={<Button variant="outline" onClick={atualizar}>Tentar novamente</Button>}>{erro.message}</Alert>}
       {dados && <>
         {dados.contagens.totalConsultas === 0 && <p role="status">Nenhuma consulta iniciada no período selecionado.</p>}
-        <div className="record-grid">
+        <div className="painel-indicadores__grade">
           {METRICAS.map(({ campo, titulo, apoio }) => {
             const taxa = dados[campo];
             const situacao = SITUACOES[taxa.situacao];
             return (
-              <Card key={campo} title={titulo} headingLevel={3}>
+              <Card key={campo} title={titulo} headingLevel={3} className="painel-indicador">
                 <p className="indicador__valor">{taxa.percentual === null ? '—' : `${percentual.format(taxa.percentual)}%`}</p>
                 {situacao && <Badge tone={situacao.tone}>{situacao.rotulo}</Badge>}
                 <p className="card__description">{apoio(numero.format(taxa.numerador), numero.format(taxa.denominador))}</p>

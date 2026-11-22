@@ -38,8 +38,6 @@ export default function HomePage() {
   const location = useLocation();
   const [hoje] = useState(() => agoraNoFuso().slice(0, 10));
   const perfil = usuario?.perfil;
-  // A equipe recebe o painel operacional; o paciente mantém os atalhos dos próprios
-  // atendimentos e avisos.
   const operacional = perfil === 'SECRETARIA_ADMIN' || perfil === 'MEDICO';
   const medicos = useMedicosPainel();
   const medicoId = perfil === 'SECRETARIA_ADMIN' && new URLSearchParams(location.search).get('medicoId')?.toLowerCase();
@@ -58,16 +56,16 @@ export default function HomePage() {
     : 'Agende consultas e acompanhe seus atendimentos e avisos de vaga.';
 
   return (
-    <div className="page home-page">
+    <div className={`page home-page${operacional ? ' home-page--operacional' : ''}`}>
       <PageHeader title={operacional ? 'Painel operacional' : 'Minha área'} description={description}
         action={podeAbrir('/nova-consulta', perfil) && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>} />
       {operacional && <PainelOperacional hoje={hoje} medicos={medicos} medicoSelecionado={medicoSelecionado} verificandoMedico={verificandoMedico} />}
-      <div className="record-grid">
+      <div className={operacional ? 'painel-atalhos' : 'record-grid'}>
         {acessos.map(({ to, title, description, label }) => {
           const calendario = to === '/calendario';
           const destino = operacional ? destinos[calendario ? 'calendario' : 'consultas'] : to;
           const bloqueado = !destino || (calendario && (medicoInativo || verificandoMedico));
-          return <Card key={to} title={title} description={description}>
+          return <Card key={to} title={title} description={description} className={operacional ? 'painel-atalho' : undefined}>
             <Button to={bloqueado ? undefined : destino} disabled={bloqueado} state={origem} variant="outline">{label}</Button>
           </Card>
         })}

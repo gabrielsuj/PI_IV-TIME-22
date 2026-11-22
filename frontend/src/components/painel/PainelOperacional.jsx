@@ -30,6 +30,7 @@ export default function PainelOperacional({ hoje, medicos, medicoSelecionado, ve
   const de = params.get('de') ?? hoje;
   const ate = params.get('ate') ?? hoje;
   const dia = params.get('dia') ?? hoje;
+  const temFiltros = Boolean(selecionado || de !== hoje || ate !== hoje || dia !== hoje);
   const erroPeriodo = erroPeriodoPainel(de, ate);
   const erroDia = !dataPainelValida(dia) ? 'Informe uma data válida para a agenda.' : null;
   const escopo = secretaria ? medicoId ? medicoSelecionado?.nome || 'Médico selecionado' : 'Todos os médicos' : 'Seus atendimentos';
@@ -41,12 +42,19 @@ export default function PainelOperacional({ hoje, medicos, medicoSelecionado, ve
     setParams(proximos);
   };
 
+  const limparFiltros = () => {
+    const proximos = new URLSearchParams(params);
+    for (const campo of ['medicoId', 'de', 'ate', 'dia']) proximos.delete(campo);
+    setParams(proximos);
+  };
+
   return <>
-    <Card title="Filtros do painel" className="painel-consultas"
-      description={`O médico vale para todas as seções. Datas no fuso da clínica: ${FUSO_CLINICA}.`}>
-      <div className="form-grid">
+    <Card title="Filtros do painel" className="painel-filtros painel-consultas"
+      description={`Datas no fuso da clínica (${FUSO_CLINICA}).`}>
+      <div className="painel-filtros__grade">
         {secretaria && <Field as="select" label="Médico do painel" value={selecionado}
-          disabled={medicos.loading} error={!medicoValido ? 'Informe um médico válido.' : undefined}
+          disabled={medicos.loading || Boolean(medicos.error)} error={!medicoValido ? 'Informe um médico válido.' : undefined}
+          hint="Aplica-se aos indicadores e às consultas."
           onChange={(event) => filtrar('medicoId', event.target.value)}>
           <option value="">{medicos.loading ? 'Carregando médicos…' : 'Todos os médicos'}</option>
           {selecionado && !medicoSelecionado && <option value={selecionado}>Médico selecionado</option>}
@@ -54,10 +62,13 @@ export default function PainelOperacional({ hoje, medicos, medicoSelecionado, ve
             {medico.nome}{medico.ativo === false ? ' (inativo)' : ''}
           </option>)}
         </Field>}
-        <Field type="date" label="Início dos indicadores" value={de} min="0001-01-01" max="9999-12-31"
-          onChange={(event) => filtrar('de', event.target.value)} />
-        <Field type="date" label="Fim dos indicadores" value={ate} min="0001-01-01" max="9999-12-31" error={erroPeriodo}
-          hint="Até 62 dias, incluindo o início e o fim." onChange={(event) => filtrar('ate', event.target.value)} />
+        <fieldset className="painel-filtros__periodo">
+          <legend className="sr-only">Período dos indicadores</legend>
+          <Field type="date" label="Início dos indicadores" value={de} min="0001-01-01" max="9999-12-31"
+            onChange={(event) => filtrar('de', event.target.value)} />
+          <Field type="date" label="Fim dos indicadores" value={ate} min="0001-01-01" max="9999-12-31" error={erroPeriodo}
+            hint="Até 62 dias, contando o início e o fim." onChange={(event) => filtrar('ate', event.target.value)} />
+        </fieldset>
         <Field type="date" label="Dia da agenda" value={dia} min="0001-01-01" max="9999-12-31" error={erroDia}
           onChange={(event) => filtrar('dia', event.target.value)} />
       </div>
@@ -66,7 +77,10 @@ export default function PainelOperacional({ hoje, medicos, medicoSelecionado, ve
       </Alert>}
       {secretaria && medicos.loading && <p role="status">Carregando lista de médicos…</p>}
       {secretaria && !medicos.loading && !medicos.error && medicos.records.length === 0 && <p role="status">Nenhum médico cadastrado.</p>}
-      <p className="page__lead" role="status" aria-atomic="true">Escopo do painel: {escopo}.</p>
+      <div className="painel-filtros__rodape">
+        <p className="page__lead" role="status" aria-atomic="true">Escopo do painel: {escopo}.</p>
+        {temFiltros && <Button variant="ghost" onClick={limparFiltros}>Voltar aos filtros de hoje</Button>}
+      </div>
     </Card>
     {!medicoValido ? <Alert>O filtro de médico é inválido. Selecione um médico ou todos os médicos.</Alert> : <>
       {!erroPeriodo && <IndicadoresPainel de={de} ate={ate} medicoId={medicoId} />}

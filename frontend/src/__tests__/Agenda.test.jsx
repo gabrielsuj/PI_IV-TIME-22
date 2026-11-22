@@ -22,7 +22,6 @@ function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-/** Simula a API: cada chave é "MÉTODO /caminho"; o valor é uma função que recebe a requisição. */
 function mockApi(rotas) {
   const fetchMock = vi.fn(async (url, init = {}) => {
     const { pathname } = new URL(url);
@@ -54,8 +53,6 @@ beforeEach(() => {
   entrarComo();
 });
 
-// Os cadastros simulados preservam IDs e especialidades para conferir os vínculos
-// usados na seleção dos profissionais.
 describe('conversões de horário', () => {
   it('converte entre minutos e horas', () => {
     expect(minutosParaHora(480)).toBe('08:00');
@@ -96,6 +93,20 @@ describe('tela de agenda', () => {
     renderAt('/agenda');
     expect(await screen.findByText('Selecione um médico para configurar a agenda.')).toBeInTheDocument();
     expect(await screen.findByRole('option', { name: /Ana Martins/ })).toBeInTheDocument();
+  });
+
+  it('não exibe formulários nem atalho do calendário para médico inativo', async () => {
+    mockApi({
+      'GET /medicos': () => response([ANA, { ...ANA, id: 'inativo', nome: 'Médico Inativo', ativo: false }]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+    });
+    renderAt('/agenda?medicoId=inativo');
+
+    expect(await screen.findByText('O médico selecionado está indisponível. Selecione outro médico para continuar.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Jornada semanal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bloqueios' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ver horários no calendário' })).not.toBeInTheDocument();
   });
 
   it('carrega a jornada do médico em horas e salva em minutos', async () => {
@@ -241,6 +252,136 @@ describe('tela de agenda', () => {
     renderAt('/agenda?medicoId=m1');
     await user.click(await screen.findByRole('button', { name: 'Adicionar bloqueio' }));
     expect(await screen.findByText('Informe a data de início.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Data de início/)).toHaveFocus();
+    expect(screen.getByLabelText(/Data de início/)).toHaveAttribute('aria-invalid', 'true');
     expect(chamadas(fetchMock, 'POST', '/bloqueios')).toHaveLength(0);
+  });
+
+  it('orienta a configuração sem jornada e mostra o resumo antes de salvar', async () => {
+    mockApi({
+      'GET /medicos': () => response([ANA]),
+      'GET /agendas': () => response({ status: 404, erro: 'Agenda não configurada para este médico' }, 404),
+      'GET /bloqueios': () => response([]),
+    });
+    const user = userEvent.setup();
+    renderAt('/agenda?medicoId=m1');
+
+    expect(await screen.findByText(/Salve a jornada para liberar os horários/)).toBeInTheDocument();
+    const resumo = screen.getByRole('region', { name: 'Resumo da jornada' });
+    expect(resumo).toHaveTextContent('Nenhum dia de atendimento selecionado');
+    expect(screen.getByRole('link', { name: 'Ver horários no calendário' })).toHaveAttribute('href', '/calendario?medicoId=m1');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Quarta-feira' }));
+    expect(resumo).toHaveTextContent('Quarta-feira: 08:00 às 12:00');
+    expect(resumo).toHaveTextContent('Consultas de 30 minutos');
+    expect(resumo).toHaveTextContent('bloqueios e as consultas já marcadas');
+  });
+
+  it('valida a jornada por campo e foca a faixa com duração insuficiente', async () => {
+    const fetchMock = mockApi({
+      'GET /medicos': () => response([ANA]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+    });
+    const user = userEvent.setup();
+    renderAt('/agenda?medicoId=m1');
+    const fim = await screen.findByLabelText('Fim');
+    await user.clear(fim);
+    await user.type(fim, '08:15');
+    await user.click(screen.getByRole('button', { name: 'Salvar jornada' }));
+
+    expect(await screen.findByText('Reserve pelo menos 30 minutos para uma consulta.')).toBeInTheDocument();
+    expect(fim).toHaveFocus();
+    expect(fim).toHaveAccessibleDescription('Reserve pelo menos 30 minutos para uma consulta.');
+    expect(chamadas(fetchMock, 'PUT', '/agendas')).toHaveLength(0);
+    expect(fim).toHaveValue('08:15');
+  });
+
+  it('valida datas invertidas no bloqueio sem perder os valores', async () => {
+    const fetchMock = mockApi({
+      'GET /medicos': () => response([ANA]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+    });
+    const user = userEvent.setup();
+    renderAt('/agenda?medicoId=m1');
+    await user.type(await screen.findByLabelText(/Data de início/), '2026-12-10');
+    await user.type(screen.getByLabelText('Data de fim'), '2026-12-09');
+    await user.type(screen.getByLabelText('Motivo (opcional)'), 'Congresso');
+    await user.click(screen.getByRole('button', { name: 'Adicionar bloqueio' }));
+
+    const fim = screen.getByLabelText('Data de fim');
+    expect(await screen.findByText('A data de fim deve ser igual ou posterior à data de início.')).toBeInTheDocument();
+    expect(fim).toHaveFocus();
+    expect(fim).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Motivo (opcional)')).toHaveValue('Congresso');
+    expect(chamadas(fetchMock, 'POST', '/bloqueios')).toHaveLength(0);
+  });
+
+  it('confere dias inteiros inclusivos e preserva o rascunho quando a API falha', async () => {
+    mockApi({
+      'GET /medicos': () => response([ANA]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+      'POST /bloqueios': () => response({ erro: 'Serviço indisponível' }, 503),
+    });
+    const user = userEvent.setup();
+    renderAt('/agenda?medicoId=m1');
+    await user.type(await screen.findByLabelText(/Data de início/), '2026-12-10');
+    await user.type(screen.getByLabelText('Data de fim'), '2026-12-12');
+    await user.click(screen.getByRole('checkbox', { name: 'Dia inteiro' }));
+    await user.type(screen.getByLabelText('Motivo (opcional)'), 'Férias');
+
+    const resumo = screen.getByRole('region', { name: 'Resumo do novo bloqueio' });
+    expect(resumo).toHaveTextContent('10/12/2026 a 12/12/2026 (dias inteiros)');
+    expect(resumo).toHaveTextContent('Férias');
+    await user.click(screen.getByRole('button', { name: 'Adicionar bloqueio' }));
+
+    expect(await screen.findByText('Serviço indisponível')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Data de início/)).toHaveValue('2026-12-10');
+    expect(screen.getByLabelText('Data de fim')).toHaveValue('2026-12-12');
+    expect(screen.getByLabelText('Motivo (opcional)')).toHaveValue('Férias');
+    expect(screen.getByRole('checkbox', { name: 'Dia inteiro' })).toBeChecked();
+    expect(resumo).toHaveTextContent('10/12/2026 a 12/12/2026 (dias inteiros)');
+  });
+
+  it('pede confirmação ao trocar de médico e mantém o formulário ao continuar editando', async () => {
+    const OUTRA = { ...ANA, id: 'm2', nome: 'Beatriz Souza', crmNumero: '456789' };
+    mockApi({
+      'GET /medicos': () => response([ANA, OUTRA]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+    });
+    const user = userEvent.setup();
+    const router = renderAt('/agenda?medicoId=m1');
+    await user.click(await screen.findByRole('checkbox', { name: 'Quarta-feira' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Médico' }), 'm2');
+
+    const dialogo = screen.getByRole('dialog', { name: 'Sair sem salvar as alterações?' });
+    expect(router.state.location.search).toBe('?medicoId=m1');
+    await user.click(within(dialogo).getByRole('button', { name: 'Continuar editando' }));
+    expect(screen.getByRole('checkbox', { name: 'Quarta-feira' })).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Médico' })).toHaveValue('m1');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Médico' }), 'm2');
+    await user.click(screen.getByRole('button', { name: 'Descartar e continuar' }));
+    expect(router.state.location.search).toBe('?medicoId=m2');
+    expect(await screen.findByRole('checkbox', { name: 'Quarta-feira' })).not.toBeChecked();
+  });
+
+  it.each(['Ver horários no calendário', 'Consultas'])('preserva o novo bloqueio ao cancelar a navegação por %s', async (link) => {
+    mockApi({
+      'GET /medicos': () => response([ANA]),
+      'GET /agendas': () => response(AGENDA_ANA),
+      'GET /bloqueios': () => response([]),
+    });
+    const user = userEvent.setup();
+    const router = renderAt('/agenda?medicoId=m1');
+    await user.type(await screen.findByLabelText(/Data de início/), '2026-12-10');
+    await user.click(screen.getByRole('link', { name: link, exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Continuar editando' }));
+
+    expect(router.state.location.pathname).toBe('/agenda');
+    expect(screen.getByLabelText(/Data de início/)).toHaveValue('2026-12-10');
   });
 });

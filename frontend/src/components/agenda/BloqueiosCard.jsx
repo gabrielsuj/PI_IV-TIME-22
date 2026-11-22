@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { conflitoComConsultas, criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
 import { diaSeguinte, formatarPeriodo, hoje } from '../../utils/horario';
 import Alert from '../ui/Alert';
@@ -11,7 +11,7 @@ import ConflitoConsultas from './ConflitoConsultas';
 
 const NOVO = { dataInicio: '', dataFim: '', horaInicio: '08:00', horaFim: '12:00', diaInteiro: false, motivo: '' };
 
-/** Converte o formulário para o corpo do POST /bloqueios (horários locais, no fuso da agenda). */
+// A API interpreta o intervalo no fuso da agenda.
 function paraApi(medicoId, form) {
   const dataFim = form.dataFim || form.dataInicio;
   const inicio = form.diaInteiro ? `${form.dataInicio}T00:00` : `${form.dataInicio}T${form.horaInicio}`;
@@ -19,7 +19,22 @@ function paraApi(medicoId, form) {
   return { medicoId, inicio, fim, motivo: form.motivo.trim() || undefined };
 }
 
-export default function BloqueiosCard({ medicoId }) {
+function validarFormulario(form) {
+  const erros = {};
+  if (!form.dataInicio) erros.dataInicio = 'Informe a data de início.';
+  if (form.dataInicio && form.dataFim && form.dataFim < form.dataInicio) erros.dataFim = 'A data de fim deve ser igual ou posterior à data de início.';
+  if (!form.diaInteiro) {
+    if (!form.horaInicio) erros.horaInicio = 'Informe a hora de início.';
+    if (!form.horaFim) erros.horaFim = 'Informe a hora de fim.';
+    if (form.horaInicio && form.horaFim && (!form.dataFim || form.dataFim === form.dataInicio) && form.horaInicio >= form.horaFim) {
+      erros.horaFim = 'O fim do bloqueio deve ser depois do início.';
+    }
+  }
+  return erros;
+}
+
+export default function BloqueiosCard({ medicoId, onDirtyChange }) {
+  const formRef = useRef(null);
   const [bloqueios, setBloqueios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroCarga, setErroCarga] = useState(null);
@@ -30,7 +45,13 @@ export default function BloqueiosCard({ medicoId }) {
   const [aviso, setAviso] = useState('');
   const [remover, setRemover] = useState(null);
   const [removendo, setRemovendo] = useState(false);
-  const [conflito, setConflito] = useState(null); // #44: consultas no período, aguardando confirmação
+  const [conflito, setConflito] = useState(null);
+  const [erros, setErros] = useState({});
+
+  useEffect(() => { onDirtyChange?.(JSON.stringify(form) !== JSON.stringify(NOVO)); }, [form, onDirtyChange]);
+  useEffect(() => {
+    if (Object.keys(erros).length) formRef.current?.querySelector('[aria-invalid="true"]')?.focus();
+  }, [erros]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,10 +75,12 @@ export default function BloqueiosCard({ medicoId }) {
     setFalha('');
     setAviso('');
     setConflito(null);
+    setErros({});
   }
 
   async function enviar(corpo, { confirmar = false, afetadas = 0 } = {}) {
     setSalvando(true);
+    setFalha('');
     try {
       await criarBloqueio(corpo, { confirmar });
       setForm(NOVO);
@@ -77,9 +100,10 @@ export default function BloqueiosCard({ medicoId }) {
 
   async function salvar(event) {
     event.preventDefault();
-    if (!form.dataInicio) { setFalha('Informe a data de início.'); return; }
+    const validacao = validarFormulario(form);
+    setErros(validacao);
+    if (Object.keys(validacao).length) { setFalha('Revise os campos destacados antes de adicionar o bloqueio.'); return; }
     const corpo = paraApi(medicoId, form);
-    if (corpo.inicio >= corpo.fim) { setFalha('O fim do bloqueio deve ser depois do início.'); return; }
     await enviar(corpo);
   }
 
@@ -104,35 +128,47 @@ export default function BloqueiosCard({ medicoId }) {
 
   const colunas = [
     { key: 'periodo', label: 'Período', render: (b) => formatarPeriodo(b.inicio, b.fim) },
-    { key: 'motivo', label: 'Motivo' },
+    { key: 'motivo', label: 'Motivo', render: (b) => b.motivo || 'Não informado' },
     {
       key: 'acoes', label: 'Ações', align: 'right',
       render: (b) => <Button variant="ghost" size="sm" aria-label={`Remover bloqueio de ${formatarPeriodo(b.inicio, b.fim)}`} onClick={() => setRemover(b)}>Remover</Button>,
     },
   ];
+  const resumo = form.dataInicio && Object.keys(validarFormulario(form)).length === 0 ? paraApi(medicoId, form) : null;
 
   return (
     <Card title="Bloqueios" description="Datas ou horários em que o médico não atende. Ficam indisponíveis para agendamento.">
       <DataTable caption="Próximos bloqueios" columns={colunas} rows={bloqueios} loading={carregando} error={erroCarga}
         onRetry={recarregar} emptyMessage="Nenhum bloqueio nos próximos 12 meses." />
+      {!carregando && !erroCarga && bloqueios.length === 0 && <p className="field__hint">A jornada semanal continua valendo. Cadastre um bloqueio abaixo apenas para os períodos em que não haverá atendimento.</p>}
 
-      <form className="bloqueio-form" onSubmit={salvar} noValidate>
+      <form ref={formRef} className="bloqueio-form" onSubmit={salvar} noValidate>
         <h3 className="bloqueio-form__titulo">Novo bloqueio</h3>
+        <p className="field__hint">Escolha as datas e, se necessário, limite o bloqueio a um horário. As consultas já marcadas serão apresentadas para confirmação antes de bloquear.</p>
         <div className="form-grid">
-          <Field type="date" name="dataInicio" label="Data de início" required value={form.dataInicio} onChange={alterar} disabled={salvando} />
-          <Field type="date" name="dataFim" label="Data de fim" hint="Deixe em branco se for no mesmo dia." value={form.dataFim} onChange={alterar} disabled={salvando} />
+          <Field type="date" name="dataInicio" label="Data de início" required error={erros.dataInicio} value={form.dataInicio} onChange={alterar} disabled={salvando} />
+          <Field type="date" name="dataFim" label="Data de fim" min={form.dataInicio || undefined} hint="Deixe em branco se for no mesmo dia. A data escolhida também será bloqueada." error={erros.dataFim} value={form.dataFim} onChange={alterar} disabled={salvando} />
           <label className="checkbox-option form-grid__wide">
-            <input type="checkbox" name="diaInteiro" checked={form.diaInteiro} onChange={alterar} disabled={salvando} />
+            <input type="checkbox" name="diaInteiro" checked={form.diaInteiro} onChange={alterar} disabled={salvando} aria-describedby={`dia-inteiro-${medicoId}-hint`} />
             Dia inteiro
           </label>
+          <p id={`dia-inteiro-${medicoId}-hint`} className="field__hint form-grid__wide">Marque para bloquear todos os horários das datas escolhidas.</p>
           {!form.diaInteiro && (
             <>
-              <Field type="time" name="horaInicio" label="Hora de início" value={form.horaInicio} onChange={alterar} disabled={salvando} />
-              <Field type="time" name="horaFim" label="Hora de fim" value={form.horaFim} onChange={alterar} disabled={salvando} />
+              <Field type="time" name="horaInicio" label="Hora de início" required error={erros.horaInicio} value={form.horaInicio} onChange={alterar} disabled={salvando} />
+              <Field type="time" name="horaFim" label="Hora de fim" required error={erros.horaFim} value={form.horaFim} onChange={alterar} disabled={salvando} />
             </>
           )}
-          <Field name="motivo" label="Motivo (opcional)" maxLength={200} className="form-grid__wide" value={form.motivo} onChange={alterar} disabled={salvando} />
+          <Field name="motivo" label="Motivo (opcional)" hint="Por exemplo: férias, congresso ou manutenção. Até 200 caracteres." maxLength={200} className="form-grid__wide" value={form.motivo} onChange={alterar} disabled={salvando} />
         </div>
+        <section className="agenda-resumo bloqueio-resumo" aria-label="Resumo do novo bloqueio">
+          <h4 className="agenda-resumo__titulo">Confira antes de adicionar</h4>
+          {resumo ? <>
+            <p>{formatarPeriodo(resumo.inicio, resumo.fim)}</p>
+            <p><strong>Motivo:</strong> {form.motivo.trim() || 'Não informado'}</p>
+            <p className="field__hint">Esse período ficará indisponível para novos agendamentos.</p>
+          </> : <p className="field__hint">Preencha as datas e os horários para conferir o período do bloqueio.</p>}
+        </section>
         {falha && <Alert>{falha}</Alert>}
         {aviso && <Alert tone="success">{aviso}</Alert>}
         {conflito ? (

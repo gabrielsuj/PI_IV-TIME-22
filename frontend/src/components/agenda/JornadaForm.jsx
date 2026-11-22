@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { buscarAgenda, conflitoComConsultas, salvarAgenda } from '../../services/agendaService';
 import { DIAS_SEMANA, horaParaMinutos, minutosParaHora } from '../../utils/horario';
 import Alert from '../ui/Alert';
@@ -14,7 +14,6 @@ function diasVazios() {
   return Object.fromEntries(DIAS_SEMANA.map(({ valor }) => [valor, { atende: false, faixas: [] }]));
 }
 
-/** Converte a resposta da API (minutos) para o estado do formulário (horas). */
 function paraFormulario(agenda) {
   const dias = diasVazios();
   for (const jornada of agenda?.jornadas ?? []) {
@@ -26,7 +25,6 @@ function paraFormulario(agenda) {
   return { duracao: String(agenda?.duracaoMinutos ?? 30), dias };
 }
 
-/** Converte o estado do formulário para o corpo do PUT /agendas. */
 function paraApi({ duracao, dias }) {
   return {
     duracaoMinutos: Number(duracao),
@@ -40,19 +38,29 @@ function paraApi({ duracao, dias }) {
   };
 }
 
-/** Validação rápida no navegador; as regras completas ficam na API. */
-function primeiroErro({ dias }) {
+function validarFormulario({ dias, duracao }) {
+  const erros = {};
   for (const { valor, nome } of DIAS_SEMANA) {
     if (!dias[valor].atende) continue;
-    for (const faixa of dias[valor].faixas) {
-      if (!faixa.inicio || !faixa.fim) return `Preencha início e fim de todas as faixas de ${nome}.`;
-      if (horaParaMinutos(faixa.inicio) >= horaParaMinutos(faixa.fim, { fim: true })) return `Em ${nome}, o fim deve ser depois do início.`;
+    const faixas = dias[valor].faixas;
+    for (const [indice, faixa] of faixas.entries()) {
+      const inicio = horaParaMinutos(faixa.inicio);
+      const fim = horaParaMinutos(faixa.fim, { fim: true });
+      if (!faixa.inicio) erros[`${valor}-${indice}-inicio`] = `Informe o início da faixa de ${nome}.`;
+      if (!faixa.fim) erros[`${valor}-${indice}-fim`] = `Informe o fim da faixa de ${nome}.`;
+      else if (faixa.inicio && inicio >= fim) erros[`${valor}-${indice}-fim`] = `Em ${nome}, o fim deve ser depois do início.`;
+      else if (faixa.inicio && fim - inicio < Number(duracao)) erros[`${valor}-${indice}-fim`] = `Reserve pelo menos ${duracao} minutos para uma consulta.`;
+      else if (faixa.inicio && faixas.slice(0, indice).some((outra) => outra.inicio && outra.fim
+        && inicio < horaParaMinutos(outra.fim, { fim: true }) && fim > horaParaMinutos(outra.inicio))) {
+        erros[`${valor}-${indice}-inicio`] = `Esta faixa se sobrepõe a outra de ${nome}.`;
+      }
     }
   }
-  return null;
+  return erros;
 }
 
-export default function JornadaForm({ medicoId }) {
+export default function JornadaForm({ medicoId, onDirtyChange }) {
+  const formRef = useRef(null);
   const [form, setForm] = useState(() => paraFormulario(null));
   const [carregando, setCarregando] = useState(true);
   const [erroCarga, setErroCarga] = useState(null);
@@ -61,7 +69,14 @@ export default function JornadaForm({ medicoId }) {
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState('');
   const [aviso, setAviso] = useState('');
-  const [conflito, setConflito] = useState(null); // #44: consultas fora da nova jornada, aguardando confirmação
+  const [conflito, setConflito] = useState(null);
+  const [erros, setErros] = useState({});
+  const [alterada, setAlterada] = useState(false);
+
+  useEffect(() => { onDirtyChange?.(alterada); }, [alterada, onDirtyChange]);
+  useEffect(() => {
+    if (Object.keys(erros).length) formRef.current?.querySelector('[aria-invalid="true"]')?.focus();
+  }, [erros]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -80,6 +95,9 @@ export default function JornadaForm({ medicoId }) {
     setForm((atual) => ({ ...atual, dias: { ...atual.dias, [valor]: { ...atual.dias[valor], ...mudanca } } }));
     setAviso('');
     setConflito(null);
+    setErros({});
+    setFalha('');
+    setAlterada(true);
   }
 
   function alternarDia(valor, atende) {
@@ -108,6 +126,7 @@ export default function JornadaForm({ medicoId }) {
       const agenda = await salvarAgenda(medicoId, paraApi(form), { confirmar });
       setForm(paraFormulario(agenda));
       setConfigurada(true);
+      setAlterada(false);
       setConflito(null);
       setAviso(confirmar ? `Agenda salva. ${afetadas} consulta(s) precisam ser remarcadas.` : 'Agenda salva.');
     } catch (error) {
@@ -121,8 +140,9 @@ export default function JornadaForm({ medicoId }) {
 
   async function salvar(event) {
     event.preventDefault();
-    const erro = primeiroErro(form);
-    if (erro) { setFalha(erro); return; }
+    const validacao = validarFormulario(form);
+    setErros(validacao);
+    if (Object.keys(validacao).length) { setFalha('Revise os horários destacados antes de salvar a jornada.'); return; }
     await enviar();
   }
 
@@ -139,10 +159,10 @@ export default function JornadaForm({ medicoId }) {
 
   return (
     <Card title="Jornada semanal" description="Dias e horários de atendimento e a duração de cada consulta.">
-      {!configurada && <Alert tone="info">Este médico ainda não tem agenda. Marque os dias de atendimento e salve.</Alert>}
-      <form className="jornada-form" onSubmit={salvar} noValidate>
-        <Field as="select" label="Duração da consulta" name="duracao" value={form.duracao} disabled={salvando}
-          onChange={(event) => { setForm((atual) => ({ ...atual, duracao: event.target.value })); setAviso(''); setConflito(null); }}>
+      {!configurada && <Alert tone="info">Este médico ainda não tem agenda. Escolha a duração, marque os dias de atendimento e adicione os horários. Salve a jornada para liberar os horários para agendamento.</Alert>}
+      <form ref={formRef} className="jornada-form" onSubmit={salvar} noValidate>
+        <Field as="select" label="Duração da consulta" name="duracao" hint="Cada faixa de atendimento precisa comportar pelo menos uma consulta." value={form.duracao} disabled={salvando}
+          onChange={(event) => { setForm((atual) => ({ ...atual, duracao: event.target.value })); setAviso(''); setFalha(''); setErros({}); setConflito(null); setAlterada(true); }}>
           {DURACOES.map((minutos) => <option key={minutos} value={minutos}>{minutos} minutos</option>)}
         </Field>
 
@@ -159,8 +179,8 @@ export default function JornadaForm({ medicoId }) {
                 <div className="jornada-dia__faixas">
                   {dia.faixas.map((faixa, indice) => (
                     <div key={indice} className="faixa-row">
-                      <Field type="time" label="Início" value={faixa.inicio} onChange={(event) => alterarFaixa(valor, indice, 'inicio', event.target.value)} />
-                      <Field type="time" label="Fim" value={faixa.fim} onChange={(event) => alterarFaixa(valor, indice, 'fim', event.target.value)} />
+                      <Field type="time" label="Início" error={erros[`${valor}-${indice}-inicio`]} value={faixa.inicio} onChange={(event) => alterarFaixa(valor, indice, 'inicio', event.target.value)} />
+                      <Field type="time" label="Fim" error={erros[`${valor}-${indice}-fim`]} hint="Use 00:00 para terminar à meia-noite." value={faixa.fim} onChange={(event) => alterarFaixa(valor, indice, 'fim', event.target.value)} />
                       <Button variant="ghost" size="sm" aria-label={`Remover faixa ${indice + 1} de ${nome}`} onClick={() => removerFaixa(valor, indice)}>Remover</Button>
                     </div>
                   ))}
@@ -172,6 +192,19 @@ export default function JornadaForm({ medicoId }) {
             </fieldset>
           );
         })}
+
+        <section className="agenda-resumo" aria-label="Resumo da jornada">
+          <h3 className="agenda-resumo__titulo">Confira sua jornada</h3>
+          <p>Consultas de {form.duracao} minutos.</p>
+          {DIAS_SEMANA.some(({ valor }) => form.dias[valor].atende) ? (
+            <ul className="agenda-resumo__lista">
+              {DIAS_SEMANA.filter(({ valor }) => form.dias[valor].atende).map(({ valor, nome }) => (
+                <li key={valor}><strong>{nome}:</strong> {form.dias[valor].faixas.map((faixa) => `${faixa.inicio || '—'} às ${faixa.fim === '00:00' ? '00:00 (meia-noite)' : faixa.fim || '—'}`).join('; ')}.</li>
+              ))}
+            </ul>
+          ) : <p className="agenda-jornada-vazia">Nenhum dia de atendimento selecionado. Ao salvar assim, a jornada ficará sem horários para agendamento.</p>}
+          <p className="field__hint">Os bloqueios e as consultas já marcadas também são considerados na disponibilidade.</p>
+        </section>
 
         {falha && <Alert>{falha}</Alert>}
         {aviso && <Alert tone="success">{aviso}</Alert>}
