@@ -31,6 +31,8 @@ As rotas e os perfis autorizados estão em [Rotas.java](../backend/src/main/java
 
 | Documento | Rotas |
 |---|---|
+| [autenticacao.md](api/autenticacao.md) | `GET /health`, `POST /auth/login`, `GET /auth/me` e `POST /auth/logout` |
+| [pacientes.md](api/pacientes.md) | `GET/POST /pacientes` e `GET/PUT /pacientes/{id}`, com busca e permissões |
 | [medicos-especialidades.md](api/medicos-especialidades.md) | `/medicos`, `/especialidades` (cadastro, edição, desativação) |
 | [agendamento.md](api/agendamento.md) | `GET /vagas` (disponibilidade) e `POST /consultas` (agendamento) |
 | [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as rotas de alteração de status e histórico |
@@ -41,7 +43,7 @@ As rotas e os perfis autorizados estão em [Rotas.java](../backend/src/main/java
 | [Central de notificações](api/notificacoes.md) | `GET /notificacoes`, `POST /notificacoes/lida` e `POST /notificacoes/confirmar` |
 | [alteracoes-agenda.md](api/alteracoes-agenda.md) | `GET/PUT /agendas` e `GET/POST/DELETE /bloqueios`, incluindo confirmação quando a mudança atinge consultas marcadas |
 
-As rotas sem documento próprio são `/health`, `/auth/login`, `/auth/logout`, `/auth/me` e `/pacientes`. Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localizar os testes de integração correspondentes.
+Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localizar os testes de integração correspondentes a cada contrato.
 
 ## Operação
 

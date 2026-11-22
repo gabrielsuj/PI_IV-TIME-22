@@ -54,8 +54,6 @@ function abrir(query = '') {
 
 beforeEach(() => { sessionStorage.clear(); entrarComo(); });
 
-// As chamadas são conferidas por endpoint para garantir que o médico e as datas
-// cheguem às seções com o significado esperado.
 it('aplica o mesmo médico às três seções com datas e significados explícitos', async () => {
   const fetchMock = mockApi();
   abrir(`&medicoId=${MEDICO_PAINEL}`);
@@ -122,6 +120,22 @@ it('datas distintas renovam somente as seções que declaram esses períodos', a
   await waitFor(() => expect(parametros(fetchMock, '/consultas').de).toBe('2026-11-24'));
   expect(chamadas(fetchMock, '/indicadores')).toHaveLength(indicadoresAntes);
   expect(chamadas(fetchMock, '/consultas/lista')).toHaveLength(proximasAntes);
+});
+
+it('volta ao escopo e às datas de hoje em uma ação', async () => {
+  const fetchMock = mockApi();
+  const user = userEvent.setup();
+  const router = abrir(`&medicoId=${MEDICO_PAINEL}`);
+  await screen.findByText('Paula da Agenda');
+  await user.click(screen.getByRole('button', { name: 'Voltar aos filtros de hoje' }));
+
+  expect(router.state.location.search).toBe('');
+  expect(screen.getByLabelText('Médico do painel')).toHaveValue('');
+  const dia = screen.getByLabelText('Dia da agenda').value;
+  expect(screen.getByLabelText('Início dos indicadores')).toHaveValue(dia);
+  expect(screen.getByLabelText('Fim dos indicadores')).toHaveValue(dia);
+  await waitFor(() => expect(parametros(fetchMock, '/indicadores')).toEqual({ de: dia, ate: dia }));
+  expect(await screen.findByText('Escopo do painel: Todos os médicos.')).toBeInTheDocument();
 });
 
 it.each([OUTRO_MEDICO_PAINEL, 'invalido'])('o médico ignora o alvo %s da URL e usa somente o próprio escopo', async (alvo) => {

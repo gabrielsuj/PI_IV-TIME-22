@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -9,7 +9,6 @@ import { entrarComo } from './sessaoTeste';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-// Ana: segunda 08:00–09:00 (30 min) e quarta 08:00–08:30.
 const AGENDA = {
   id: 'a1', medicoId: 'm1', fusoHorario: 'America/Sao_Paulo', duracaoMinutos: 30,
   jornadas: [
@@ -75,8 +74,8 @@ describe('utilitários do calendário', () => {
 });
 
 const HORARIO = { inicio: '2026-11-20T09:00', fim: '2026-11-20T09:30' };
-const ANTES = '2026-11-12T10:00';   // "agora" antes do horário
-const DEPOIS = '2026-11-21T08:00';  // "agora" depois do horário
+const ANTES = '2026-11-12T10:00';
+const DEPOIS = '2026-11-21T08:00';
 const consulta = (status, extra = {}) => ({ id: status, pacienteNome: 'Paulo', inicio: HORARIO.inicio, fim: HORARIO.fim, status, ...extra });
 const bloqueio = { inicio: '2026-11-20T00:00', fim: '2026-11-21T00:00', motivo: 'Congresso' };
 
@@ -122,6 +121,91 @@ describe('regras de classificação dos horários (#23)', () => {
 });
 
 describe('tela do calendário', () => {
+  it('explica os estados dos horários na semana sem depender das cores', async () => {
+    mockApi({
+      consultas: [{ id: 'c1', pacienteNome: 'Paulo Paciente', especialidadeNome: 'Clínica Geral',
+        inicio: '2099-11-09T08:00', fim: '2099-11-09T08:30', status: 'CONFIRMADA' }],
+      bloqueios: [{ id: 'b1', inicio: '2099-11-09T08:30', fim: '2099-11-09T09:00', motivo: 'Congresso' }],
+    });
+    renderAt('/calendario?medicoId=m1&data=2099-11-09');
+
+    const tabela = await screen.findByRole('table');
+    const ocupado = within(tabela).getByText('Paulo Paciente').closest('td');
+    expect(within(ocupado).getByText('Ocupado')).toBeVisible();
+    expect(within(ocupado).getByText('Paulo Paciente · Clínica Geral · Confirmada')).toBeVisible();
+    const bloqueado = within(tabela).getByText('Congresso').closest('td');
+    expect(within(bloqueado).getByText('Bloqueado')).toBeVisible();
+    expect(within(bloqueado).getByText('Bloqueio: Congresso')).toBeVisible();
+  });
+
+  it('diferencia um dia sem atendimento de um dia com todos os horários ocupados', async () => {
+    mockApi();
+    renderAt('/calendario?medicoId=m1&data=2099-11-10&visao=dia');
+
+    expect(await screen.findByText('Sem atendimento neste dia.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Configurar agenda' })).toHaveAttribute('href', '/agenda?medicoId=m1');
+    expect(screen.queryByText(/Sem vagas disponíveis neste dia/)).not.toBeInTheDocument();
+  });
+
+  it('explica o dia sem vagas e mantém os bloqueios visíveis', async () => {
+    mockApi({ bloqueios: [{ id: 'b1', inicio: '2099-11-09T08:00', fim: '2099-11-09T09:00', motivo: 'Congresso' }] });
+    renderAt('/calendario?medicoId=m1&data=2099-11-09&visao=dia');
+
+    expect(await screen.findByText(/Sem vagas disponíveis neste dia/)).toBeVisible();
+    expect(screen.getAllByText('Bloqueio: Congresso')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: 'Agendar consulta' })).not.toBeInTheDocument();
+  });
+
+  it('oferece agendamento à secretaria quando há horários livres', async () => {
+    mockApi();
+    renderAt('/calendario?medicoId=m1&data=2099-11-09&visao=dia');
+
+    expect(await screen.findByText('2 horários livres neste dia.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Agendar consulta' })).toHaveAttribute('href', '/nova-consulta');
+  });
+
+  it('mantém o médico em seu próprio calendário sem oferecer agendamento', async () => {
+    entrarComo({ id: 'u-medico', nome: 'Ana Martins', perfil: 'MEDICO' });
+    const fetchMock = mockApi();
+    renderAt('/calendario?data=2099-11-09&visao=dia');
+
+    expect(await screen.findByText('2 horários livres neste dia.')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Agendar consulta' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Médico' })).not.toBeInTheDocument();
+    expect(chamadasPara(fetchMock, '/consultas')[0].searchParams.get('medicoId')).toBe('meu');
+  });
+
+  it('orienta a configuração quando a agenda existe com jornada vazia', async () => {
+    mockApi({ agenda: { ...AGENDA, jornadas: [] } });
+    renderAt('/calendario?medicoId=m1&data=2099-11-09');
+
+    expect(await screen.findByText(/A jornada deste médico está vazia/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Configurar agenda' })).toHaveAttribute('href', '/agenda?medicoId=m1');
+    expect(screen.queryByText(/ainda não tem agenda configurada/)).not.toBeInTheDocument();
+  });
+
+  it('permite escolher a data preservando médico, visão e referência ao dia da clínica', async () => {
+    const fetchMock = mockApi();
+    const router = renderAt('/calendario?medicoId=m1&data=2099-11-09&visao=dia&diaClinica=1');
+    await screen.findByText('2 horários livres neste dia.');
+
+    fireEvent.change(screen.getByLabelText('Ir para a data'), { target: { value: '2099-11-11' } });
+    await waitFor(() => expect(router.state.location.search).toContain('data=2099-11-11'));
+    expect(router.state.location.search).toContain('medicoId=m1');
+    expect(router.state.location.search).toContain('visao=dia');
+    expect(router.state.location.search).toContain('diaClinica=1');
+    await waitFor(() => expect(chamadasPara(fetchMock, '/consultas').at(-1).searchParams.get('de')).toBe('2099-11-11'));
+  });
+
+  it('não exibe o calendário de um médico inativo informado pela URL', async () => {
+    mockApi({ medicos: () => json([{ id: 'm1', nome: 'Ana Martins', ativo: false }]) });
+    renderAt('/calendario?medicoId=m1&data=2099-11-09');
+
+    expect(await screen.findByText('O médico selecionado não está disponível. Selecione um médico ativo para consultar o calendário.')).toBeVisible();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ir para a data')).not.toBeInTheDocument();
+  });
+
   it('pede para escolher um médico', async () => {
     mockApi();
     renderAt('/calendario');

@@ -16,11 +16,11 @@
 | Interface | Vitest + Testing Library (jsdom) | `frontend/src/__tests__` | Telas, navegação, sessão, mensagens de erro e chamadas à API (simulada) |
 | Dados de demonstração | Script mongosh | `scripts/verificar-carga.js` | Coerência da carga: jornadas, bloqueios, sobreposições, histórico e logins |
 
-Os testes de integração usam bancos exclusivos, que são limpos a cada teste e nunca tocam o banco de desenvolvimento ou de demonstração:
+Os testes que gravam dados usam bancos exclusivos de teste e fazem suas limpezas neles. A conferência opcional dos indicadores lê a demonstração sem modificá-la:
 
 | Banco | Usado por |
 |---|---|
-| `consultafacil_test` | Todos os testes de integração |
+| `consultafacil_test` | Testes de integração que gravam dados, exceto a persistência opcional de histórico |
 | `consultafacil_historico_test` | `HistoricoPersistenceIntegrationTest` (opcional) |
 | `consultafacil_demo` (ou o banco em `DEMO_MONGO_DB`) | `IndicadoresDemonstracaoIntegrationTest` (opcional, só leitura) |
 
@@ -121,6 +121,17 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 
 ## Como executar
 
+### Preparar o servidor TCP de CPF
+
+Na raiz do repositório, instale o módulo `server/` no repositório Maven local e deixe o processo TCP rodando em outro terminal. `ValidadorCpfTcpTest` usa a porta 3000, como a CI. Se a API estiver usando essa porta, pause-a antes dos testes.
+
+```bash
+(cd server && mvn clean install)
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor 3000
+```
+
+### Rodar as suítes
+
 ```bash
 docker compose up -d mongo
 bash scripts/recriar-banco.sh consultafacil_test     # validadores e índices, sem dados de exemplo
@@ -129,7 +140,7 @@ bash scripts/recriar-banco.sh consultafacil_test     # validadores e índices, s
 (cd frontend && npm ci && npm test && npm run lint && npm run build)
 ```
 
-Os dois testes opcionais exigem a ativação explícita, porque usam o validador real do banco:
+As suítes opcionais de cadastro e histórico exigem ativações independentes: `-DmongoTests=true` habilita `CadastroMongoIntegrationTest`; `HISTORICO_MONGO_URI` habilita `HistoricoPersistenceIntegrationTest`. Prepare os schemas antes de executá-las:
 
 ```bash
 # banco exclusivo do teste de histórico (o recriar-banco.sh não aceita esse nome)
@@ -149,6 +160,25 @@ docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /de
 ```
 
 O verificador também exige que o histórico da carga use só transições aceitas pela API (por exemplo, toda consulta concluída passa por `CONFIRMACAO`). Sem isso, a taxa de confirmação do painel ficaria sem percentual.
+
+### Validação completa como na CI
+
+Na raiz do repositório, com Java 21, Node compatível, o MongoDB do Compose e o [servidor TCP de CPF](#preparar-o-servidor-tcp-de-cpf) no ar:
+
+```bash
+bash scripts/recriar-banco.sh consultafacil_test
+for f in database/init/*.js; do docker exec -i consultafacil-mongo mongosh consultafacil_historico_test --quiet --file /dev/stdin < "$f"; done
+bash scripts/recriar-banco.sh consultafacil_demo
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+(cd backend && HISTORICO_MONGO_URI='mongodb://localhost:27017/?serverSelectionTimeoutMS=3000' DEMO_MONGO_DB=consultafacil_demo ./mvnw -DmongoTests=true clean verify)
+(cd frontend && npm ci && npm test && npm run lint && npm run build)
+```
+
+A preparação recria os bancos de testes e de demonstração. Use uma demonstração descartável para essa validação e pause a API durante o preparo para não misturar gravações com a carga conferida. O comando do backend inclui os testes que a execução básica pode ignorar; confira o resumo do Surefire e as condições de ativação se houver testes ignorados.
+
+O `mvn clean install` do módulo `server/` também executa o teste desse módulo. A [verificação de backup](../../.github/workflows/backup-recuperacao.yml) executa `bash scripts/testes/restaurar-banco.test.sh` separadamente. A recuperação da carga entregue é conferida com `bash scripts/testar-recuperacao.sh consultafacil_demo`, conforme o [procedimento de operação](../operacao/backup-recuperacao.md).
+
+Os resultados de aceite e os SHAs já conferidos estão no [roteiro de entrega](../operacao/entrega-mvp.md). Uma nova release precisa registrar os resultados da revisão final, sem tratar contagens de uma revisão anterior como evidência do novo commit.
 
 ## Acesso à agenda
 

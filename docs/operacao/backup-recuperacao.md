@@ -14,6 +14,8 @@ Todos rodam a partir da raiz do projeto, com o container no ar (`docker compose 
 
 A pasta `backups/` está no `.gitignore`: os backups ficam só na máquina de quem os gerou.
 
+Para conferir uma carga estável, pare a API e outros escritores antes do backup e do teste de recuperação, incluindo o agendador de notificações. O teste compara o estado do original com a cópia restaurada; gravações durante essa comparação podem produzir diferenças legítimas e invalidar o resultado.
+
 A restauração copia o arquivo, confere a integridade do gzip e testa a cópia em um banco temporário. Se houver erro ou o arquivo não contiver coleções do banco de origem informado, o destino é preservado. Após a validação, o script usa a mesma cópia para restaurar o destino.
 
 O teste `bash scripts/testes/restaurar-banco.test.sh` usa um container MongoDB descartável. Ele verifica que arquivos inválidos ou de outra origem preservam o destino e que um backup válido restaura os dados, os índices e os validadores.

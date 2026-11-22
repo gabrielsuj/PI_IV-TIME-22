@@ -11,6 +11,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Field from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
+import SeletorMedico from '../components/agenda/SeletorMedico';
 import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
 import { buscarAgenda, listarBloqueios } from '../services/agendaService';
@@ -29,13 +30,11 @@ const ESTADOS = {
   bloqueado: { rotulo: 'Bloqueado', tom: 'danger' },
   passado: { rotulo: 'Indisponível', tom: 'neutral' },
 };
-/** Complemento de "Indisponível" para horários que já passaram. */
 const DESFECHO = { CONCLUIDA: 'concluída', FALTA: 'falta', CANCELADA: 'cancelada', AGENDADA: 'aguardando baixa', CONFIRMADA: 'aguardando baixa' };
 const STATUS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', CONCLUIDA: 'Concluída', FALTA: 'Falta', CANCELADA: 'Cancelada' };
 const idDe = (registro) => registro.id || registro._id;
 const dataBr = (data) => data.split('-').reverse().join('/');
 
-/** Agenda, bloqueios e consultas do médico no período, recarregados quando o período muda. */
 function useDadosDoCalendario(medicoId, de, ate, diaClinica) {
   const [revisao, setRevisao] = useState(0);
   const chave = `${medicoId}|${de}|${ate}|${diaClinica}|${revisao}`;
@@ -76,7 +75,6 @@ function textoDoHorario({ estado, consulta, bloqueio, foraDaJornada }) {
   return consulta ? 'Livre (cancelada)' : 'Livre';
 }
 
-/** Texto completo do horário (dica da célula e detalhe da visão do dia). */
 function detalheDoHorario({ estado, consulta, bloqueio, foraDaJornada }) {
   const partes = [];
   if (consulta) partes.push(`${consulta.pacienteNome} · ${consulta.especialidadeNome} · ${STATUS[consulta.status] ?? consulta.status}`);
@@ -90,7 +88,7 @@ function Semana({ dias, porDia, aoAbrirDia }) {
   const horas = [...new Set(dias.flatMap((dia) => porDia[dia].map((h) => h.hora)))].sort();
   if (horas.length === 0) return <p className="empty-state" role="status">Sem atendimento nesta semana.</p>;
   return (
-    <div className="cal-tabela-wrap">
+    <div className="cal-tabela-wrap" role="region" aria-label="Horários da semana" tabIndex={0}>
       <table className="cal-tabela">
         <caption className="sr-only">Horários da semana por dia</caption>
         <thead>
@@ -111,12 +109,16 @@ function Semana({ dias, porDia, aoAbrirDia }) {
               <th scope="row" className="cal-hora">{hora}</th>
               {dias.map((dia) => {
                 const horario = porDia[dia].find((h) => h.hora === hora);
-                if (!horario) return <td key={dia} className="cal-celula cal-celula--fora" />;
+                if (!horario) return <td key={dia} className="cal-celula cal-celula--fora"><span className="sr-only">Sem atendimento</span><span aria-hidden="true">—</span></td>;
                 const texto = textoDoHorario(horario);
+                const info = ESTADOS[horario.estado];
+                const detalhe = detalheDoHorario(horario);
                 return (
                   <td key={dia} className={`cal-celula cal-celula--${horario.estado}`}
-                    title={[`${rotuloDia(dia)} ${hora}`, texto, detalheDoHorario(horario)].filter(Boolean).join(' · ')}>
-                    <span className="cal-celula__texto">{texto}</span>
+                    title={[`${rotuloDia(dia)} ${hora}`, texto, detalhe].filter(Boolean).join(' · ')}>
+                    <span className="cal-celula__estado"><Badge tone={info.tom}>{info.rotulo}</Badge></span>
+                    {texto !== info.rotulo && <span className="cal-celula__texto">{texto}</span>}
+                    {detalhe && <span className="cal-celula__detalhe">{detalhe}</span>}
                   </td>
                 );
               })}
@@ -128,22 +130,38 @@ function Semana({ dias, porDia, aoAbrirDia }) {
   );
 }
 
-function Dia({ horarios, canceladas }) {
-  if (horarios.length === 0) return <p className="empty-state" role="status">Sem atendimento neste dia.</p>;
+function Dia({ horarios, canceladas, agendaUrl, podeAgendar }) {
+  const livres = horarios.filter((horario) => horario.estado === 'livre').length;
+  const futuro = horarios.some((horario) => horario.estado !== 'passado');
   return (
     <>
-      <ol className="cal-lista">
-        {horarios.map((h) => {
-          const info = ESTADOS[h.estado] ?? ESTADOS.livre;
-          return (
-            <li key={h.inicio} className={`cal-lista__item cal-lista__item--${h.estado}`}>
-              <span className="cal-lista__hora">{h.hora} – {h.fim.slice(11)}</span>
-              <Badge tone={info.tom}>{h.estado === 'passado' || h.estado === 'livre' ? textoDoHorario(h) : info.rotulo}</Badge>
-              <span className="cal-lista__detalhe">{detalheDoHorario(h)}</span>
-            </li>
-          );
-        })}
-      </ol>
+      {horarios.length === 0 ? (
+        <div className="empty-state" role="status">
+          <p>Sem atendimento neste dia.</p>
+          <p>Escolha outra data ou ajuste os dias e horários da jornada.</p>
+          <Link to={agendaUrl}>Configurar agenda</Link>
+        </div>
+      ) : (
+        <>
+          <div className="cal-disponibilidade" role="status">
+            {livres > 0 ? <p>{livres} {livres === 1 ? 'horário livre neste dia.' : 'horários livres neste dia.'}</p>
+              : <p>{futuro ? 'Sem vagas disponíveis neste dia. Os horários estão ocupados, bloqueados ou precisam de remarcação.' : 'Os horários deste dia já passaram e estão indisponíveis para agendamento.'}</p>}
+            {livres > 0 && podeAgendar && <Button to="/nova-consulta" variant="outline" size="sm">Agendar consulta</Button>}
+          </div>
+          <ol className="cal-lista" aria-label="Horários do dia">
+            {horarios.map((h) => {
+              const info = ESTADOS[h.estado] ?? ESTADOS.livre;
+              return (
+                <li key={h.inicio} className={`cal-lista__item cal-lista__item--${h.estado}`}>
+                  <span className="cal-lista__hora">{h.hora} – {h.fim.slice(11)}</span>
+                  <Badge tone={info.tom}>{h.estado === 'passado' || h.estado === 'livre' ? textoDoHorario(h) : info.rotulo}</Badge>
+                  <span className="cal-lista__detalhe">{detalheDoHorario(h)}</span>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
       {canceladas.length > 0 && (
         <div className="cal-canceladas">
           <h3>Canceladas neste dia</h3>
@@ -156,7 +174,7 @@ function Dia({ horarios, canceladas }) {
   );
 }
 
-function Dias({ dias, porDia, consultas, diaClinica }) {
+function Dias({ dias, porDia, consultas, diaClinica, agendaUrl, podeAgendar }) {
   const multiplosDias = dias.length > 1;
   return (
     <>
@@ -164,7 +182,8 @@ function Dias({ dias, porDia, consultas, diaClinica }) {
       {dias.map((dia) => (
         <Fragment key={dia}>
           {multiplosDias && <h2>{rotuloDiaCompleto(dia)}</h2>}
-          <Dia horarios={porDia[dia]} canceladas={consultas.filter((consulta) => consulta.status === 'CANCELADA' && consulta.inicio.startsWith(dia))} />
+          <Dia horarios={porDia[dia]} canceladas={consultas.filter((consulta) => consulta.status === 'CANCELADA' && consulta.inicio.startsWith(dia))}
+            agendaUrl={agendaUrl} podeAgendar={podeAgendar} />
         </Fragment>
       ))}
     </>
@@ -190,8 +209,8 @@ export default function CalendarioPage() {
 
   const medicos = useRecords(agendaPropria ? null : 'medicos');
   const ativos = medicos.records.filter((m) => m.ativo !== false);
-  const selecionavel = ativos.some((m) => idDe(m) === medicoId);
-  const dados = useDadosDoCalendario(medicoId, de, ate, diaClinica);
+  const medicoIndisponivel = !agendaPropria && medicoId && !medicos.loading && !medicos.error && !ativos.some((medico) => idDe(medico) === medicoId);
+  const dados = useDadosDoCalendario(medicoIndisponivel ? '' : medicoId, de, ate, diaClinica);
   const diasAgenda = dados.carregando ? dias : dados.diasLocais ?? dias;
 
   const ir = (mudancas) => {
@@ -211,55 +230,41 @@ export default function CalendarioPage() {
 
   const contagem = Object.values(porDia).flat().reduce((total, h) => ({ ...total, [h.estado]: (total[h.estado] ?? 0) + 1 }), {});
   const periodo = visao === 'semana' ? `${dataBr(de).slice(0, 5)} a ${dataBr(ate)}` : rotuloDiaCompleto(data);
+  const agendaUrl = agendaPropria ? '/agenda' : `/agenda?medicoId=${encodeURIComponent(medicoId)}`;
+  const jornadaVazia = dados.agenda && !dados.agenda.jornadas?.some((jornada) => jornada.faixas?.length > 0);
 
   return (
-    <div className="page">
+    <div className="page calendario-page">
       <PageHeader title={agendaPropria ? 'Meu calendário' : 'Calendário'} description="Agenda de cada médico por dia ou semana: horários livres, ocupados e bloqueados."
         action={retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>} />
-      {medicoId && !dados.carregando && dados.agenda && <p className="page__lead">Horários no fuso da agenda: {dados.agenda.fusoHorario}.</p>}
+      {medicoId && !medicoIndisponivel && !dados.carregando && dados.agenda && <p className="page__lead">Horários no fuso da agenda: {dados.agenda.fusoHorario}.</p>}
 
-      <Card className="search-card">
-        <div className="cal-controles">
-          {!agendaPropria && (
-            <Field as="select" label="Médico" className="search-field" value={medicoId} disabled={medicos.loading || ativos.length === 0}
-              onChange={(event) => ir({ medicoId: event.target.value })}>
-              <option value="">Selecione um médico</option>
-              {ativos.map((m) => <option key={idDe(m)} value={idDe(m)}>{m.nome}</option>)}
-              {medicoId && !selecionavel && <option value={medicoId}>Médico {medicoId}</option>}
-            </Field>
-          )}
-          <div className="cal-nav" role="group" aria-label="Visualização">
-            <Button variant={visao === 'semana' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'semana'} onClick={() => ir({ visao: 'semana' })}>Semana</Button>
-            <Button variant={visao === 'dia' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'dia'} onClick={() => ir({ visao: 'dia' })}>Dia</Button>
-          </div>
-        </div>
+      <div className="cal-controles calendario-selecao">
         {!agendaPropria && (
-          <>
-            {medicos.loading && <p role="status">Carregando lista de médicos…</p>}
-            {medicos.error && (
-              <Alert action={<Button variant="outline" size="sm" onClick={medicos.refresh}>Tentar novamente</Button>}>
-                Não foi possível carregar a lista de médicos. {medicos.error.message}
-              </Alert>
-            )}
-            {!medicos.loading && !medicos.error && ativos.length === 0 && (
-              <p className="empty-state" role="status">Nenhum médico ativo disponível para seleção.</p>
-            )}
-          </>
+          <SeletorMedico medicoId={medicoId} medicos={medicos} onChange={(valor) => ir({ medicoId: valor })} />
         )}
-      </Card>
+        <div className="cal-nav" role="group" aria-label="Visualização">
+          <Button variant={visao === 'semana' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'semana'} onClick={() => ir({ visao: 'semana' })}>Semana</Button>
+          <Button variant={visao === 'dia' ? 'primary' : 'outline'} size="sm" aria-pressed={visao === 'dia'} onClick={() => ir({ visao: 'dia' })}>Dia</Button>
+        </div>
+      </div>
 
-      {!medicoId ? (
+      {medicoIndisponivel ? (
+        <Alert tone="info">O médico selecionado não está disponível. Selecione um médico ativo para consultar o calendário.</Alert>
+      ) : !medicoId ? (
         !medicos.loading && !medicos.error && ativos.length > 0 &&
           <Card><p className="empty-state" role="status">Selecione um médico para ver o calendário.</p></Card>
       ) : (
         <Card>
           <div className="cal-cabecalho">
-            <div className="cal-nav">
+            <div className="cal-nav" role="group" aria-label={visao === 'semana' ? 'Navegar entre semanas' : 'Navegar entre dias'}>
               <Button variant="outline" size="sm" onClick={() => ir({ data: somarDias(data, -passo) })}>‹ Anterior</Button>
               <Button variant="ghost" size="sm" onClick={() => ir({ data: diaClinica ? agoraNoFuso(FUSO_CLINICA).slice(0, 10) : hoje() })}>Hoje</Button>
               <Button variant="outline" size="sm" onClick={() => ir({ data: somarDias(data, passo) })}>Próximo ›</Button>
               <span className="cal-periodo" aria-live="polite">{periodo}{diaClinica && ' no fuso da clínica'}</span>
             </div>
+            <Field type="date" label="Ir para a data" className="cal-data" value={data} min="0001-01-01" max="9999-12-31"
+              onChange={(event) => { if (dataPainelValida(event.target.value)) ir({ data: event.target.value }); }} />
             <div className="cal-legenda" aria-label="Legenda">
               {Object.entries(ESTADOS).map(([estado, info]) => (
                 <Badge key={estado} tone={info.tom}>{info.rotulo}{contagem[estado] ? ` (${contagem[estado]})` : ''}</Badge>
@@ -274,11 +279,12 @@ export default function CalendarioPage() {
             </Alert>
           )}
           {!dados.carregando && !dados.erro && !dados.agenda && (
-            <Alert tone="info">Este médico ainda não tem agenda configurada. <Link to={`/agenda?medicoId=${medicoId}`}>Configurar agenda</Link></Alert>
+            <Alert tone="info">Este médico ainda não tem agenda configurada. Configure a jornada para disponibilizar horários de atendimento. <Link to={agendaUrl}>Configurar agenda</Link></Alert>
           )}
+          {!dados.carregando && !dados.erro && jornadaVazia && <Alert tone="info">A jornada deste médico está vazia. Defina os dias e horários de atendimento. <Link to={agendaUrl}>Configurar agenda</Link></Alert>}
           {!dados.carregando && !dados.erro && dados.agenda && (visao === 'semana'
             ? <Semana dias={dias} porDia={porDia} aoAbrirDia={(dia) => ir({ visao: 'dia', data: dia })} />
-            : <Dias dias={diasAgenda} porDia={porDia} consultas={dados.consultas} diaClinica={diaClinica} />)}
+            : <Dias dias={diasAgenda} porDia={porDia} consultas={dados.consultas} diaClinica={diaClinica} agendaUrl={agendaUrl} podeAgendar={!agendaPropria} />)}
         </Card>
       )}
     </div>
