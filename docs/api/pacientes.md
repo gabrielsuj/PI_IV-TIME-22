@@ -65,3 +65,21 @@ Os erros produzidos pelo cadastro usam `{"mensagem":"texto"}`. A autorização, 
 O schema, os índices `uk_paciente_cpf` e `uk_paciente_email` e o vínculo opcional de login estão em [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md) e em [`04-esquema-pacientes.js`](../../database/init/04-esquema-pacientes.js).
 
 Na pasta `backend`, `./mvnw test -Dtest=PacienteValidatorTest,PacienteServiceTest,PacienteHandlerTest,RotasAutorizacaoTest,ValidadorCpfTcpTest` verifica validação, unicidade, consulta/edição, contratos HTTP, acesso por perfil e o validador TCP. Prepare o [servidor de CPF para os testes](../testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf). Na pasta `frontend`, `npm test -- src/__tests__/UxPacientes.test.jsx src/__tests__/Registration.test.jsx` cobre busca, detalhe, edição e preservação dos dados em erros.
+
+### Ponta a ponta com o MongoDB (#50)
+
+`PacienteHandlerTest` usa um repositório em memória. O `AcessoPacientesMongoIntegrationTest` faz o login real e grava em `pacientes` pelo `PacienteRepository.Mongo`, passando pelo validador e pelos índices do banco:
+
+| Cenário | Resultado conferido |
+|---|---|
+| Secretaria cadastra com CPF mascarado, nome com espaços e e-mail em maiúsculas | `201` e `Location`; no Mongo, CPF só com dígitos, nome sem espaços nas extremidades e e-mail em minúsculas |
+| Listagem, busca (nome parcial, CPF com e sem máscara, e-mail), detalhe e edição | Ordem por nome; a edição altera o documento existente, sem criar outro |
+| Busca com `.*`, `^` ou `(` | Tratada como texto, sem erro e sem resultados indevidos |
+| CPF ou e-mail repetido, inclusive na edição | `400` com a mensagem do campo repetido; o documento original não muda |
+| 8 cadastros simultâneos com o mesmo CPF | Exatamente um `201`; o índice `uk_paciente_cpf` barra os demais |
+| CPF mal formado ou com dígitos repetidos | `400` antes de consultar o servidor de CPF |
+| Dígito verificador errado | `400` "CPF inválido." devolvido pelo servidor TCP real; com o CPF correto o mesmo cadastro passa |
+| Servidor de CPF fora do ar | `503` sem gravar; quando volta, o cadastro passa |
+| `GET`/`PUT` em ID inexistente | `404`; o `PUT` não cria paciente |
+| Médico | Lê lista e detalhe; `POST`/`PUT` retornam `403` e o Mongo não muda |
+| Paciente e anônimo | `403` e `401` em todas as rotas de `/pacientes` |
