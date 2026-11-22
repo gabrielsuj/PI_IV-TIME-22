@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Exemplo entregue à central da #35. Com a API no ar, o agendador da #34 gera os demais lembretes;
 // ele não cria outro para esta consulta porque ela já tem um (NotificacaoRepository.temLembrete).
 const pacienteId = ObjectId("400000000000000000000001");

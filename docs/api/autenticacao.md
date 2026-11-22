@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # API de autenticação e disponibilidade
 
 Contratos de `AuthHandler`, `AuthService`, `Autenticador` e `HealthHandler`. A URL local, com o `.env.example`, é `http://localhost:3000`.

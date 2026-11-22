@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
 # Teste da restauração (#45) com MongoDB 7 em um container descartável.
 set -euo pipefail
 

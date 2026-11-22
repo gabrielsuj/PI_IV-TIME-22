@@ -1,7 +1,11 @@
 /*
 Autoria: Murilo Moraes (modificador)
 RA: 25000073
+
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
 */
+
 package br.edu.puccampinas.consultafacil.api.dto;
 
 /**

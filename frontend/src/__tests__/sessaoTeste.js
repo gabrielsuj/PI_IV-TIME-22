@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { salvarSessao } from '../services/sessao';
 
 export const SECRETARIA_TESTE = { id: 'u-secretaria', nome: 'Sofia Secretaria', perfil: 'SECRETARIA_ADMIN' };

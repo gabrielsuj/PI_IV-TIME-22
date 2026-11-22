@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Backup e recuperação (#45)
 
 Scripts para salvar e restaurar um banco do ConsultaFácil com um único comando, e para verificar que o backup realmente recupera os dados. Usam as ferramentas oficiais `mongodump` e `mongorestore`, que já vêm no container `mongo:7`.

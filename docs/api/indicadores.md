@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # API de indicadores do painel
 
 `GET /indicadores` devolve as contagens e taxas do período para a clínica ou para um médico. A operação é de leitura e exige `Authorization: Bearer <token>`. O painel usa esse contrato para apresentar ocupação, faltas, cancelamentos, confirmações e preenchimento pela fila (#36, #37 e #48).

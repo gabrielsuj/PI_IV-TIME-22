@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router';
 import RegistrationForm from '../components/RegistrationForm';

@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Garantias de reserva (#55)
 
 Como o ConsultaFácil impede reservas duplicadas ou sobrepostas, e como isso é testado.

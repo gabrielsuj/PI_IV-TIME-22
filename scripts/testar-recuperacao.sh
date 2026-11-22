@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
 # Teste de recuperação (#45): faz o backup de um banco, restaura numa cópia temporária
 # com nome exclusivo e confere, coleção por coleção, documentos, conteúdo (hash),
 # índices e validadores. O banco original não é alterado; a cópia é apagada no final.

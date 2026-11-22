@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Documentação do ConsultaFácil
 
 Índice de toda a documentação do projeto. Para instalar e executar, veja o [README principal](../README.md).

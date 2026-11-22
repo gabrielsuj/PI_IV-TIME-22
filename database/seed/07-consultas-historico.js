@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Consultas e histórico de demonstração, coerentes com agendas, bloqueios e logins.
 //
 // Janela: 3 semanas antes e 3 semanas depois do dia da carga. Consultas passadas

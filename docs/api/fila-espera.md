@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # API da fila de espera
 
 > Issue #31 (registro de interesse na fila) · Sprint 4

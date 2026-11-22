@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Carga de demonstração
 
 Dados fictícios carregados por `database/seed/` ao recriar um banco de desenvolvimento ou de demonstração:

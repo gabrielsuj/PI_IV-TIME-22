@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Alterações de agenda com consultas marcadas (#44)
 
 Criar um bloqueio ou mudar a jornada de um médico pode atingir consultas já marcadas. Quando a mudança afeta consultas, a API devolve a lista antes de gravar, salvo quando o pedido já inclui a confirmação explícita. Consulte a [modelagem de agendas e bloqueios](../modelagem/medicos-agenda.md) e a [API de busca de vagas e agendamento](agendamento.md).

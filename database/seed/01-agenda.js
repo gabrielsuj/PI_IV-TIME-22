@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 const banco = db;
 
 // IDs fixos permitem repetir a carga sem criar duplicatas

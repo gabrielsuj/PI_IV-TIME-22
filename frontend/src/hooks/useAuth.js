@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useContext } from 'react';
 import { AuthContext } from '../contexts/authContext';
 

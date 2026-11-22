@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { FUSO_CLINICA } from './consulta';
 import { DIAS_SEMANA, minutosParaHora } from './horario';
 

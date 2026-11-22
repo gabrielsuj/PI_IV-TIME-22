@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
 # Backup completo de um banco do ConsultaFácil (dados, índices e validadores) em backups/ (#45).
 # O arquivo é compactado e leva o banco e a data no nome: backups/<banco>-AAAAMMDD-HHMMSS-<sufixo>.archive.gz
 #

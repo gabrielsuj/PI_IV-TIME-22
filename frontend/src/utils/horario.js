@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 /** Dias da semana no padrão ISO 8601 (1 = segunda … 7 = domingo), o mesmo usado pela API. */
 export const DIAS_SEMANA = [
   { valor: 1, nome: 'Segunda-feira' },

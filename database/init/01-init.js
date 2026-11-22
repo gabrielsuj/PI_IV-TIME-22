@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Cria as coleções da aplicação no banco atual.
 // No Docker, o banco é o de MONGO_INITDB_DATABASE (docker-compose.yml);
 // com scripts/recriar-banco.sh, é o banco passado como parâmetro.

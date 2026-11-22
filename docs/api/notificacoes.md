@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # API da central de notificações
 
 > Issues #34 e #35 · Envio simulado, central de notificações e confirmação de presença

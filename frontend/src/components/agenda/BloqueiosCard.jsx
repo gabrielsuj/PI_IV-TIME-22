@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { conflitoComConsultas, criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
 import { diaSeguinte, formatarPeriodo, hoje } from '../../utils/horario';

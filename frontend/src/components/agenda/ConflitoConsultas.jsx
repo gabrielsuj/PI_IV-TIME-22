@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { Link } from 'react-router';
 import { formatarPeriodo } from '../../utils/horario';
 import Button from '../ui/Button';

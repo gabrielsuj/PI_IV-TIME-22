@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Modelagem: especialidades, médicos, agendas e bloqueios
 
 > Issue #51 · Relacionada a #17 · Sprint 2 (Dados)
