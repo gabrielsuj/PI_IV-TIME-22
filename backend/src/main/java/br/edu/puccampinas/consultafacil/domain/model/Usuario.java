@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.domain.model;
 
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;

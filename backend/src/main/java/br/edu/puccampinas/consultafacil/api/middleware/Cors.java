@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.api.middleware;
 
 import com.sun.net.httpserver.Headers;
