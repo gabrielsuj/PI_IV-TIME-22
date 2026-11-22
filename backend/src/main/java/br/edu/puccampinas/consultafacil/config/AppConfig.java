@@ -33,5 +33,6 @@ public record AppConfig(String mongoUri, String mongoDatabase, int serverPort,
                 Boolean.parseBoolean(env.get("NOTIFICACOES_EMAIL_TESTE", "false"))),
             env.get("CPF_SERVER_HOST", "localhost"),
             Integer.parseInt(env.get("CPF_SERVER_PORT", "3000"))
+        );
     }
 }
