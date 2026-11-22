@@ -32,7 +32,7 @@ public record AppConfig(String mongoUri, String mongoDatabase, int serverPort,
                 Integer.parseInt(env.get("NOTIFICACOES_INTERVALO_SEGUNDOS", "60")),
                 Boolean.parseBoolean(env.get("NOTIFICACOES_EMAIL_TESTE", "false"))),
             env.get("CPF_SERVER_HOST", "localhost"),
-            Integer.parseInt(env.get("CPF_SERVER_PORT", "3000"))
+            Integer.parseInt(env.get("CPF_SERVER_PORT", "3001"))
         );
     }
 }

@@ -144,12 +144,23 @@ export default function FluxoAgendamento({ usuario, paciente, especialidade, med
       }
     }
   }
-  if (confirmacao) return (
-    <Card title="Agendamento realizado" ref={painel} tabIndex={-1}>
-      <Alert tone="success">Consulta agendada. Código da consulta: {confirmacao.id}.</Alert>
-      <div className="form-actions"><Button onClick={onNovaConsulta}>Nova consulta</Button><Button variant="outline" to="/fila-espera">Voltar à fila</Button></div>
-    </Card>
-  );
+  if (confirmacao) {
+    // #38: resumo legível no lugar do ID interno; "Voltar à fila" só quando o agendamento veio da fila.
+    const quando = formatarHorarioAgendamento(horario, vagas.fusoHorario);
+    return (
+      <Card title="Agendamento realizado" ref={painel} tabIndex={-1}>
+        <Alert tone="success">
+          Consulta agendada{quando ? ` para ${quando.data}, ${quando.periodo}` : ''}
+          {medico?.nome ? ` com ${medico.nome}` : ''}{especialidade?.nome ? ` (${especialidade.nome})` : ''}.
+        </Alert>
+        <div className="form-actions">
+          <Button to={`/consultas/${encodeURIComponent(confirmacao.id)}`}>Ver consulta</Button>
+          <Button variant="outline" onClick={onNovaConsulta}>Nova consulta</Button>
+          {vagaInicial && <Button variant="outline" to="/fila-espera">Voltar à fila</Button>}
+        </div>
+      </Card>
+    );
+  }
   if (resultadoIncerto) return (
     <Card title="Verifique o agendamento" ref={painel} tabIndex={-1}>
       <Alert>Não foi possível verificar o resultado da confirmação. Confira o agendamento antes de tentar novamente.</Alert>

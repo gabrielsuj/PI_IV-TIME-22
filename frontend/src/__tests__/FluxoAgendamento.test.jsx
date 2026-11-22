@@ -6,7 +6,7 @@ RA: 25000387
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
-import { createMemoryRouter } from 'react-router';
+import { createMemoryRouter, MemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NovaConsultaPage from '../pages/NovaConsultaPage';
@@ -43,6 +43,20 @@ describe('integração da vaga sinalizada com o agendamento', () => {
     expect(buscarVagas.mock.calls[0][1].signal.aborted).toBe(true);
     expect(buscarVagas.mock.lastCall[1].signal.aborted).toBe(false);
     expect(confirmarAgendamento).not.toHaveBeenCalled();
+  });
+
+  it('depois de confirmar a vaga da fila, mostra o resumo, o link da consulta e a volta à fila', async () => {
+    const user = userEvent.setup();
+    const confirmarAgendamento = vi.fn(async () => ({ id: 'consulta 7' }));
+    render(<MemoryRouter><FluxoAgendamento {...propriedades} buscarVagas={vi.fn(async () => vagas)}
+      confirmarAgendamento={confirmarAgendamento} /></MemoryRouter>);
+    await screen.findByRole('radio', { name: '09:00 às 09:30' });
+    await user.click(screen.getByRole('button', { name: 'Revisar agendamento' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Consulta agendada para 01/12/2026, 09:00 às 09:30 com Ana Teste (Cardiologia).');
+    expect(screen.getByRole('link', { name: 'Ver consulta' })).toHaveAttribute('href', '/consultas/consulta%207');
+    expect(screen.getByRole('link', { name: 'Voltar à fila' })).toHaveAttribute('href', '/fila-espera');
   });
 
   it('mantém o outro horário escolhido pelo usuário ao atualizar as vagas', async () => {
@@ -274,7 +288,11 @@ describe('fluxo integrado do frontend de agendamento', () => {
     expect(buscarVagas).toHaveBeenCalledExactlyOnceWith({ especialidadeId: 'e1', medicoId: 'm1', data: '2026-12-01' }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(confirmarAgendamento).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Consulta agendada. Código da consulta: c1.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Consulta agendada para 01/12/2026, 09:00 às 09:30 com Ana Teste (Cardiologia).');
+    expect(screen.queryByText(/c1/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver consulta' })).toHaveAttribute('href', '/consultas/c1');
+    // #38: o agendamento não veio da fila, então não oferece voltar a ela.
+    expect(screen.queryByRole('link', { name: 'Voltar à fila' })).not.toBeInTheDocument();
     expect(confirmarAgendamento).toHaveBeenCalledExactlyOnceWith({ pacienteId: 'p1', especialidadeId: 'e1', medicoId: 'm1', ...horario });
     await user.click(screen.getByRole('button', { name: 'Nova consulta' }));
     expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
