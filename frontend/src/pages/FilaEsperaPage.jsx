@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import DataTable from '../components/ui/DataTable';
 import Field from '../components/ui/Field';
+import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useRecords } from '../hooks/useRecords';
@@ -83,6 +84,9 @@ export default function FilaEsperaPage() {
   const [revisao, setRevisao] = useState(0);
   const [estado, setEstado] = useState({ revisao: -1, ativos: [], atendidos: [], erro: null });
   const [operandoId, setOperandoId] = useState(null);
+  // Inscrição aguardando confirmação de saída da fila (#58: modal no lugar do window.confirm).
+  const [saindo, setSaindo] = useState(null);
+  const [erroSaida, setErroSaida] = useState('');
   const sinalizacoesAnteriores = useRef(new Map());
   const [avisosDeVaga, setAvisosDeVaga] = useState([]);
 
@@ -191,17 +195,36 @@ export default function FilaEsperaPage() {
     }
   }
 
-  async function cancelar(item) {
-    const nome = item.pacienteNome || 'este paciente';
-    if (!window.confirm(`Cancelar a inscrição de ${nome} na fila de espera? Esta operação será enviada ao servidor.`)) return;
+  function pedirCancelamento(item) {
+    setErroSaida('');
+    setSaindo(item);
+  }
+
+  function fecharCancelamento() {
+    if (!operandoId) setSaindo(null);
+  }
+
+  async function confirmarCancelamento(event) {
+    event.preventDefault();
+    const item = saindo;
+    if (!item || operandoId) return;
     setOperandoId(item.id);
     setAviso('');
+    setErroSaida('');
     try {
       await cancelarInscricaoFila(item.id);
+      setSaindo(null);
       setAviso('Inscrição cancelada com sucesso.');
       recarregar();
     } catch (erro) {
-      setAviso(`Não foi possível cancelar a inscrição: ${erro.message}`);
+      if (erro.status === 404 || erro.status === 409) {
+        // A inscrição mudou em outro lugar (atendida, expirada ou já cancelada): a lista está desatualizada.
+        setSaindo(null);
+        setAviso('Esta inscrição já tinha sido encerrada. A lista foi atualizada com a situação atual.');
+        recarregar();
+      } else {
+        setErroSaida(`Não foi possível cancelar a inscrição: ${erro.message}`);
+      }
     } finally {
       setOperandoId(null);
     }
@@ -258,7 +281,7 @@ export default function FilaEsperaPage() {
         )}
         {(p.status === 'AGUARDANDO' || p.status === 'SINALIZADA') && (
           <button className="fila-espera__acao fila-espera__acao--remover" type="button" disabled={!!operandoId}
-            onClick={() => cancelar(p)} title="Cancelar inscrição" aria-label={`Cancelar inscrição de ${p.pacienteNome || 'paciente'}`}>
+            onClick={() => pedirCancelamento(p)} title="Cancelar inscrição" aria-label={`Cancelar inscrição de ${p.pacienteNome || 'paciente'}`}>
             <Icon name="trash" />
           </button>
         )}
@@ -301,6 +324,24 @@ export default function FilaEsperaPage() {
           emptyMessage="Nenhuma inscrição encontrada." />
       </Card>
       <p className="fila-espera__nota">Os dados são carregados da API. Unidade, prioridade e dias da semana não aparecem porque não fazem parte do contrato atual do backend. A sinalização de vaga ocorre automaticamente no servidor.</p>
+
+      {saindo && (
+        <Modal title="Sair da fila de espera" busy={!!operandoId} onClose={fecharCancelamento}
+          description={`${saindo.pacienteNome || 'Paciente'} · ${saindo.especialidadeNome || 'Especialidade'} · ${saindo.medicoNome || 'Qualquer médico'}`}>
+          <form onSubmit={confirmarCancelamento}>
+            <p>
+              {saindo.status === 'SINALIZADA'
+                ? 'Esta inscrição tem uma vaga oferecida. Ao sair da fila, a vaga fica livre para o próximo paciente.'
+                : 'A inscrição deixa de receber avisos quando um horário compatível for liberado.'}
+            </p>
+            {erroSaida && <Alert>{erroSaida}</Alert>}
+            <div className="form-actions">
+              <Button variant="outline" onClick={fecharCancelamento} disabled={!!operandoId}>Manter inscrição</Button>
+              <Button type="submit" variant="danger" loading={!!operandoId}>Sair da fila</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       <dialog ref={modalRef} className="modal fila-espera__modal" aria-labelledby="fila-espera-modal-titulo" onCancel={(e) => { if (enviando) e.preventDefault(); }}>
         <div className="modal__header">
