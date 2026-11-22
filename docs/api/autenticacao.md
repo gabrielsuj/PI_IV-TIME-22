@@ -61,3 +61,17 @@ Não há rota de autocadastro ou manutenção de usuários no MVP. As contas de 
 ## Verificação
 
 Na pasta `backend`, `./mvnw test -Dtest=AuthHandlerTest,RotasAutorizacaoTest,SenhaHasherTest,SessoesTest` cobre login, sessão, expiração, logout, hash e autorização. A modelagem está em [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md).
+
+Esses testes usam usuários em memória. O `AcessoPacientesMongoIntegrationTest` (#50) repete o fluxo com a coleção `usuarios` do MongoDB, gravada pelo validador `$jsonSchema`, e com a mesma montagem de rotas do `App.java`:
+
+| Cenário | Resultado conferido |
+|---|---|
+| Login válido | `200` com `token`, `expiraEm` (= agora + `SESSION_TTL_MINUTES`) e `usuario`; `ultimoAcessoEm` gravado no Mongo |
+| E-mail com maiúsculas ou espaços | Normalizado antes da busca; o login funciona |
+| Senha errada, e-mail inexistente, usuário inativo | `401` com a mensagem de cada caso; o inativo não registra acesso |
+| Dois logins do mesmo usuário | Tokens diferentes; o logout de um não derruba o outro |
+| Logout e depois `GET`/`POST /pacientes` | `401` e nada gravado |
+| Sessão vencida no meio do cadastro | `401` sem gravar; um novo login continua o cadastro. Com 59 minutos a sessão ainda vale |
+| Sem token ou com token inventado | `401` em `/pacientes` e `/auth/me`; `/health` continua público |
+
+Comando: `./mvnw test -Dtest='AcessoPacientesMongoIntegrationTest*'` (requer MongoDB com `consultafacil_test` e o [servidor de CPF](../testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf)).

@@ -32,7 +32,7 @@ Os testes que gravam dados usam bancos exclusivos de teste e fazem suas limpezas
 | Paciente ou médico já ocupado: a sobreposição é recusada | `ReservasConcorrenciaIntegrationTest` cobre o médico ocupado e a sobreposição do paciente entre médicos diferentes, inclusive com pedidos simultâneos e inícios diferentes. | ✅ |
 | Horário bloqueado ou fora da agenda não aparece nem pode ser reservado | `AgendamentoIntegrationTest.deveImpedirReservaEmPeriodoBloqueado`, `deveRecusarHorarioForaDaJornada`, `deveRecusarHorarioQueJaPassou`; `CalculadoraDisponibilidadeTest` | ✅ |
 | Cancelamento libera a vaga, atualiza o histórico e sinaliza a fila | `SinalizacaoFilaIntegrationTest.deveLiberarVagaRegistrarHistoricoESinalizarFila`; `CancelamentoIntegrationTest.deveLiberarAVagaParaABuscaEParaNovaReserva`; `FilaEsperaIntegrationTest.inscricaoSinalizadaMostraAVagaLiberada`; `ReservasConcorrenciaIntegrationTest.cancelamentoLiberaAVagaParaOutroPaciente`; `HistoricoTest`; sob concorrência, `CancelamentoConcorrenciaIntegrationTest` (#40) | ✅ |
-| Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado`, `matrizCompletaDePermissoes` (toda rota × os três perfis) e `todaRotaDaMatrizExigeLogin` | ✅ |
+| Acesso a função de outro perfil é bloqueado pelo servidor | `RotasAutorizacaoTest.deveBloquearAcessoDePerfilNaoAutorizado`, `matrizCompletaDePermissoes` (toda rota × os três perfis) e `todaRotaDaMatrizExigeLogin`; com login real e MongoDB, `AcessoPacientesMongoIntegrationTest.PermissoesComLoginReal` (#50) | ✅ |
 | Formulário inválido ou API indisponível: a interface informa sem perder o contexto | `UxPacientes.test.jsx`, `Registration.test.jsx`, `App.test.jsx` (API fora do ar), `AgendaConflitos.test.jsx` | ✅ |
 
 ### Verificação dos critérios de aceite (#40, 20/11/2026)
@@ -45,6 +45,15 @@ Executada no `develop` (commit `535c06b`, com #34 e #48) mais os testes da #40:
 | Front-end | `npm test`, `npm run lint`, `npm run build` | 307 testes em 21 arquivos; lint e build sem erros |
 
 Ampliações da #40: matriz de permissões completa (toda rota × perfil, incluindo `/medicos` e `/especialidades`, que antes não eram montadas no teste) e cancelamento concorrente com fila e notificações ligadas.
+
+### Verificação de acesso, permissões e pacientes (#50, 22/11/2026)
+
+Os testes de login (`AuthHandlerTest`) e de pacientes (`PacienteHandlerTest`) usavam só repositórios em memória. A #50 acrescentou o `AcessoPacientesMongoIntegrationTest`, com 26 casos em três grupos (`LoginComUsuarioDoMongo`, `CadastroDePacientesNoMongo`, `PermissoesComLoginReal`), estável em execuções repetidas. Os cenários estão descritos em [autenticacao.md](../api/autenticacao.md#verificação) e [pacientes.md](../api/pacientes.md#ponta-a-ponta-com-o-mongodb-50).
+
+Dois comportamentos confirmados pelo teste:
+
+- Desde a integração do servidor TCP, o `PacienteValidator` confere só o formato e os dígitos repetidos. **Os dígitos verificadores são conferidos pelo servidor de CPF.** Sem ele no ar, a escrita de pacientes retorna `503`.
+- A duplicidade é verificada pelo serviço antes de gravar ("CPF já cadastrado…"). Em pedidos simultâneos, o índice único do Mongo barra o segundo ("CPF ou e-mail já cadastrado…").
 
 > No Windows, rode o `npm test` a partir de um caminho com a letra do disco em maiúscula (`C:\...`). Com `c:\...`, o Vitest carrega o próprio módulo duas vezes e todos os arquivos falham com "Vitest failed to find the current suite", sem nenhum teste executado.
 
@@ -90,6 +99,7 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 | `AuthHandlerTest` | Login, mensagens de recusa, usuário inativo, token expirado e logout pela API |
 | `RotasAutorizacaoTest` | Matriz de permissões completa: cada rota × os três perfis (200/403) e sem login (401), a partir da tabela `PERMISSOES`, além de casos de rota inexistente (404), logout e sessões simultâneas (sem banco) |
 | `PacienteHandlerTest`, `CadastroHandlerTest` | CRUD de pacientes, médicos e especialidades pela API |
+| `AcessoPacientesMongoIntegrationTest` | Ponta a ponta com o MongoDB real (#50): login com `usuarios` do banco, logout, sessão expirada no meio do cadastro, CRUD de pacientes gravado e normalizado no Mongo, duplicidade (inclusive 8 cadastros simultâneos com o mesmo CPF), servidor de CPF real e indisponível, e permissões de médico, paciente e anônimo com login de verdade |
 | `CadastroMongoIntegrationTest` | Validadores e índices reais de médicos e especialidades (opcional) |
 | `AgendaBloqueioIntegrationTest` | Agenda semanal e bloqueios: gravação, sobreposição, fuso |
 | `ConsultaReservaIntegrationTest` | Índices de reserva: vaga única sob concorrência, mesmo paciente, consulta cancelada |

@@ -320,6 +320,8 @@ Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bas
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.
 
+O valor de cada variável quando ela não é definida, as variáveis usadas só pelos testes e uma tabela de problemas comuns (porta ocupada, CPF indisponível, CORS) estão em [docs/operacao/configuracao.md](docs/operacao/configuracao.md).
+
 ---
 
 ## Documentação
