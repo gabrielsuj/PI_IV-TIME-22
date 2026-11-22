@@ -51,6 +51,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.ReplaceOptions;
 import com.sun.net.httpserver.HttpServer;
 import org.bson.Document;
@@ -512,6 +513,42 @@ class FilaEsperaIntegrationTest {
         assertTrue(central.get(0).get("presencaConfirmada").asBoolean());
         assertEquals("CONFIRMADA", db.getCollection("consultas").find(Filters.eq("_id", consulta)).first().getString("status"));
         assertEquals(1, db.getCollection("historico").countDocuments(new Document("consultaId", consulta).append("evento", "CONFIRMACAO")));
+    }
+
+    /**
+     * #38: depois do cancelamento, o lembrete e a confirmação já entregues continuam na central, mas
+     * marcados como de consulta cancelada; o próprio aviso de cancelamento não recebe a marca.
+     */
+    @Test void centralMarcaAvisosDeConsultaCancelada() throws Exception {
+        var sec = new UsuarioLogado(new ObjectId().toHexString(), "Secretaria", Perfil.SECRETARIA_ADMIN);
+        var consulta = registro.criar(new Document("pacienteId", P1).append("medicoId", MEDICO)
+                .append("especialidadeId", ESPECIALIDADE).append("inicio", Date.from(VAGA))
+                .append("fim", Date.from(VAGA.plusSeconds(1800))), sec).getObjectId("_id");
+        var repo = new NotificacaoRepository(db);
+        for (String tipo : List.of("CONFIRMACAO_AGENDAMENTO", "LEMBRETE_CONSULTA", "CANCELAMENTO_CONSULTA")) {
+            assertTrue(repo.inserirSeNova(new Document("_id", new ObjectId()).append("destinatarioPerfil", "PACIENTE")
+                    .append("destinatarioId", P1).append("tipo", tipo).append("canal", "SISTEMA").append("simulada", true)
+                    .append("consultaId", consulta).append("filaEsperaId", null)
+                    .append("statusConsulta", tipo.startsWith("CANCEL") ? "CANCELADA" : "AGENDADA")
+                    .append("antecedenciaHoras", tipo.startsWith("LEMBRETE") ? 24 : null).append("titulo", tipo)
+                    .append("mensagem", "Mensagem " + tipo)
+                    .append("dadosConsulta", new Document("dataHora", Date.from(VAGA)).append("medicoNome", "Dra. Paula"))
+                    .append("status", "ENVIADA").append("agendadaPara", Date.from(AGORA)).append("enviadaEm", Date.from(AGORA))
+                    .append("tentativas", 1).append("erro", null).append("criadoEm", Date.from(AGORA))));
+        }
+        var dono = paciente(U1);
+        for (JsonNode item : json.readTree(enviar("GET", "/notificacoes", dono, null).body()))
+            assertFalse(item.get("consultaCancelada").asBoolean(), "antes do cancelamento: " + item.get("titulo"));
+
+        db.getCollection("consultas").updateOne(Filters.eq("_id", consulta), Updates.set("status", "CANCELADA"));
+
+        var central = json.readTree(enviar("GET", "/notificacoes", dono, null).body());
+        assertEquals(3, central.size(), "os avisos entregues continuam na central");
+        for (JsonNode item : central) {
+            boolean ehCancelamento = "CANCELAMENTO_CONSULTA".equals(item.get("titulo").asText());
+            assertEquals(!ehCancelamento, item.get("consultaCancelada").asBoolean(), item.get("titulo").asText());
+            assertFalse(item.get("podeConfirmar").asBoolean(), item.get("titulo").asText());
+        }
     }
 
     @Test void antecedenciasOuCanaisDistintosSaoPermitidos() {
