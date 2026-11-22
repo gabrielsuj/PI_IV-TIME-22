@@ -14,6 +14,7 @@ public class Parceiro {
     private Comunicado proximoComunicado=null;
 
     private final Semaphore mutEx = new Semaphore(1,true);
+    private final Object consumo = new Object();
 
     public Parceiro(Socket conexao, ObjectInputStream  receptor, ObjectOutputStream transmissor) throws Exception {
         if (conexao==null) throw new Exception ("Conexao ausente");
@@ -25,7 +26,7 @@ public class Parceiro {
         this.transmissor = transmissor;
     }
 
-    public void receba(Comunicado x) throws Exception {
+    public synchronized void receba(Comunicado x) throws Exception {
         try {
             this.transmissor.writeObject (x);
             this.transmissor.flush       ();
@@ -35,34 +36,58 @@ public class Parceiro {
     }
 
     public Comunicado espie() throws Exception {
+        this.mutEx.acquireUninterruptibly();
         try {
-            this.mutEx.acquireUninterruptibly();
-            if (this.proximoComunicado==null) this.proximoComunicado = (Comunicado)this.receptor.readObject();
-            this.mutEx.release();
-            return this.proximoComunicado;
+            return proximo();
         } catch(Exception erro) {
-            throw new Exception ("Erro de recepcao");
+            throw new Exception ("Erro de recepcao", erro);
+        } finally {
+            this.mutEx.release();
         }
     }
 
     public Comunicado envie() throws Exception {
+        this.mutEx.acquireUninterruptibly();
         try {
-            if (this.proximoComunicado==null) this.proximoComunicado = (Comunicado)this.receptor.readObject();
-            Comunicado ret         = this.proximoComunicado;
+            Comunicado ret         = proximo();
             this.proximoComunicado = null;
             return ret;
         } catch(Exception erro) {
-            throw new Exception ("Erro de recepcao");
+            throw new Exception ("Erro de recepcao", erro);
+        } finally {
+            this.mutEx.release();
+            synchronized (consumo) { consumo.notifyAll(); }
+        }
+    }
+
+    private Comunicado proximo() throws Exception {
+        if (conexao.isClosed()) throw new IOException("Conexao encerrada");
+        if (proximoComunicado == null) proximoComunicado = (Comunicado) receptor.readObject();
+        return proximoComunicado;
+    }
+
+    public void aguardeConsumo(Comunicado observado) throws InterruptedException {
+        synchronized (consumo) {
+            for (;;) {
+                mutEx.acquireUninterruptibly();
+                try {
+                    if (conexao.isClosed() || proximoComunicado != observado) return;
+                } finally {
+                    mutEx.release();
+                }
+                consumo.wait();
+            }
         }
     }
 
     public void adeus() throws Exception {
         try {
-            this.transmissor.close();
-            this.receptor   .close();
+            // Fechar o socket também desbloqueia uma leitura em andamento nos streams.
             this.conexao    .close();
         } catch(Exception erro) {
-            throw new Exception ("Erro de desconexao");
+            throw new Exception ("Erro de desconexao", erro);
+        } finally {
+            synchronized (consumo) { consumo.notifyAll(); }
         }
     }
 }

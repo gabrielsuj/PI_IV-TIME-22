@@ -5,38 +5,38 @@ package br.edu.puccampinas.consultafacil.connection;
 import br.edu.puccampinas.consultafacil.protocol.Comunicado;
 import br.edu.puccampinas.consultafacil.protocol.ComunicadoDeDesligamento;
 import br.edu.puccampinas.consultafacil.protocol.Parceiro;
+import br.edu.puccampinas.consultafacil.handler.ValidarCPFResponse;
 
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.BlockingQueue;
+import java.io.IOException;
+import java.util.function.Consumer;
 
 public class TratadoraDeComunicadoDeDesligamento extends Thread
 {
     private final Parceiro servidor;
-    private final BlockingQueue<Comunicado> respostas;
+    private final Consumer<Exception> aoEncerrar;
 
-    public TratadoraDeComunicadoDeDesligamento (Parceiro servidor, BlockingQueue<Comunicado> respostas) throws Exception {
+    public TratadoraDeComunicadoDeDesligamento (Parceiro servidor, Consumer<Exception> aoEncerrar) throws Exception {
         if(servidor == null) throw new Exception ("Porta invalida");
-        if(respostas == null) throw new Exception ("Fila ausente");
+        if(aoEncerrar == null) throw new Exception ("Sinalizacao ausente");
 
         this.servidor = servidor;
-        this.respostas = respostas;
-        setDaemon(true); // Evita que a JVM encerre o processo
+        this.aoEncerrar = aoEncerrar;
+        setDaemon(true); // Permite que a JVM termine quando restarem apenas threads daemon.
     }
 
     public void run() {
-        for(;;) {
-			try {
-                Comunicado c = servidor.envie(); // bloqueia até chegar algo e CONSOME
-
-				if(c instanceof ComunicadoDeDesligamento) {
-					System.out.println("\nO servidor vai ser desligado agora;");
-				    System.err.println("volte mais tarde!\n");
-				    System.exit(0);
-				}
-
-                respostas.put(c); // qualquer outra coisa vai para quem está esperando
-			}
-			catch(Exception ignored) {}
+        try {
+            while (!isInterrupted()) {
+                Comunicado c = servidor.espie();
+                if (c instanceof ComunicadoDeDesligamento)
+                    throw new IOException("Servidor de CPF desligado");
+                if (!(c instanceof ValidarCPFResponse))
+                    throw new IOException("Resposta inesperada do servidor de CPF");
+                // A resposta pertence à validação; aguarda seu consumo sem repetir a leitura.
+                servidor.aguardeConsumo(c);
+            }
+        } catch (Exception erro) {
+            aoEncerrar.accept(erro);
         }
     }
 }

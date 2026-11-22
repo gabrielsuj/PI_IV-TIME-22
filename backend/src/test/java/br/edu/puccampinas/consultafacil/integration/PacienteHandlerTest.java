@@ -4,6 +4,8 @@ import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.service.*;
 import br.edu.puccampinas.consultafacil.unit.PacienteServiceTest.EmMemoria;
 import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
+import br.edu.puccampinas.consultafacil.handler.ValidarCPFRequest;
+import br.edu.puccampinas.consultafacil.protocol.ComunicadoDeDesligamento;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.*;
@@ -11,6 +13,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.net.*;
 import java.net.http.*;
+import java.io.EOFException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -124,6 +131,48 @@ class PacienteHandlerTest {
         var resposta = enviar("DELETE", "/pacientes", "");
         validarErro(resposta, 405);
         assertEquals("GET, POST", resposta.headers().firstValue("Allow").orElseThrow());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @Timeout(10)
+    void desligamentoTcpRetorna503EMantemHttpAtivo(boolean comAviso) throws Exception {
+        try (ServerSocket tcp = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            tcp.setSoTimeout(3000);
+            var executor = Executors.newSingleThreadExecutor(tarefa -> {
+                Thread thread = new Thread(tarefa);
+                thread.setDaemon(true);
+                return thread;
+            });
+            try {
+                var atendimento = executor.submit(() -> {
+                    try (Socket conexao = tcp.accept()) {
+                        conexao.setSoTimeout(3000);
+                        try (ObjectOutputStream saida = new ObjectOutputStream(conexao.getOutputStream());
+                             ObjectInputStream entrada = new ObjectInputStream(conexao.getInputStream())) {
+                            assertInstanceOf(ValidarCPFRequest.class, entrada.readObject());
+                            if (comAviso) {
+                                saida.writeObject(new ComunicadoDeDesligamento());
+                                saida.flush();
+                                assertThrows(EOFException.class, entrada::readObject);
+                            }
+                        }
+                    }
+                    return null;
+                });
+                iniciarComValidador(new ValidadorCpfTcp(tcp.getInetAddress().getHostAddress(), tcp.getLocalPort()));
+                var resposta = enviar("POST", "/pacientes", ANA);
+                assertEquals(503, resposta.statusCode());
+                assertEquals("Serviço de validação de CPF temporariamente indisponível.",
+                        json.readTree(resposta.body()).get("mensagem").asText());
+                var consulta = enviar("GET", "/pacientes", "");
+                assertEquals(200, consulta.statusCode());
+                assertEquals(0, json.readTree(consulta.body()).size());
+                atendimento.get(3, TimeUnit.SECONDS);
+            } finally {
+                executor.shutdownNow();
+            }
+        }
     }
 
     @Test
