@@ -16,7 +16,6 @@ import { buscaDeOutraVaga } from '../utils/avisoVaga';
 /**
  * @author Murilo Rigoni (criador)
  * @author Gabriel (modificador)
- * @author Murilo Moraes (modificador, #58: vaga perdida, cancelamento e estados vazios)
  */
 
 const ROTULOS = {

@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes (modificador)
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.config;
 
 import io.github.cdimascio.dotenv.Dotenv;
