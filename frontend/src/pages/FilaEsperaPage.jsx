@@ -53,6 +53,16 @@ function Indicador({ titulo, total, variante }) {
   );
 }
 
+/** Estado vazio da tabela conforme o filtro e o perfil (#58). */
+function mensagemListaVazia(filtroStatus, secretaria) {
+  if (filtroStatus === 'ATENDIDA') {
+    return 'Nenhuma inscrição atendida ainda. Quando o paciente agenda pela vaga oferecida, a inscrição aparece aqui.';
+  }
+  return secretaria
+    ? 'Nenhuma inscrição ativa na fila de espera. Use “Entrar na fila” para inscrever um paciente.'
+    : 'Você não está em nenhuma fila de espera. Use “Entrar na fila” para ser avisado quando um horário compatível for liberado.';
+}
+
 function dataBR(iso) {
   if (!iso) return '—';
   const valor = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00` : iso;
@@ -321,9 +331,9 @@ export default function FilaEsperaPage() {
       <Card className="table-card fila-espera__tabela">
         <DataTable caption="Inscrições na fila de espera" columns={colunas} rows={carregando ? [] : lista}
           loading={carregando} error={estado.erro} onRetry={recarregar}
-          emptyMessage="Nenhuma inscrição encontrada." />
+          emptyMessage={mensagemListaVazia(filtroStatus, secretaria)} />
       </Card>
-      <p className="fila-espera__nota">Os dados são carregados da API. Unidade, prioridade e dias da semana não aparecem porque não fazem parte do contrato atual do backend. A sinalização de vaga ocorre automaticamente no servidor.</p>
+      <p className="fila-espera__nota">A lista é atualizada automaticamente a cada 30 segundos. Quando um horário compatível é liberado, a inscrição passa para “Vaga oferecida” e o paciente recebe um aviso de vaga.</p>
 
       {saindo && (
         <Modal title="Sair da fila de espera" busy={!!operandoId} onClose={fecharCancelamento}
