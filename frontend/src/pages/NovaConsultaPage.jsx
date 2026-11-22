@@ -56,6 +56,9 @@ export default function NovaConsultaPage({
   // filtros escolhidos antes do agendamento.
   const retorno = retornoPainel(location, usuario);
   const origemFila = location.state?.origemFila;
+  // Filtros enviados pelo botão "Buscar outra vaga" de um aviso expirado (#58).
+  // Só preenchem a busca: a data e o horário continuam por conta do paciente.
+  const buscaVaga = origemFila ? null : location.state?.buscaVaga;
 
   // Recuperação do rascunho (develop).
   const [recuperado, setRecuperado] = useState(
@@ -69,8 +72,8 @@ export default function NovaConsultaPage({
 
   const [filtros, setFiltros] = useState(
     () => recuperado?.filtros || {
-      especialidadeId: '',
-      medicoId: '',
+      especialidadeId: buscaVaga?.especialidadeId || '',
+      medicoId: buscaVaga?.medicoId || '',
       data: ''
     }
   );
@@ -246,6 +249,13 @@ export default function NovaConsultaPage({
           Agendamento iniciado pela fila de espera.
           Confira os dados e confirme apenas se o horário
           estiver disponível.
+        </Alert>
+      )}
+
+      {buscaVaga && !recuperado && (
+        <Alert tone="info">
+          Buscando outra vaga com o médico e a especialidade do aviso.
+          Escolha uma data para ver os horários livres.
         </Alert>
       )}
 

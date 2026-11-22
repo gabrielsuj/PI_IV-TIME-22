@@ -228,3 +228,49 @@ describe('tela de nova consulta', () => {
     }
   });
 });
+
+// #58: o botão "Buscar outra vaga" de um aviso expirado abre a busca já filtrada.
+describe('nova busca a partir de um aviso de vaga', () => {
+  function abrirComBusca(buscaVaga, perfil = 'PACIENTE') {
+    entrarComo({ id: 'u-teste', nome: 'Teste', perfil });
+    mockCatalogos();
+    renderAt({ pathname: '/nova-consulta', state: { buscaVaga } });
+  }
+
+  it('preenche a especialidade e o médico do aviso e deixa a data para o paciente', async () => {
+    abrirComBusca({ especialidadeId: 'e1', medicoId: 'm1' });
+    await screen.findByRole('option', { name: 'Cardiologia' });
+
+    expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1');
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('m1'));
+    expect(screen.getByLabelText(/Data da consulta/)).toHaveValue('');
+    expect(screen.getByText(/Buscando outra vaga com o médico e a especialidade do aviso/)).toBeInTheDocument();
+    expect(screen.queryByText(/Agendamento iniciado pela fila de espera/)).not.toBeInTheDocument();
+  });
+
+  it('mantém só a especialidade quando o médico do aviso não a atende mais', async () => {
+    abrirComBusca({ especialidadeId: 'e1', medicoId: 'm2' });
+    await screen.findByRole('option', { name: 'Cardiologia' });
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue('e1'));
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('');
+  });
+
+  it('descarta a especialidade inativa e abre a busca vazia', async () => {
+    abrirComBusca({ especialidadeId: 'e3', medicoId: 'm1' });
+    await screen.findByRole('option', { name: 'Cardiologia' });
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue(''));
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('');
+  });
+
+  it('deixa o paciente trocar o médico sugerido', async () => {
+    const user = userEvent.setup();
+    abrirComBusca({ especialidadeId: 'e1', medicoId: 'm1' });
+    await screen.findByRole('option', { name: 'Cardiologia' });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /Especialidade/ }), 'e2');
+    await user.selectOptions(screen.getByRole('combobox', { name: /Médico/ }), 'm2');
+    expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('m2');
+  });
+});
