@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
 import { entrarComo } from './sessaoTeste';

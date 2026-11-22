@@ -1,8 +1,10 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 /**
  * Textos e rotas dos avisos de vaga (#58).
  * Contrato do campo `motivo`: docs/api/fila-espera.md, seção 7.1.
- *
- * @author Murilo Moraes (criador)
  */
 
 /**

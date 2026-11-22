@@ -1,7 +1,9 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 /**
  * Textos e rotas dos avisos de vaga (#58).
- *
- * @author Murilo Moraes (criador)
  */
 import { describe, expect, it } from 'vitest';
 import { buscaDeOutraVaga, explicarExpiracao } from '../utils/avisoVaga';
