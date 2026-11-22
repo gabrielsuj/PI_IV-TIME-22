@@ -68,6 +68,12 @@ jobs:
           done
           exit 1
 
+      - name: Instalar modulo server no Maven
+        working-directory: server
+        shell: bash
+        run: ../backend/mvnw --batch-mode --no-transfer-progress install
+
+
       - name: Rodar testes do backend
         working-directory: backend
         env:
