@@ -382,6 +382,50 @@ class AcessoPacientesMongoIntegrationTest {
         }
     }
 
+    // =================================================================== permissões por perfil
+
+    @Nested class PermissoesComLoginReal {
+        @Test void medicoLeMasNaoCadastraNemEdita() throws Exception {
+            String idAna = criar(token("sofia"), "Ana Lima", CPF_ANA, "ana");
+            String marcos = token("marcos");
+
+            assertEquals(200, enviar("GET", "/pacientes", marcos, null).statusCode());
+            assertEquals(200, enviar("GET", "/pacientes/" + idAna, marcos, null).statusCode());
+            assertEquals(403, enviar("POST", "/pacientes", marcos, paciente("Bruno Souza", CPF_BRUNO, "bruno")).statusCode());
+            assertEquals(403, enviar("PUT", "/pacientes/" + idAna, marcos, paciente("Hackeada", CPF_ANA, "ana")).statusCode());
+
+            assertEquals("Ana Lima", db.getCollection("pacientes").find(Filters.eq("_id", new ObjectId(idAna))).first()
+                    .getString("nome"), "o PUT recusado não alterou o Mongo");
+            assertEquals(1, pacientesDoTeste());
+        }
+
+        @Test void pacienteNaoAcessaOCadastroDePacientes() throws Exception {
+            String idAna = criar(token("sofia"), "Ana Lima", CPF_ANA, "ana");
+            String paula = token("paula");
+
+            assertEquals(403, enviar("GET", "/pacientes", paula, null).statusCode());
+            assertEquals(403, enviar("GET", "/pacientes/" + idAna, paula, null).statusCode());
+            assertEquals(403, enviar("POST", "/pacientes", paula, paciente("Carla Dias", CPF_CARLA, "carla")).statusCode());
+            assertEquals(403, enviar("PUT", "/pacientes/" + idAna, paula, paciente("Ana Lima", CPF_ANA, "ana")).statusCode());
+            assertEquals(1, pacientesDoTeste());
+        }
+
+        @Test void semLoginOuComTokenInventadoRetorna401() throws Exception {
+            for (String token : new String[]{null, "inventado"}) {
+                assertEquals(401, enviar("GET", "/pacientes", token, null).statusCode());
+                assertEquals(401, enviar("POST", "/pacientes", token, paciente("Ana Lima", CPF_ANA, "ana")).statusCode());
+                assertEquals(401, enviar("GET", "/auth/me", token, null).statusCode());
+            }
+            assertEquals(0, pacientesDoTeste());
+        }
+
+        @Test void healthNaoExigeLogin() throws Exception {
+            var r = enviar("GET", "/health", null, null);
+            assertEquals(200, r.statusCode());
+            assertEquals("ok", json.readTree(r.body()).get("status").asText());
+        }
+    }
+
     // =================================================================== apoio
 
     private void limpar() {
