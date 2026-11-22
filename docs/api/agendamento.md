@@ -1,3 +1,8 @@
+<!--
+Autoria: Murilo Moraes
+RA: 25000073
+-->
+
 # API de disponibilidade, busca de vagas e agendamento
 
 > Issues #20 (cálculo de disponibilidade) e #21 (busca de vagas e confirmação do agendamento) · Sprint 2

@@ -11,10 +11,6 @@ import { agendarPeloAviso, listarAvisosVaga } from '../services/avisosVagaServic
 import { buscaDeOutraVaga, explicarExpiracao } from '../utils/avisoVaga';
 import { dataHoraDaConsulta, FUSO_CLINICA } from '../utils/consulta';
 
-/**
- * @author Murilo Moraes (modificador, #58: motivo da expiração e volta à busca de vagas)
- */
-
 const INTERVALO_ATUALIZACAO = 15_000;
 const validade = new Intl.DateTimeFormat('pt-BR', {
   timeZone: FUSO_CLINICA, dateStyle: 'short', timeStyle: 'short',

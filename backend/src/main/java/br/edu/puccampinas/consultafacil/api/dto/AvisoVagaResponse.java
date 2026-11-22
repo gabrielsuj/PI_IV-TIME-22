@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes (modificador)
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.api.dto;
 
 /**
@@ -6,8 +10,6 @@ package br.edu.puccampinas.consultafacil.api.dto;
  * <p>{@code motivo} só é preenchido quando {@code status = EXPIRADO} e explica por que a vaga
  * deixou de valer (#58). {@code medicoId} e {@code especialidadeId} permitem que a tela leve o
  * paciente de volta à busca de vagas já com os filtros do aviso.
- *
- * @author Murilo Moraes (modificador, #58)
  */
 public record AvisoVagaResponse(String id, String medicoNome, String inicio, String fim, String validoAte,
                                 Status status, String consultaAgendadaId, Motivo motivo,

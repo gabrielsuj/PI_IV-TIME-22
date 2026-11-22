@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Rotas;
@@ -73,8 +77,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Banco {@code consultafacil_test}. Usuários com IDs de prefixo {@code e5…} e pacientes com
  * e-mail em {@code @acesso.consultafacil.test}; o teste só apaga esses registros.
- *
- * @author Murilo Moraes (criador)
  */
 class AcessoPacientesMongoIntegrationTest {
     private static final Instant AGORA = Instant.parse("2026-11-20T12:00:00Z");
