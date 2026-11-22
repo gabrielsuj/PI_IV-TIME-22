@@ -68,12 +68,51 @@ jobs:
           done
           exit 1
 
+      - name: Instalar modulo server no Maven
+        working-directory: server
+        shell: bash
+        run: ../backend/mvnw --batch-mode --no-transfer-progress install
+
+
+      
       - name: Rodar testes do backend
-        working-directory: backend
+        working-directory: .
+        shell: bash
         env:
           HISTORICO_MONGO_URI: mongodb://localhost:27017/?serverSelectionTimeoutMS=3000
           DEMO_MONGO_DB: consultafacil_demo
-        run: ./mvnw --batch-mode --no-transfer-progress -DmongoTests=true test
+        run: |
+          # Inicia o servidor TCP de CPF.
+          coproc CPF_SERVER {
+            exec java -cp server/target/classes \
+              br.edu.puccampinas.consultafacil.Servidor \
+              > /tmp/cpf-server.log 2>&1
+          }
+
+          # Encerra o processo ao terminar.
+          trap 'kill "$CPF_SERVER_PID" 2>/dev/null || true' EXIT
+
+          # Aguarda o servidor ficar disponivel.
+          pronto=false
+          for tentativa in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/3000) 2>/dev/null; then
+              pronto=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$pronto" != "true" ]; then
+            echo "Servidor TCP de CPF nao iniciou."
+            cat /tmp/cpf-server.log
+            exit 1
+          fi
+
+          echo "Servidor TCP de CPF disponivel."
+
+          cd backend
+          ./mvnw --batch-mode --no-transfer-progress -DmongoTests=true test
+
 
   frontend:
     name: Frontend (testes, lint e build)

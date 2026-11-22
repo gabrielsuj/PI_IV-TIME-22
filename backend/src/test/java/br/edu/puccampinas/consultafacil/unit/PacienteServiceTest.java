@@ -14,8 +14,115 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 
 public class PacienteServiceTest {
+
+@Test
+void cadastraQuandoServidorAprovaCpf() {
+    var repo = new EmMemoria();
+
+    ValidadorCpf validador = cpf -> {
+        assertEquals("52998224725", cpf);
+    };
+
+    var servico = new PacienteService(
+        repo, new PacienteValidator(), validador
+    );
+
+    var paciente = servico.cadastrar(ana);
+
+    assertEquals("52998224725", paciente.cpf());
+    assertEquals(1, repo.dados.size());
+}
+
+@Test
+void naoCadastraQuandoServidorRejeitaCpf() {
+    var repo = new EmMemoria();
+
+    ValidadorCpf validador = cpf -> {
+        throw new ValidacaoException("CPF inválido.");
+    };
+
+    var servico = new PacienteService(
+        repo, new PacienteValidator(), validador
+    );
+
+    assertThrows(ValidacaoException.class, () ->
+        servico.cadastrar(ana)
+    );
+
+    assertTrue(repo.dados.isEmpty());
+}
+
+@Test
+void naoCadastraQuandoServidorIndisponivel() {
+    var repo = new EmMemoria();
+
+    ValidadorCpf validador = cpf -> {
+        throw new IllegalStateException(
+            "Servidor de CPF indisponível."
+        );
+    };
+
+    var servico = new PacienteService(
+        repo, new PacienteValidator(), validador
+    );
+
+    assertThrows(IllegalStateException.class, () ->
+        servico.cadastrar(ana)
+    );
+
+    assertTrue(repo.dados.isEmpty());
+}
+
+@Test
+void naoAtualizaQuandoServidorRejeitaCpf() {
+    var repo = new EmMemoria();
+
+    // Primeiro permite cadastrar o paciente.
+    ValidadorCpf aprovado = cpf -> {};
+
+    var servicoCadastro = new PacienteService(
+        repo, new PacienteValidator(), aprovado
+    );
+
+    var paciente = servicoCadastro.cadastrar(ana);
+
+    // Depois simula rejeição do servidor.
+    ValidadorCpf rejeitado = cpf -> {
+        throw new ValidacaoException("CPF inválido.");
+    };
+
+    var servicoEdicao = new PacienteService(
+        repo, new PacienteValidator(), rejeitado
+    );
+
+    assertThrows(ValidacaoException.class, () ->
+        servicoEdicao.atualizar(
+            paciente.id(),
+            new PacienteRequest(
+                "Ana Silva",
+                "11144477735",
+                "novo@exemplo.com"
+            )
+        )
+    );
+
+    assertEquals(
+        paciente,
+        repo.consultar(paciente.id()).orElseThrow()
+    );
+}
+
     private final EmMemoria repository = new EmMemoria();
-    private final PacienteService service = new PacienteService(repository, new PacienteValidator());
+    private final ValidadorCpf validadorCpf = cpf -> {
+    // Simula um CPF aprovado pelo servidor TCP.
+};
+
+    private final PacienteService service =
+    new PacienteService(
+        repository,
+        new PacienteValidator(),
+        validadorCpf
+    );
     private final PacienteRequest ana = new PacienteRequest("Ana", "52998224725", "ana@exemplo.com");
 
     @Test void cadastraConsultaELista() {

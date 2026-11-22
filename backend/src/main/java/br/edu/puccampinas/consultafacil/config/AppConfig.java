@@ -4,7 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import java.util.List;
 
 public record AppConfig(String mongoUri, String mongoDatabase, int serverPort,
-                        List<String> corsAllowedOrigins, int sessionTtlMinutes, Notificacoes notificacoes) {
+                        List<String> corsAllowedOrigins, int sessionTtlMinutes, Notificacoes notificacoes, String cpfServerHost, int cpfServerPort) {
 
     /**
      * Lembretes e notificações simuladas (#34).
@@ -30,7 +30,9 @@ public record AppConfig(String mongoUri, String mongoDatabase, int serverPort,
             new Notificacoes(
                 Integer.parseInt(env.get("NOTIFICACOES_ANTECEDENCIA_HORAS", "24")),
                 Integer.parseInt(env.get("NOTIFICACOES_INTERVALO_SEGUNDOS", "60")),
-                Boolean.parseBoolean(env.get("NOTIFICACOES_EMAIL_TESTE", "false")))
+                Boolean.parseBoolean(env.get("NOTIFICACOES_EMAIL_TESTE", "false"))),
+            env.get("CPF_SERVER_HOST", "localhost"),
+            Integer.parseInt(env.get("CPF_SERVER_PORT", "3000"))
         );
     }
 }

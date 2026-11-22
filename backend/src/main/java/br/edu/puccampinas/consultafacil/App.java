@@ -54,11 +54,16 @@ public class App {
 
         var db = mongo.database();
 
-        // CRUD de pacientes (sua implementação)
-        var pacienteRepo = new PacienteRepository.Mongo(db);
+        // CRUD de pacientes 
+        var pacienteRepo = new PacienteRepository.Mongo(db);   
+        var validadorCpf = new ValidadorCpfTcp(
+            config.cpfServerHost(),
+            config.cpfServerPort()
+        );
         var pacienteService = new PacienteService(
             pacienteRepo,
-            new PacienteValidator()
+            new PacienteValidator(),
+            validadorCpf
         );
         var pacienteHandler = new PacienteHandler(pacienteService);
 

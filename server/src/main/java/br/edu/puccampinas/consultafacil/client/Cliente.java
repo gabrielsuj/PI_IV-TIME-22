@@ -27,19 +27,34 @@ public class Cliente implements AutoCloseable {
     private final TratadoraDeComunicadoDeDesligamento tratadoraDeComunicadoDeDesligamento;
     private final BlockingQueue<Comunicado> respostas = new LinkedBlockingQueue<>();
 
+    
     public Cliente(String host, int porta) throws Exception {
+        this(host, porta, 3000, 3000);
+    }
+
+    public Cliente(String host, int porta, int timeoutConexao, int timeoutLeitura) throws Exception {
+        Socket conexao = new Socket();
+
         try {
-            this.conexao = new Socket(host, porta);
+            conexao.connect(new InetSocketAddress(host, porta), timeoutConexao);
+            conexao.setSoTimeout(timeoutLeitura);
         } catch(Exception erro) {
-            throw new Exception("Host e/ou porta não foram informandos!");
+            try { conexao.close(); } catch(Exception ignored) {}
+            throw new Exception("Erro ao conectar com o servidor", erro);
         }
 
-        this.transmissor = new ObjectOutputStream(conexao.getOutputStream());
-        this.receptor    = new ObjectInputStream(conexao.getInputStream());
-        this.servidor    = new Parceiro(conexao, receptor, transmissor);
-
-        this.tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento(servidor, respostas);
+        try {
+            this.transmissor = new ObjectOutputStream(conexao.getOutputStream());
+            this.receptor    = new ObjectInputStream(conexao.getInputStream());
+            this.servidor    = new Parceiro(conexao, receptor, transmissor);
+            this.tratadoraDeComunicadoDeDesligamento = new TratadoraDeComunicadoDeDesligamento(servidor, respostas);
+            this.conexao = conexao;
+        } catch(Exception erro) {
+            try { conexao.close(); } catch(Exception ignored) {}
+            throw erro;
+        }
     }
+
 
     public Cliente() throws Exception { this(HOST_PADRAO, PORTA_PADRAO); }
 
