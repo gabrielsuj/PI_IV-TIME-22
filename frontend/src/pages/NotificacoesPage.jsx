@@ -33,7 +33,13 @@ export default function NotificacoesPage() {
   }
 
   const colunas = [
-    { key: 'titulo', label: 'Notificação', render: n => <><strong>{n.titulo}</strong><p>{n.mensagem}</p></> },
+    { key: 'titulo', label: 'Notificação', render: n => <>
+      <strong>{n.titulo}</strong>
+      {/* #38: avisos já entregues de uma consulta que foi cancelada depois. */}
+      {n.consultaCancelada && <> <Badge tone="danger">Consulta cancelada</Badge></>}
+      <p>{n.mensagem}</p>
+      {n.consultaCancelada && <p className="notificacao__cancelada">Esta consulta foi cancelada depois deste aviso.</p>}
+    </> },
     { key: 'dataHora', label: 'Consulta', render: n => <>{n.medicoNome} · {dataHora.format(new Date(n.dataHora))}</> },
     { key: 'lida', label: 'Leitura', render: n => <Badge tone={n.lida ? 'neutral' : 'info'}>{n.lida ? 'Lida' : 'Não lida'}</Badge> },
     { key: 'acoes', label: 'Ações', render: n => <>

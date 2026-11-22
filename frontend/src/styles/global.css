@@ -458,3 +458,6 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 /* Avisos de vaga (#58): motivo da expiração embaixo do selo. */
 .aviso-vaga__status { display: flex; flex-direction: column; gap: var(--space-1); }
 .aviso-vaga__motivo { color: var(--color-text-muted); font-size: 0.75rem; line-height: 1.3333; }
+
+/* Central de notificações (#38): aviso de consulta cancelada depois da entrega. */
+.notificacao__cancelada { color: var(--color-danger-text); font-size: 0.75rem; }
