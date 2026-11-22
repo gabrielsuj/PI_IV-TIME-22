@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useState } from 'react';
 import { useRecords } from '../hooks/useRecords';
 import { api } from '../services/api';

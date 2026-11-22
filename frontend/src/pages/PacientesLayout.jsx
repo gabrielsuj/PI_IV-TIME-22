@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useState } from 'react';
 import { Outlet, useOutletContext } from 'react-router';
 import RegistrationPage from './RegistrationPage';

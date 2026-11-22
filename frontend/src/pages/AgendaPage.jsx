@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useCallback, useEffect, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router';
 import BloqueiosCard from '../components/agenda/BloqueiosCard';

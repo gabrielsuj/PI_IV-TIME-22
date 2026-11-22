@@ -1,6 +1,9 @@
 /*
 Autoria: Vinicius Valim de Vechi Cardoso
 RA: 25000387
+
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
 */
 
 import { render, screen, within } from '@testing-library/react';

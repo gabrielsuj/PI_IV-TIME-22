@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Confere a coerência da carga de demonstração (database/seed) além dos validadores:
 // referências, jornada, bloqueios, sobreposições, histórico e logins.
 //

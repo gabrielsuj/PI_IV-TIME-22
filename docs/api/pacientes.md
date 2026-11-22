@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # API de pacientes
 
 Contrato de `PacienteHandler`, `PacienteService` e `PacienteValidator`. Todas as chamadas exigem `Authorization: Bearer <token>` obtido no [login](autenticacao.md).

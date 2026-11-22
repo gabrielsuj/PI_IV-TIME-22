@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Modelagem: consultas e proteção das reservas
 
 > Issue #26 · Relacionada a #21, #25, #27, #28, #29 e #55 · Sprint 3

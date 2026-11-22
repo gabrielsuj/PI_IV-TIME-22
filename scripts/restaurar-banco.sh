@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
 # Restaura um backup gerado por scripts/backup-banco.sh (#45).
 # Valida o backup em um banco temporário antes de substituir o banco de destino.
 #

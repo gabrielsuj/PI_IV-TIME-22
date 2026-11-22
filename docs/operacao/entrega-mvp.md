@@ -1,3 +1,8 @@
+<!--
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+-->
+
 # Entrega do ConsultaFácil
 
 Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4). A situação de cada funcionalidade está no [README](../../README.md#situação-atual-20112026).

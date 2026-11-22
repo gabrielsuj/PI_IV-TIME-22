@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 const ana = ObjectId("100000000000000000000001");
 
 function confere(nome, obtido, esperado) {

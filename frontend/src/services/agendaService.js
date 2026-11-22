@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { api, ApiError } from './api';
 
 /** Agenda semanal do médico, ou null quando ainda não foi configurada. */

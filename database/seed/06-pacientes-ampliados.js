@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Carga ampliada de pacientes fictícios (147 novos, além dos 3 de 03-pacientes.js).
 //
 // Gerados por uma sequência pseudoaleatória com semente fixa: toda carga produz

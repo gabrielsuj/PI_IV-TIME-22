@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Logins da equipe e de pacientes da carga ampliada. Todos com a senha: Demo@123
 // Executado depois de 03 e 04 (médicos e pacientes já existem).
 //

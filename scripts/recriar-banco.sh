@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
 # Recria um banco do ConsultaFácil do zero: apaga, executa database/init/*.js
 # e, exceto no banco de testes, carrega database/seed/*.js.
 #

@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // A secretaria cancela uma consulta futura e os dois pacientes da fila disputam a vaga.
 const interessados = db.pacientes.find({
   email: { $in: ["carla.souza@consultafacil.demo", "diego.santos@consultafacil.demo"] }

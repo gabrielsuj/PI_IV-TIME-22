@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useEffect, useRef, useState } from 'react';
 import { buscarAgenda, conflitoComConsultas, salvarAgenda } from '../../services/agendaService';
 import { DIAS_SEMANA, horaParaMinutos, minutosParaHora } from '../../utils/horario';

@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Carga ampliada: especialidades, corpo clínico, agendas semanais e bloqueios.
 // Complementa 01-agenda.js (Clínica Geral, Cardiologia, Ana e Bruno), sem alterá-lo.
 //

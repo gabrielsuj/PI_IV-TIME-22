@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useEffect, useId, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { NOME_PERFIL } from '../data/menu';

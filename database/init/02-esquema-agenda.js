@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 // Validadores e índices de especialidades, médicos, agendas e bloqueios
 function aplicarValidador(nome, validator) {
   if (db.getCollectionNames().includes(nome)) {

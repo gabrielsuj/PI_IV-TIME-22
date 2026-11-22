@@ -1,3 +1,8 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import Alert from '../components/ui/Alert';
