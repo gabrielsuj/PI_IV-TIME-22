@@ -14,7 +14,10 @@ public class Parceiro {
     private Comunicado proximoComunicado=null;
 
     private final Semaphore mutEx = new Semaphore(1,true);
-    private final Object consumo = new Object();
+    private final Object estado = new Object();
+    private boolean encerrado;
+    private boolean operacaoEmAndamento;
+    private Exception falha;
 
     public Parceiro(Socket conexao, ObjectInputStream  receptor, ObjectOutputStream transmissor) throws Exception {
         if (conexao==null) throw new Exception ("Conexao ausente");
@@ -56,7 +59,6 @@ public class Parceiro {
             throw new Exception ("Erro de recepcao", erro);
         } finally {
             this.mutEx.release();
-            synchronized (consumo) { consumo.notifyAll(); }
         }
     }
 
@@ -66,28 +68,57 @@ public class Parceiro {
         return proximoComunicado;
     }
 
-    public void aguardeConsumo(Comunicado observado) throws InterruptedException {
-        synchronized (consumo) {
-            for (;;) {
-                mutEx.acquireUninterruptibly();
-                try {
-                    if (conexao.isClosed() || proximoComunicado != observado) return;
-                } finally {
-                    mutEx.release();
-                }
-                consumo.wait();
-            }
+    public void iniciarOperacao() throws Exception {
+        synchronized (estado) {
+            if (encerrado) throw new IOException("Conexao encerrada", falha);
+            operacaoEmAndamento = true;
+        }
+    }
+
+    public void concluirOperacao() throws Exception {
+        synchronized (estado) {
+            if (encerrado) throw new IOException("Conexao encerrada", falha);
+            operacaoEmAndamento = false;
+        }
+    }
+
+    public Exception indisponivel(Exception erro) {
+        Exception causa;
+        synchronized (estado) {
+            if (!encerrado) falha = erro;
+            encerrado = true;
+            operacaoEmAndamento = false;
+            causa = falha == null ? erro : falha;
+        }
+        try { adeus(); } catch (Exception ignored) {}
+        return causa;
+    }
+
+    public void encerrar() throws Exception {
+        boolean avisar;
+        synchronized (estado) {
+            avisar = !encerrado && !operacaoEmAndamento;
+            encerrado = true;
+            operacaoEmAndamento = false;
+        }
+        try {
+            // Com I/O em andamento, fecha direto para não disputar o monitor de escrita.
+            if (avisar) receba(new PedidoParaSair());
+        } finally {
+            adeus();
         }
     }
 
     public void adeus() throws Exception {
+        synchronized (estado) {
+            encerrado = true;
+            operacaoEmAndamento = false;
+        }
         try {
             // Fechar o socket também desbloqueia uma leitura em andamento nos streams.
             this.conexao    .close();
         } catch(Exception erro) {
             throw new Exception ("Erro de desconexao", erro);
-        } finally {
-            synchronized (consumo) { consumo.notifyAll(); }
         }
     }
 }

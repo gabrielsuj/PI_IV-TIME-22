@@ -15,7 +15,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 
@@ -77,43 +76,22 @@ public class ParceiroTest {
     }
 
     @Test(timeout = 10000)
-    public void observadorEsperaSemLoopAtivoEAcordaAposConsumo() throws Exception {
-        conferirEspera(true);
-    }
-
-    @Test(timeout = 10000)
-    public void fechamentoAcordaObservadorQueEsperaConsumo() throws Exception {
-        conferirEspera(false);
-    }
-
-    private void conferirEspera(boolean consumir) throws Exception {
+    public void espieMantemCacheEEnvieConsomeUmaVez() throws Exception {
         AtomicInteger leituras = new AtomicInteger();
-        Comunicado mensagem = new Comunicado();
         Parceiro parceiro = parceiro(new ObjectInputStream() {
-            @Override protected Object readObjectOverride() { leituras.incrementAndGet(); return mensagem; }
+            @Override protected Object readObjectOverride() { leituras.incrementAndGet(); return new Comunicado(); }
         });
-        ExecutorService executor = executor();
-        CountDownLatch iniciou = new CountDownLatch(1);
-        AtomicReference<Thread> observador = new AtomicReference<>();
         try {
+            Comunicado mensagem = parceiro.espie();
             assertSame(mensagem, parceiro.espie());
-            assertSame(mensagem, parceiro.espie());
-            Future<Void> espera = executor.submit(() -> {
-                observador.set(Thread.currentThread());
-                iniciou.countDown();
-                parceiro.aguardeConsumo(mensagem);
-                return null;
-            });
-            assertTrue(iniciou.await(3, TimeUnit.SECONDS));
-            assertThrows(TimeoutException.class, () -> espera.get(100, TimeUnit.MILLISECONDS));
-            assertEquals(Thread.State.WAITING, observador.get().getState());
-            if (consumir) assertSame(mensagem, parceiro.envie());
-            else parceiro.adeus();
-            espera.get(3, TimeUnit.SECONDS);
+            assertSame(mensagem, parceiro.envie());
             assertEquals(1, leituras.get());
+            Comunicado seguinte = parceiro.espie();
+            assertNotSame(mensagem, seguinte);
+            assertSame(seguinte, parceiro.envie());
+            assertEquals(2, leituras.get());
         } finally {
             parceiro.adeus();
-            executor.shutdownNow();
         }
     }
 
