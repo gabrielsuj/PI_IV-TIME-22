@@ -190,3 +190,117 @@ it('recupera o cadastro de especialidades dentro do formulário da fila e manté
     especialidadeId: idEspecialidade, turnoPreferido: 'TARDE', medicoId: null,
   });
 });
+
+// ---- #58: motivo da expiração e volta à busca de vagas ----
+
+const MEDICO_ID = 'a'.repeat(24);
+const ESPECIALIDADE_ID = 'b'.repeat(24);
+const COM_FILTROS = { medicoId: MEDICO_ID, especialidadeId: ESPECIALIDADE_ID };
+
+it('mostra na lista por que cada aviso expirou e a saída certa para cada caso', async () => {
+  abrirAvisos(vi.fn(async () => json([
+    { ...AVISO, ...COM_FILTROS, id: 'ocupado', status: 'EXPIRADO', motivo: 'VAGA_OCUPADA', medicoNome: 'Dra. Ocupada' },
+    { ...AVISO, ...COM_FILTROS, id: 'prazo', status: 'EXPIRADO', motivo: 'PRAZO_ENCERRADO', medicoNome: 'Dr. Prazo' },
+    { ...AVISO, ...COM_FILTROS, id: 'agenda', status: 'EXPIRADO', motivo: 'OPORTUNIDADE_DESATUALIZADA', medicoNome: 'Dr. Agenda' },
+  ])));
+
+  const linha = (nome) => screen.getByRole('cell', { name: nome }).closest('tr');
+  await screen.findByText('Dra. Ocupada');
+
+  expect(within(linha('Dra. Ocupada')).getByText('Vaga ocupada')).toBeInTheDocument();
+  expect(within(linha('Dra. Ocupada')).getByRole('link', { name: 'Buscar outra vaga' })).toHaveAttribute('href', '/nova-consulta');
+
+  expect(within(linha('Dr. Prazo')).getByText('Prazo encerrado')).toBeInTheDocument();
+  expect(within(linha('Dr. Prazo')).getByRole('link', { name: 'Ver fila de espera' })).toHaveAttribute('href', '/fila-espera');
+  expect(within(linha('Dr. Prazo')).queryByRole('link', { name: 'Buscar outra vaga' })).not.toBeInTheDocument();
+
+  expect(within(linha('Dr. Agenda')).getByText('Oferta desatualizada')).toBeInTheDocument();
+  expect(within(linha('Dr. Agenda')).getByRole('link', { name: 'Buscar outra vaga' })).toBeInTheDocument();
+});
+
+it('não mostra motivo para aviso disponível ou agendado', async () => {
+  abrirAvisos(vi.fn(async () => json([
+    { ...AVISO, id: 'livre', motivo: null },
+    { ...AVISO, id: 'feito', status: 'AGENDADO', consultaAgendadaId: 'consulta-9', medicoNome: 'Dr. Feito' },
+  ])));
+  await screen.findByText('Dr. Feito');
+
+  for (const rotulo of ['Vaga ocupada', 'Prazo encerrado', 'Oferta desatualizada', 'Indisponível']) {
+    expect(screen.queryByText(rotulo)).not.toBeInTheDocument();
+  }
+});
+
+it('explica a vaga ocupada depois do 409 e leva à busca filtrada pelo aviso', async () => {
+  let ocupada = false;
+  abrirAvisos(vi.fn(async (url, init) => {
+    const { pathname } = new URL(url);
+    if (pathname === '/especialidades') return json([{ id: ESPECIALIDADE_ID, nome: 'Cardiologia', ativa: true }]);
+    if (pathname === '/medicos') {
+      return json([{ id: MEDICO_ID, nome: 'Dra. Paula Lima', crmNumero: '1', crmUf: 'SP', especialidadeIds: [ESPECIALIDADE_ID], ativo: true }]);
+    }
+    if (init.method === 'POST') {
+      ocupada = true;
+      return json({ erro: 'A vaga deste aviso expirou ou já foi ocupada.' }, 409);
+    }
+    return json([{ ...AVISO, ...COM_FILTROS, ...(ocupada ? { status: 'EXPIRADO', motivo: 'VAGA_OCUPADA' } : {}) }]);
+  }));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Agendar vaga' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar agendamento' }));
+
+  const alerta = await screen.findByText(/Outro paciente confirmou este horário antes de você/);
+  expect(alerta).toHaveTextContent(/continua na fila/);
+  expect(await screen.findByText('Vaga ocupada')).toBeInTheDocument();
+
+  const buscar = screen.getAllByRole('link', { name: 'Buscar outra vaga' })[0];
+  await user.click(buscar);
+
+  expect(await screen.findByRole('heading', { name: 'Nova consulta' })).toBeInTheDocument();
+  expect(screen.getByText(/Buscando outra vaga com o médico e a especialidade do aviso/)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('combobox', { name: /Especialidade/ })).toHaveValue(ESPECIALIDADE_ID));
+  await waitFor(() => expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue(MEDICO_ID));
+});
+
+it('mostra a mensagem do servidor quando o aviso recarregado não traz motivo', async () => {
+  let recusado = false;
+  abrirAvisos(vi.fn(async (_url, init) => {
+    if (init.method === 'POST') {
+      recusado = true;
+      return json({ erro: 'Aviso de vaga não encontrado' }, 404);
+    }
+    return recusado ? json([]) : json([AVISO]);
+  }));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Agendar vaga' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar agendamento' }));
+
+  expect(await screen.findByText('Aviso de vaga não encontrado')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Buscar outra vaga' })).toHaveAttribute('href', '/nova-consulta');
+});
+
+it('explica no modal a oferta desatualizada pela agenda', async () => {
+  abrirAvisos(vi.fn(async () => json([{ ...AVISO, ...COM_FILTROS, status: 'EXPIRADO', motivo: 'OPORTUNIDADE_DESATUALIZADA' }])),
+    { pathname: '/avisos-vaga', state: { avisoId: AVISO.id } });
+
+  const modal = await screen.findByRole('dialog', { name: 'Confirmar agendamento' });
+  expect(await within(modal).findByText(/A agenda do médico mudou/)).toBeInTheDocument();
+  expect(within(modal).getByRole('link', { name: 'Buscar outra vaga' })).toBeInTheDocument();
+  expect(within(modal).getByRole('button', { name: 'Confirmar agendamento' })).toBeDisabled();
+});
+
+it('no prazo encerrado o modal leva de volta à fila, e não à busca', async () => {
+  abrirAvisos(vi.fn(async () => json([{ ...AVISO, status: 'EXPIRADO', motivo: 'PRAZO_ENCERRADO' }])),
+    { pathname: '/avisos-vaga', state: { avisoId: AVISO.id } });
+
+  const modal = await screen.findByRole('dialog', { name: 'Confirmar agendamento' });
+  expect(await within(modal).findByText(/O prazo deste aviso terminou/)).toBeInTheDocument();
+  expect(within(modal).getByRole('link', { name: 'Ver fila de espera' })).toHaveAttribute('href', '/fila-espera');
+  expect(within(modal).queryByRole('link', { name: 'Buscar outra vaga' })).not.toBeInTheDocument();
+});
+
+it('sem avisos, orienta o paciente a entrar na fila de espera', async () => {
+  abrirAvisos(vi.fn(async () => json([])));
+
+  expect(await screen.findByText(/Você ainda não recebeu avisos de vaga/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'fila de espera' })).toHaveAttribute('href', '/fila-espera');
+});
