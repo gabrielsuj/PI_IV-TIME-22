@@ -3,6 +3,7 @@ package br.edu.puccampinas.consultafacil.service;
 import br.edu.puccampinas.consultafacil.api.ApiException;
 import br.edu.puccampinas.consultafacil.api.dto.AgendamentoRequest;
 import br.edu.puccampinas.consultafacil.api.dto.AvisoVagaResponse;
+import br.edu.puccampinas.consultafacil.api.dto.AvisoVagaResponse.Motivo;
 import br.edu.puccampinas.consultafacil.api.dto.AvisoVagaResponse.Status;
 import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
 import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
@@ -91,8 +92,26 @@ public final class AvisoVagaService {
             consultaAgendada = consultaQueAtendeu(interesse, origem);
             if (consultaAgendada != null) status = Status.AGENDADO;
         }
+        Motivo motivo = status == Status.EXPIRADO ? motivoDaExpiracao(origem, validade) : null;
         return new AvisoVagaResponse(id.toHexString(), dados.getString("medicoNome"), inicio.toString(),
-                fim, validade.toString(), status, consultaAgendada == null ? null : consultaAgendada.toHexString());
+                fim, validade.toString(), status, consultaAgendada == null ? null : consultaAgendada.toHexString(),
+                motivo, hexDe(origem, "medicoId"), hexDe(origem, "especialidadeId"));
+    }
+
+    /**
+     * Explica a expiração para a tela (#58). A ordem importa: se outra consulta já ocupa o horário,
+     * esse é o motivo mais útil para o paciente, mesmo que o prazo também tenha passado.
+     */
+    private Motivo motivoDaExpiracao(Document origem, Instant validade) {
+        if (origem != null && consultas.ativaNaVaga(origem.getObjectId("medicoId"), origem.getDate("inicio")).isPresent())
+            return Motivo.VAGA_OCUPADA;
+        if (!validade.isAfter(relogio.instant())) return Motivo.PRAZO_ENCERRADO;
+        return Motivo.OPORTUNIDADE_DESATUALIZADA;
+    }
+
+    private static String hexDe(Document origem, String campo) {
+        ObjectId valor = origem == null ? null : origem.getObjectId(campo);
+        return valor == null ? null : valor.toHexString();
     }
 
     private static boolean sinalizacaoAtual(Document interesse, ObjectId id) {
