@@ -72,6 +72,35 @@ Em 20/11/2026, o aceite rodou no navegador e foi repetido após as três correç
 
 A repetição local do aceite da #38 passou. A revisão final ainda precisa reunir as alterações de entrega e registrar a validação no commit escolhido.
 
+### Segunda rodada do fluxo completo (22/11/2026)
+
+Executada sobre a `develop` em `ee03263` (com #58 e #50), com os quatro processos rodando juntos na mesma máquina: MongoDB (27017), servidor TCP de CPF (3001), API (3000, banco `consultafacil_demo` recriado) e front-end (5173). O fluxo foi percorrido no navegador com três perfis e conferido também pela API.
+
+| Etapa | Perfil | Resultado |
+|---|---|---|
+| Cadastro de paciente | Secretaria | CPF com dígito errado recusado no formulário; com o CPF correto, o cadastro passou pelo servidor TCP e apareceu na busca da nova consulta. |
+| Agendamento | Secretaria | Clínica Geral com Ana Martins em 25/11, 08h30. A mesma vaga pedida para outro paciente retornou `409`. |
+| Entrada na fila | Paciente (Diego) | Estado vazio orientou a inscrição; a inscrição ficou **Aguardando**. |
+| Cancelamento | Médica (Ana) | Motivo registrado; o histórico mostrou **Fila de espera sinalizada** com dois interessados. |
+| Aviso de vaga | Paciente (Diego) | Aviso **Disponível**; o agendamento pelo aviso passou e o aviso ficou **Agendado**. |
+| Vaga perdida (#58) | Paciente (Carla) | Aviso **Expirado · Vaga ocupada**; **Buscar outra vaga** abriu a nova consulta já filtrada e a Carla agendou 30/11, 08h. |
+| Central de notificações | Pacientes e médica | Confirmações e lembretes entregues; a médica recebeu o cancelamento feito pela paciente. |
+| Painel | Médica | Próximas consultas incluíram a vaga preenchida pela fila e deixaram de mostrar a consulta cancelada. Sem erros no console. |
+
+**Falhas de integração encontradas e corrigidas nesta rodada:**
+
+1. **API e servidor de CPF na mesma porta.** O `.env.example` e os padrões do código usavam 3000 para os dois; com um `.env` sem `CPF_SERVER_PORT`, o cadastro de pacientes não alcançava o validador. O servidor de CPF, o cliente TCP, o padrão da API, o `.env.example`, os testes e o CI passaram a usar **3001**.
+2. **Confirmação do agendamento.** A tela mostrava o ID interno da consulta e o botão **Voltar à fila** mesmo fora da fila. Agora mostra data, horário, médico e especialidade, oferece **Ver consulta** e só mostra a volta à fila quando o agendamento veio dela.
+3. **Avisos de consulta cancelada na central.** Depois do cancelamento, o lembrete ("Confirme sua presença") e a confirmação de agendamento continuavam sem indicação. A central passou a devolver `consultaCancelada` e a tela mostra o selo **Consulta cancelada**.
+4. **Servidor de CPF que não inicia (`UnsupportedClassVersionError`).** A extensão Java do VS Code recompila `server/target/classes` com um JDK mais novo. Registrado em [configuracao.md](configuracao.md#6-problemas-comuns), com a solução `mvnw clean install`.
+
+**Observações sem correção (decisão do time):**
+
+- O período padrão dos indicadores do painel é só o dia atual. Num domingo, ou no começo do dia, os cartões abrem com "Sem base para cálculo". Para a apresentação, ajustar o período nos filtros (ex.: últimos 7 dias).
+- O resumo do agendamento mostra o CPF sem máscara (`26148307553`), enquanto o cadastro aceita e exibe com máscara.
+
+Uma gravação do fluxo (cadastro → agendamento → fila) foi gerada para a apresentação.
+
 ## Validação local da integração (#45)
 
 Em 20/11/2026, a validação local rodou sobre a `develop` em `89f8fb0ecf85c8071e4b0c21b681590bd7463f21`, com as correções locais da #38. O commit-base já inclui o painel do PR #117 e a resolução do PR #115. A revisão `866c2fc` registra a execução anterior à integração do painel.

@@ -95,7 +95,7 @@ jobs:
           # Aguarda o servidor ficar disponivel.
           pronto=false
           for tentativa in {1..30}; do
-            if (echo > /dev/tcp/127.0.0.1/3000) 2>/dev/null; then
+            if (echo > /dev/tcp/127.0.0.1/3001) 2>/dev/null; then
               pronto=true
               break
             fi

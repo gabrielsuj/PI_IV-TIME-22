@@ -1,7 +1,9 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 /**
  * UX da fila de espera (#58): vaga perdida, saída da fila e estados vazios.
- *
- * @author Murilo Moraes (criador)
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

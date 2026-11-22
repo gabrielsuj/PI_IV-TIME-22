@@ -156,7 +156,7 @@ cp .env.example .env
 
 O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Execute os comandos de cada módulo a partir das respectivas pastas, como abaixo: o backend procura o `.env` no diretório pai. Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT` e reinicie os processos depois de alterar o arquivo.
 
-O `.env.example` usa a porta 3000 para a API e para o validador de CPF. Para rodar os dois na mesma máquina, ajuste `CPF_SERVER_PORT=3001` no `.env` e mantenha `SERVER_PORT=3000` e `VITE_API_BASE_URL=http://localhost:3000`. Sem `SERVER_PORT` no ambiente ou no `.env`, a API usa a porta 8080. Somente as variáveis prefixadas com `VITE_` são incorporadas ao frontend no build.
+A API usa a porta 3000 (`SERVER_PORT`) e o servidor de CPF a 3001 (`CPF_SERVER_PORT`, também o padrão do próprio servidor). Se o seu `.env` foi criado antes dessa mudança e não tem `CPF_SERVER_PORT`, acrescente `CPF_SERVER_PORT=3001`. Sem `SERVER_PORT` no ambiente ou no `.env`, a API usa a porta 8080. Somente as variáveis prefixadas com `VITE_` são incorporadas ao frontend no build.
 
 ### 3. Subir o banco de dados (MongoDB)
 
@@ -254,7 +254,7 @@ Na raiz do repositório, instale o módulo Java de validação de CPF e deixe se
 
 ```bash
 (cd server && mvn install)
-java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor 3001
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
 ```
 
 Em outro terminal, inicie a API:
@@ -280,7 +280,7 @@ A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /h
 
 ### 6. Executar os testes
 
-Com o MongoDB no ar e o [módulo de CPF instalado e rodando na porta 3000](docs/testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf):
+Com o MongoDB no ar e o [módulo de CPF instalado e rodando na porta 3001](docs/testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf):
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem dados
@@ -310,7 +310,7 @@ Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bas
 | `MONGODB_DATABASE` | Banco usado pela API (ver "Bancos por ambiente") | `consultafacil` |
 | `SERVER_PORT` | Porta da API | `3000` |
 | `CPF_SERVER_HOST` | Endereço do servidor TCP de validação de CPF | `localhost` |
-| `CPF_SERVER_PORT` | Porta do servidor TCP. Use 3001 para executar a aplicação com a API na porta 3000. | `3001` |
+| `CPF_SERVER_PORT` | Porta do servidor TCP de CPF (padrão 3001, diferente da API) | `3001` |
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
 | `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
 | `NOTIFICACOES_ANTECEDENCIA_HORAS` | Quantas horas antes da consulta o lembrete é enviado (#34) | `24` |

@@ -30,7 +30,8 @@ A ordenação usa a entrega mais recente primeiro (`enviadaEm` decrescente) e o 
     "dataHora": "2026-11-24T13:00:00Z",
     "lida": false,
     "presencaConfirmada": false,
-    "podeConfirmar": true
+    "podeConfirmar": true,
+    "consultaCancelada": false
   }
 ]
 ```
@@ -39,6 +40,7 @@ A ordenação usa a entrega mais recente primeiro (`enviadaEm` decrescente) e o 
 - `lida` indica que a leitura foi registrada. A requisição de listagem apenas consulta a central.
 - `presencaConfirmada` indica que o lembrete já registrou confirmação ou que a consulta correspondente já está `CONFIRMADA` e ainda corresponde ao paciente e ao horário registrados no lembrete.
 - `podeConfirmar` indica que o lembrete ainda permite a ação. A consulta deve pertencer ao paciente, continuar `AGENDADA` e conservar o mesmo início, que deve estar no futuro.
+- `consultaCancelada` (#38) indica que a consulta citada foi cancelada depois que o aviso foi entregue (mesma consulta e mesmo início). O lembrete e a confirmação de agendamento continuam na central como histórico, mas a tela mostra o selo **Consulta cancelada** e não oferece confirmar presença. O próprio aviso `CANCELAMENTO_CONSULTA` vem com `false`.
 
 ## 3. POST /notificacoes/lida e POST /notificacoes/confirmar
 

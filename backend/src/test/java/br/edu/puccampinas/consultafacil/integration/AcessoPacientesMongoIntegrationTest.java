@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.integration;
 
 import br.edu.puccampinas.consultafacil.api.Rotas;
@@ -5,6 +9,7 @@ import br.edu.puccampinas.consultafacil.api.handler.AuthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.HealthHandler;
 import br.edu.puccampinas.consultafacil.api.handler.PacienteHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
+import br.edu.puccampinas.consultafacil.client.Cliente;
 import br.edu.puccampinas.consultafacil.config.MongoConnection;
 import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
 import br.edu.puccampinas.consultafacil.repository.PacienteRepository;
@@ -72,8 +77,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Banco {@code consultafacil_test}. Usuários com IDs de prefixo {@code e5…} e pacientes com
  * e-mail em {@code @acesso.consultafacil.test}; o teste só apaga esses registros.
- *
- * @author Murilo Moraes (criador)
  */
 class AcessoPacientesMongoIntegrationTest {
     private static final Instant AGORA = Instant.parse("2026-11-20T12:00:00Z");
@@ -345,10 +348,10 @@ class AcessoPacientesMongoIntegrationTest {
 
         /**
          * Os dígitos verificadores são conferidos pelo servidor TCP de CPF (módulo server/), como no
-         * App.java. Requer o servidor na porta 3000, iniciado pelo CI antes dos testes do backend.
+         * App.java. Requer o servidor na porta padrão (3001), iniciado pelo CI antes dos testes do backend.
          */
         @Test void digitoVerificadorErradoERecusadoPeloServidorDeCpf() throws Exception {
-            validadorCpf.set(new ValidadorCpfTcp("localhost", 3000));
+            validadorCpf.set(new ValidadorCpfTcp("localhost", Cliente.PORTA_PADRAO));
             String sofia = token("sofia");
             String errado = CPF_ANA.substring(0, 10) + ((CPF_ANA.charAt(10) - '0' + 1) % 10);
 

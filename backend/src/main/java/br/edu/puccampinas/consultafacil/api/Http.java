@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 package br.edu.puccampinas.consultafacil.api;
 
 import br.edu.puccampinas.consultafacil.api.dto.ErrorResponse;

@@ -13,8 +13,12 @@ import java.util.Date;
 import java.util.List;
 
 public final class CentralNotificacoesService {
+    /**
+     * {@code consultaCancelada}: a consulta citada foi cancelada depois deste aviso (#38). Evita que um
+     * lembrete ou uma confirmação de agendamento já entregues pareçam válidos na central.
+     */
     public record Item(String id, String titulo, String mensagem, String medicoNome, String dataHora,
-                       boolean lida, boolean presencaConfirmada, boolean podeConfirmar) {}
+                       boolean lida, boolean presencaConfirmada, boolean podeConfirmar, boolean consultaCancelada) {}
 
     private final NotificacaoRepository notificacoes;
     private final ConsultaRepository consultas;
@@ -45,20 +49,24 @@ public final class CentralNotificacoesService {
     public List<Item> listar(UsuarioLogado ator) {
         return notificacoes.entregues(ator.perfil(), destinatario(ator)).stream().map(n -> {
             Document dados = n.get("dadosConsulta", Document.class);
+            String tipo = n.getString("tipo");
             boolean confirmada = n.getDate("confirmadaEm") != null;
             boolean podeConfirmar = false;
-            if (!confirmada && "LEMBRETE_CONSULTA".equals(n.getString("tipo"))) {
-                var consulta = consultas.buscar(n.getObjectId("consultaId")).orElse(null);
-                if (consulta != null && consulta.getObjectId("pacienteId").equals(n.getObjectId("destinatarioId"))
-                        && consulta.getDate("inicio").equals(dados.getDate("dataHora"))) {
-                    confirmada = "CONFIRMADA".equals(consulta.getString("status"));
-                    podeConfirmar = "AGENDADA".equals(consulta.getString("status"))
-                            && consulta.getDate("inicio").toInstant().isAfter(relogio.instant());
-                }
+            // A consulta só conta se ainda for o mesmo horário do aviso (uma remarcação gera outro aviso).
+            ObjectId consultaId = n.getObjectId("consultaId");
+            Document consulta = consultaId == null ? null : consultas.buscar(consultaId)
+                    .filter(c -> c.getDate("inicio").equals(dados.getDate("dataHora"))).orElse(null);
+            boolean consultaCancelada = consulta != null && !"CANCELAMENTO_CONSULTA".equals(tipo)
+                    && "CANCELADA".equals(consulta.getString("status"));
+            if (!confirmada && "LEMBRETE_CONSULTA".equals(tipo) && consulta != null
+                    && consulta.getObjectId("pacienteId").equals(n.getObjectId("destinatarioId"))) {
+                confirmada = "CONFIRMADA".equals(consulta.getString("status"));
+                podeConfirmar = "AGENDADA".equals(consulta.getString("status"))
+                        && consulta.getDate("inicio").toInstant().isAfter(relogio.instant());
             }
             return new Item(n.getObjectId("_id").toHexString(), n.getString("titulo"), n.getString("mensagem"),
                     dados.getString("medicoNome"), dados.getDate("dataHora").toInstant().toString(),
-                    n.getDate("lidaEm") != null, confirmada, podeConfirmar);
+                    n.getDate("lidaEm") != null, confirmada, podeConfirmar, consultaCancelada);
         }).toList();
     }
 

@@ -1,6 +1,8 @@
 
 package br.edu.puccampinas.consultafacil.integration;
 
+import br.edu.puccampinas.consultafacil.client.Cliente;
+
 import br.edu.puccampinas.consultafacil.service.ValidadorCpfTcp;
 import br.edu.puccampinas.consultafacil.domain.exception.ServidorCpfIndisponivelException;
 import br.edu.puccampinas.consultafacil.domain.exception.ValidacaoException;
@@ -14,7 +16,7 @@ import java.util.concurrent.*;
 class ValidadorCpfTcpTest {
 
     private final ValidadorCpfTcp validador =
-        new ValidadorCpfTcp("localhost", 3000);
+        new ValidadorCpfTcp("localhost", Cliente.PORTA_PADRAO);
 
     @Test
     void deveAceitarCpfValido() {

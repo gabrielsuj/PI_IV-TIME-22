@@ -133,11 +133,11 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 
 ### Preparar o servidor TCP de CPF
 
-Na raiz do repositório, instale o módulo `server/` no repositório Maven local e deixe o processo TCP rodando em outro terminal. `ValidadorCpfTcpTest` usa a porta 3000, como a CI. Se a API estiver usando essa porta, pause-a antes dos testes.
+Na raiz do repositório, instale o módulo `server/` no repositório Maven local e deixe o processo TCP rodando em outro terminal. `ValidadorCpfTcpTest` e `AcessoPacientesMongoIntegrationTest` usam a porta padrão do servidor (3001), como a CI. A API pode continuar rodando na 3000 durante os testes.
 
 ```bash
 (cd server && mvn clean install)
-java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor 3000
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
 ```
 
 ### Rodar as suítes
