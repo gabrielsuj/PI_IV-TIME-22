@@ -224,6 +224,130 @@ class AcessoPacientesMongoIntegrationTest {
         }
     }
 
+    // =================================================================== CRUD de pacientes
+
+    @Nested class CadastroDePacientesNoMongo {
+        @Test void secretariaCadastraEOMongoGuardaOsDadosNormalizados() throws Exception {
+            var r = enviar("POST", "/pacientes", token("sofia"),
+                    Map.of("nome", "  Ana Lima ", "cpf", mascarado(CPF_ANA), "email", "ANA" + DOMINIO.toUpperCase()));
+            assertEquals(201, r.statusCode(), r.body());
+            JsonNode criado = json.readTree(r.body());
+            String id = criado.get("id").asText();
+            assertEquals("/pacientes/" + id, r.headers().firstValue("Location").orElseThrow());
+
+            Document gravado = db.getCollection("pacientes").find(Filters.eq("_id", new ObjectId(id))).first();
+            assertNotNull(gravado, "o paciente está no MongoDB, não só na resposta");
+            assertEquals("Ana Lima", gravado.getString("nome"));
+            assertEquals(CPF_ANA, gravado.getString("cpf"), "CPF sem máscara, como o validador do banco exige");
+            assertEquals("ana" + DOMINIO, gravado.getString("email"), "e-mail em minúsculas");
+        }
+
+        @Test void listaBuscaDetalhaEEditaPeloMongo() throws Exception {
+            String sofia = token("sofia");
+            String idAna = criar(sofia, "Ana Lima", CPF_ANA, "ana");
+            criar(sofia, "Bruno Souza", CPF_BRUNO, "bruno");
+
+            JsonNode todos = json.readTree(enviar("GET", "/pacientes", sofia, null).body());
+            List<String> nomes = nomesDoTeste(todos);
+            assertEquals(List.of("Ana Lima", "Bruno Souza"), nomes, "ordenado por nome");
+
+            for (String busca : List.of("ana%20l", mascarado(CPF_ANA), CPF_ANA.substring(0, 9), "ANA%40ACESSO")) {
+                JsonNode achados = json.readTree(enviar("GET", "/pacientes?busca=" + busca, sofia, null).body());
+                assertEquals(List.of("Ana Lima"), nomesDoTeste(achados), "busca: " + busca);
+            }
+
+            var detalhe = enviar("GET", "/pacientes/" + idAna, sofia, null);
+            assertEquals(200, detalhe.statusCode());
+            assertEquals(CPF_ANA, json.readTree(detalhe.body()).get("cpf").asText());
+
+            var editado = enviar("PUT", "/pacientes/" + idAna, sofia, paciente("Ana Lima Prado", CPF_ANA, "ana.prado"));
+            assertEquals(200, editado.statusCode(), editado.body());
+            Document gravado = db.getCollection("pacientes").find(Filters.eq("_id", new ObjectId(idAna))).first();
+            assertEquals("Ana Lima Prado", gravado.getString("nome"));
+            assertEquals("ana.prado" + DOMINIO, gravado.getString("email"));
+            assertEquals(2, pacientesDoTeste(), "a edição não cria um registro novo");
+        }
+
+        @Test void buscaComCaracteresDeRegexETratadaComoTexto() throws Exception {
+            String sofia = token("sofia");
+            criar(sofia, "Ana Lima", CPF_ANA, "ana");
+            for (String busca : List.of(".%2A", "%5E", "(")) {
+                var r = enviar("GET", "/pacientes?busca=" + busca, sofia, null);
+                assertEquals(200, r.statusCode(), "busca: " + busca);
+                assertEquals(List.of(), nomesDoTeste(json.readTree(r.body())), "busca: " + busca);
+            }
+        }
+
+        @Test void cpfOuEmailRepetidoNaoGravaSegundoRegistro() throws Exception {
+            String sofia = token("sofia");
+            criar(sofia, "Ana Lima", CPF_ANA, "ana");
+
+            var mesmoCpf = enviar("POST", "/pacientes", sofia, paciente("Outra Ana", mascarado(CPF_ANA), "outra"));
+            var mesmoEmail = enviar("POST", "/pacientes", sofia, paciente("Outra Ana", CPF_BRUNO, "ANA"));
+            assertErro(mesmoCpf, "CPF já cadastrado para outro paciente.");
+            assertErro(mesmoEmail, "E-mail já cadastrado para outro paciente.");
+            assertEquals(1, pacientesDoTeste());
+        }
+
+        @Test void edicaoParaCpfDeOutroPacienteERecusada() throws Exception {
+            String sofia = token("sofia");
+            criar(sofia, "Ana Lima", CPF_ANA, "ana");
+            String idBruno = criar(sofia, "Bruno Souza", CPF_BRUNO, "bruno");
+
+            assertErro(enviar("PUT", "/pacientes/" + idBruno, sofia, paciente("Bruno Souza", CPF_ANA, "bruno")),
+                    "CPF já cadastrado para outro paciente.");
+            Document bruno = db.getCollection("pacientes").find(Filters.eq("_id", new ObjectId(idBruno))).first();
+            assertEquals(CPF_BRUNO, bruno.getString("cpf"), "o registro continua com o CPF original");
+        }
+
+        /** Formato e dígitos repetidos são barrados pelo PacienteValidator, antes do servidor de CPF. */
+        @ParameterizedTest
+        @ValueSource(strings = {"00000000000", "123", "529.982.247", "abc.def.ghi-jk"})
+        void cpfMalFormadoNaoChegaAoBanco(String cpf) throws Exception {
+            var r = enviar("POST", "/pacientes", token("sofia"), paciente("Ana Lima", cpf, "ana"));
+            assertEquals(400, r.statusCode(), r.body());
+            assertEquals(0, pacientesDoTeste());
+        }
+
+        /**
+         * Os dígitos verificadores são conferidos pelo servidor TCP de CPF (módulo server/), como no
+         * App.java. Requer o servidor na porta 3000, iniciado pelo CI antes dos testes do backend.
+         */
+        @Test void digitoVerificadorErradoERecusadoPeloServidorDeCpf() throws Exception {
+            validadorCpf.set(new ValidadorCpfTcp("localhost", 3000));
+            String sofia = token("sofia");
+            String errado = CPF_ANA.substring(0, 10) + ((CPF_ANA.charAt(10) - '0' + 1) % 10);
+
+            var recusado = enviar("POST", "/pacientes", sofia, paciente("Ana Lima", errado, "ana"));
+            assertEquals(400, recusado.statusCode(), recusado.body());
+            assertEquals("CPF inválido.", mensagemDeErro(recusado));
+            assertEquals(0, pacientesDoTeste());
+
+            assertEquals(201, enviar("POST", "/pacientes", sofia, paciente("Ana Lima", CPF_ANA, "ana")).statusCode(),
+                    "o mesmo cadastro com o CPF correto passa pelo servidor e chega ao Mongo");
+            assertEquals(1, pacientesDoTeste());
+        }
+
+        @Test void idInexistenteRetorna404() throws Exception {
+            String sofia = token("sofia");
+            String ausente = new ObjectId().toHexString();
+            assertEquals(404, enviar("GET", "/pacientes/" + ausente, sofia, null).statusCode());
+            assertEquals(404, enviar("PUT", "/pacientes/" + ausente, sofia, paciente("Ana Lima", CPF_ANA, "ana")).statusCode());
+            assertEquals(0, pacientesDoTeste(), "PUT em ID ausente não cria paciente (sem upsert)");
+        }
+
+        @Test void validadorDeCpfIndisponivelRetorna503SemGravar() throws Exception {
+            validadorCpf.set(cpf -> { throw new ServidorCpfIndisponivelException(new ConnectException("Connection refused")); });
+            var r = enviar("POST", "/pacientes", token("sofia"), paciente("Ana Lima", CPF_ANA, "ana"));
+            assertEquals(503, r.statusCode(), r.body());
+            assertEquals(0, pacientesDoTeste());
+
+            validadorCpf.set(cpf -> {});
+            assertEquals(201, enviar("POST", "/pacientes", token("sofia"), paciente("Ana Lima", CPF_ANA, "ana")).statusCode(),
+                    "quando o validador volta, o mesmo cadastro passa");
+        }
+    }
+
     // =================================================================== apoio
 
     private void limpar() {
