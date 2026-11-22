@@ -11,9 +11,10 @@ RA: 25006162
 
 | Documento | Conteúdo |
 |---|---|
+| [Apresentação (PDF)](ConsultaFacil_apresentação.pdf) | Slides do projeto: problema, perfis, tecnologias, comunicação entre os módulos e validação de CPF |
 | [Relatório consolidado (PDF)](ConsultaFacil_Relatorio_Consolidado.pdf) | Problema, ideação e classificação das ideias, SWOT, requisitos, escopo do MVP, cronograma por sprints (5W2H), matriz de responsabilidades e cenários de aceite (Quadro 4) |
 
-As pastas `ideacao/`, `requisitos/`, `cronograma/`, `prototipo/`, `reunioes/`, `relatorios/` e `adr/` estão reservadas para artefatos avulsos. Hoje esse conteúdo está concentrado no relatório consolidado.
+O relatório consolidado registra o planejamento feito na ideação (outubro de 2026). A implementação evoluiu a partir dele: o banco tem 10 coleções (inclusive `usuarios`, `bloqueios` e `notificacoes`), dois índices únicos parciais protegem as reservas e a validação de CPF é feita por um servidor Java separado, via TCP. A modelagem atual está nos documentos abaixo.
 
 ## Modelagem do banco (MongoDB)
 
@@ -63,4 +64,5 @@ Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localiza
 | Documento | Conteúdo |
 |---|---|
 | [estrategia-de-testes.md](testes/estrategia-de-testes.md) | Como os testes foram feitos, cobertura dos cenários de aceite (Quadro 4), bancos usados e comandos |
+| [Relatório de teste OO do servidor de CPF (PDF)](testes/Relatorio_Teste_OO.pdf) | Teste intraclasse e interclasse em JUnit do servidor de CPF (PI IV), com falhas, anomalias e melhorias encontradas |
 | [garantias-de-reserva.md](testes/garantias-de-reserva.md) | Como as reservas são protegidas (API + índices únicos parciais) e os testes de concorrência pela API |

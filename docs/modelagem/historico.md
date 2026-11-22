@@ -7,6 +7,7 @@
 | Data | Autor | Versão | Comentários |
 |------|-------|--------|-------------|
 | 2026-11-05 | Davi Vitoreti | v1.0.0 | Versão inicial da coleção `historico`: campos, referências, domínio de status da consulta, eventos, transições e índices. |
+| 2026-11-22 | Gabriel Martins | v1.1.0 | Inclusão de `especialidadeId` e `fimConsulta`, perfis de ator atuais (`SECRETARIA_ADMIN`) e referência de `ator.id` a `usuarios`. |
 
 ## Entidades
 
@@ -29,7 +30,9 @@ Atributos:
 | `pacienteId` | ObjectId | Sim | Referência a `pacientes._id`. Cópia do paciente da consulta, para consultas por paciente sem junção. |
 | `medicoId` | ObjectId | Sim | Referência a `medicos._id`. Médico da consulta **após** o evento (em `ALTERACAO` de médico, é o novo). |
 | `dataHoraConsulta` | Date (UTC) | Sim | Início do horário da consulta **após** o evento. Em `ALTERACAO` de data/horário, é o novo valor (o anterior fica em `alteracoes`). |
-| `ator` | Object | Sim | Quem causou o evento: `{ perfil, id }`. `perfil`: `PACIENTE`, `MEDICO`, `SECRETARIA`, `ADMINISTRADOR` ou `SISTEMA`. `id`: identificador do usuário; `null` quando `SISTEMA`. |
+| `especialidadeId` | ObjectId | Não | Referência a `especialidades._id`. Especialidade da consulta **após** o evento. Opcional para preservar documentos antigos. |
+| `fimConsulta` | Date (UTC) | Não | Fim do horário da consulta **após** o evento. Opcional para preservar documentos antigos. |
+| `ator` | Object | Sim | Quem causou o evento: `{ perfil, id }`. `perfil`: `PACIENTE`, `MEDICO`, `SECRETARIA_ADMIN` ou `SISTEMA` (o validador também aceita `SECRETARIA` e `ADMINISTRADOR`). `id`: `usuarios._id` do usuário da sessão; `null` quando `SISTEMA`. |
 | `alteracoes` | Array de Object | Condicional | Obrigatório (ao menos um item) quando `evento = ALTERACAO`; ausente nos demais. Cada item: `{ campo: String, valorAnterior, valorNovo }`, onde `campo` é o nome do atributo em `consultas` (ex.: `dataHora`, `medicoId`) e os valores são tipos BSON simples (String, número, Date, ObjectId). |
 | `motivo` | String ou null | Não | Até 255 caracteres. Usado principalmente em `CANCELAMENTO`. **Não deve conter dados clínicos.** |
 | `totalSinalizados` | Inteiro (Int32) | Condicional | Obrigatório quando `evento = SINALIZACAO_FILA`: quantos interessados da fila foram sinalizados (pode ser `0`). Quem foi sinalizado é consultável em `notificacoes` (`tipo = VAGA_LIBERADA`, mesmo `consultaId`). Evita um array sem limite de tamanho. |
@@ -42,7 +45,7 @@ Atributos:
 | `consultaId` | `consultas` | N:1 | Sim | Uma consulta tem vários eventos. |
 | `pacienteId` | `pacientes` | N:1 | Sim | Cópia do valor da consulta. |
 | `medicoId` | `medicos` | N:1 | Sim | Valor após o evento. |
-| `ator.id` | `pacientes`, `medicos` ou cadastro de usuários internos (conforme `ator.perfil`) | N:1 | Condicional | `null` quando `SISTEMA`. A coleção de usuários da secretaria/administrador não consta na lista de coleções do relatório e precisa ser definida pela equipe (módulo de Acesso). |
+| `ator.id` | `usuarios` | N:1 | Condicional | `null` quando `SISTEMA`. Aponta para o login (`usuarios._id`), não para `pacientes` ou `medicos`; a API resolve o nome exibido. |
 
 A existência dos documentos referenciados é validada na camada de serviços da API.
 

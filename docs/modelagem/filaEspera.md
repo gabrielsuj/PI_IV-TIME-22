@@ -5,6 +5,7 @@
 | Data | Autor | Versão | Comentários |
 |------|-------|--------|-------------|
 | 2026-11-06 | Davi Vitoreti | v1.0.0 | Versão inicial da coleção `filaEspera`: campos, referências, status, regras de integração com o status da consulta e índices. |
+| 2026-11-22 | Gabriel Martins | v1.1.0 | Regra de `validoAte` atualizada para o valor implementado (90 dias). |
 
 ## Entidades
 
@@ -29,7 +30,7 @@ Atributos:
 | `ultimaSinalizacao` | Object ou null | Condicional | Obrigatório quando `status = SINALIZADA`; `null` caso contrário. Estrutura na tabela abaixo. |
 | `consultaAgendadaId` | ObjectId ou null | Condicional | Referência a `consultas._id`. Obrigatório quando `status = ATENDIDA` (consulta criada pelo paciente a partir da vaga sinalizada); `null` caso contrário. |
 | `atendidaEm` | Date (UTC) ou null | Condicional | Obrigatório quando `status = ATENDIDA`. Base do indicador "vagas preenchidas pela fila". |
-| `validoAte` | Date (UTC) | Sim | Data-limite do interesse; após ela o interesse passa a `EXPIRADA`. Sugestão: `criadoEm` + 90 dias (valor a confirmar com as clínicas parceiras). |
+| `validoAte` | Date (UTC) | Sim | Data-limite do interesse; após ela o interesse passa a `EXPIRADA`. A API grava o fim do último dia de `dataFim` ou, sem `dataFim`, `criadoEm` + 90 dias (`FilaEsperaService.DIAS_VALIDADE`). |
 | `registradoPor` | Object | Sim | `{ perfil, id }`. `perfil`: `PACIENTE` (autoatendimento), `SECRETARIA` ou `ADMINISTRADOR`. `id`: identificador do usuário que registrou. |
 | `criadoEm` | Date (UTC) | Sim | Momento do registro. Define a posição na fila (FIFO). Não deve ser alterado. |
 | `atualizadoEm` | Date (UTC) | Sim | Atualizado a cada mudança de `status` ou de preferências. |

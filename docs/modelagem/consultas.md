@@ -47,6 +47,9 @@ especialidades ◄── consultas.especialidadeId
 | `criadaEm` | Date | sim | Momento em que a consulta foi registrada |
 | `atualizadaEm` | Date | não | Última alteração (status, cancelamento etc.) |
 | `motivoCancelamento` | string | não | Preenchido no cancelamento (#27) |
+| `versao` | int | não | Versão do documento, usada no controle de concorrência ao gravar o histórico. Começa em 1 nas consultas novas; opcional para documentos antigos. Ver [historico-implementacao.md](historico-implementacao.md) |
+| `eventosPendentes` | object[] | não | Eventos de histórico ainda não confirmados na coleção `historico` (no máximo 50). Ver [historico-implementacao.md](historico-implementacao.md) |
+| `sinalizacaoFila` | string | não | `PENDENTE` (o cancelamento ainda precisa sinalizar a fila) ou `LIMPAR` (sinalização feita, falta remover os comprovantes). Ver [filaEspera.md](filaEspera.md) |
 
 ```js
 {
@@ -99,6 +102,7 @@ AGENDADA ──► CONFIRMADA ──► CONCLUIDA
 | `uk_consulta_paciente_inicio` | `pacienteId`, `inicio` | único **parcial** (só status ativos) | O paciente não tem duas consultas ativas começando no mesmo instante, nem com médicos diferentes |
 | `ix_consulta_medico_periodo` | `medicoId`, `inicio`, `fim` | composto | Busca de consultas que se sobrepõem a um período (disponibilidade, conflitos, alteração de agenda) |
 | `ix_consulta_paciente` | `pacienteId`, `inicio` (desc.) | composto | Listagem das consultas do paciente, das mais recentes para as mais antigas |
+| `ix_sinalizacao_pendente` | `sinalizacaoFila`, `_id` | **parcial** (só documentos com `sinalizacaoFila`) | Retomada em lotes das sinalizações de fila pendentes após cancelamento |
 
 Filtro dos índices parciais:
 

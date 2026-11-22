@@ -8,6 +8,7 @@
 | 2026-11-13 | Gabriel Martins | v1.1.0 | Situação da implementação: `VAGA_LIBERADA` gerada pela sinalização da fila (#32). |
 | 2026-11-15 | Gabriel Martins | v1.2.0 | Avisos de vaga exibidos ao paciente, com agendamento e expiração (#57). |
 | 2026-11-20 | Murilo Moraes | v1.3.0 | Geração de confirmação, lembrete e cancelamento e agendador de envio (#34). |
+| 2026-11-22 | Gabriel Martins | v1.4.0 | `antecedenciaHoras` com o padrão implementado (24 h, configurável). |
 
 ## Entidades
 
@@ -36,7 +37,7 @@ Atributos:
 | `consultaId` | ObjectId | Sim | Referência a `consultas._id`. Em `VAGA_LIBERADA`, é a consulta `CANCELADA` que originou a vaga. |
 | `filaEsperaId` | ObjectId ou null | Condicional | Referência a `filaEspera._id`. Obrigatório quando `tipo = VAGA_LIBERADA`; `null` nos demais tipos. |
 | `statusConsulta` | String (lista literal e estática) | Sim | Status da consulta **no momento da criação** da notificação (cópia): `AGENDADA`, `CONFIRMADA`, `CANCELADA`, `CONCLUIDA` ou `FALTA` (definições em `historico.md`). Serve para decidir se o envio ainda faz sentido. |
-| `antecedenciaHoras` | Inteiro (Int32) ou null | Condicional | Obrigatório quando `tipo = LEMBRETE_CONSULTA` (ex.: `48`, `24`; valores a confirmar); `null` nos demais tipos. Deve ser gravado como `null` explicitamente. |
+| `antecedenciaHoras` | Inteiro (Int32) ou null | Condicional | Obrigatório quando `tipo = LEMBRETE_CONSULTA` (padrão `24`, configurável em `NOTIFICACOES_ANTECEDENCIA_HORAS`; mínimo `1`); `null` nos demais tipos. Deve ser gravado como `null` explicitamente. |
 | `titulo` | String | Sim | Até 120 caracteres. Ex.: "Lembrete de consulta". |
 | `mensagem` | String | Sim | Até 500 caracteres. Deve apresentar de forma objetiva data, horário e médico. **Não deve conter** CPF/documento, motivo, diagnóstico ou outro dado de saúde, principalmente no canal `EMAIL_TESTE`. |
 | `dadosConsulta` | Object | Sim | Cópia dos dados exibidos: `{ dataHora: Date (UTC), medicoNome: String }`. Mantém a mensagem correta mesmo que a consulta seja alterada depois. |
