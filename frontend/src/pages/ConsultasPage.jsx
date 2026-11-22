@@ -3,7 +3,7 @@ Autoria: Murilo Moraes
 RA: 25000073
 */
 /*
-Coautoria: Vinicius Valim de Vechi Cardoso
+Autoria: Vinicius Valim de Vechi Cardoso
 RA: 25000387
 */
 

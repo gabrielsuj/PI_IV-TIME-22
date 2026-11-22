@@ -1,5 +1,5 @@
 /*
-Autoria: Murilo Moraes (criador)
+Autoria: Murilo Moraes
 RA: 25000073
 */
 /*
