@@ -365,6 +365,9 @@ class FilaEsperaIntegrationTest {
         assertEquals("DISPONIVEL", aviso1.get("status").asText());
         assertEquals("DISPONIVEL", aviso2.get("status").asText());
         assertEquals(VAGA.toString(), aviso1.get("validoAte").asText());
+        assertTrue(semValor(aviso1, "motivo"));
+        assertEquals(MEDICO.toHexString(), aviso1.get("medicoId").asText());
+        assertEquals(ESPECIALIDADE.toHexString(), aviso1.get("especialidadeId").asText());
         assertEquals(404, enviar("POST", "/avisos-vaga", token1, Map.of("avisoId", id2)).statusCode());
 
         barreiraDeReserva = new CyclicBarrier(2);
@@ -387,6 +390,9 @@ class FilaEsperaIntegrationTest {
         assertEquals(idConsulta, vencedor.get("consultaAgendadaId").asText());
         assertEquals("EXPIRADO", perdedor.get("status").asText());
         assertTrue(semValor(perdedor, "consultaAgendadaId"));
+        // #58: a tela explica que outra pessoa ficou com o horário.
+        assertEquals("VAGA_OCUPADA", perdedor.get("motivo").asText());
+        assertTrue(semValor(vencedor, "motivo"));
         assertEquals("AGUARDANDO", json.readTree(enviar("GET", "/fila-espera", tokenPerdedor, null).body())
                 .get(0).get("status").asText());
         assertEquals("CANCELADA", db.getCollection("notificacoes").find(Filters.eq("_id",
@@ -447,6 +453,8 @@ class FilaEsperaIntegrationTest {
         JsonNode expirado = unicoAviso(token);
         assertEquals(idAviso, expirado.get("id").asText());
         assertEquals("EXPIRADO", expirado.get("status").asText());
+        // #58: a agenda mudou e o horário deixou de ser oferecido, sem outra consulta no lugar.
+        assertEquals("OPORTUNIDADE_DESATUALIZADA", expirado.get("motivo").asText());
         assertEquals("CANCELADA", notificacao.getString("status"));
         assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", idAviso)).statusCode());
         assertEquals(0, db.getCollection("consultas").countDocuments(Filters.and(
@@ -461,7 +469,9 @@ class FilaEsperaIntegrationTest {
 
         relogio.avancar(Duration.between(AGORA, VAGA));
 
-        assertEquals("EXPIRADO", unicoAviso(token).get("status").asText());
+        JsonNode vencido = unicoAviso(token);
+        assertEquals("EXPIRADO", vencido.get("status").asText());
+        assertEquals("PRAZO_ENCERRADO", vencido.get("motivo").asText());
         assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", id)).statusCode());
     }
 
