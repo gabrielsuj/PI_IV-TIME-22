@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import Alert from '../components/ui/Alert';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -8,7 +8,12 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
 import { agendarPeloAviso, listarAvisosVaga } from '../services/avisosVagaService';
+import { buscaDeOutraVaga, explicarExpiracao } from '../utils/avisoVaga';
 import { dataHoraDaConsulta, FUSO_CLINICA } from '../utils/consulta';
+
+/**
+ * @author Murilo Moraes (modificador, #58: motivo da expiração e volta à busca de vagas)
+ */
 
 const INTERVALO_ATUALIZACAO = 15_000;
 const validade = new Intl.DateTimeFormat('pt-BR', {
@@ -19,6 +24,15 @@ const STATUS = {
   EXPIRADO: { texto: 'Expirado', tom: 'neutral' },
   AGENDADO: { texto: 'Agendado', tom: 'success' },
 };
+
+/** Saída oferecida ao paciente quando o aviso não vale mais (#58). */
+function SaidaDoAviso({ aviso, size = 'sm' }) {
+  if (explicarExpiracao(aviso?.motivo).buscarOutra) {
+    const busca = buscaDeOutraVaga(aviso);
+    return <Button to={busca.to} state={busca.state} variant="outline" size={size}>Buscar outra vaga</Button>;
+  }
+  return <Button to="/fila-espera" variant="outline" size={size}>Ver fila de espera</Button>;
+}
 
 export default function AvisosVagaPage() {
   const [lista, setLista] = useState({ avisos: [], carregando: true, erro: null });
@@ -78,7 +92,8 @@ export default function AvisosVagaPage() {
       fecharConfirmacao();
     } catch (erro) {
       if (erro.status === 404 || erro.status === 409) {
-        setResultado({ erro: erro.message });
+        // Guarda o aviso para explicar o motivo depois que a lista for atualizada.
+        setResultado({ erro: erro.message, avisoId: avisoAtual.id, aviso: avisoAtual });
         fecharConfirmacao();
       } else {
         setErroConfirmacao(erro.message);
@@ -97,7 +112,12 @@ export default function AvisosVagaPage() {
     } },
     { key: 'validade', label: 'Válido até', render: (aviso) => validade.format(new Date(aviso.validoAte)) },
     { key: 'status', label: 'Status', render: (aviso) => (
-      <Badge tone={STATUS[aviso.status].tom}>{STATUS[aviso.status].texto}</Badge>
+      <div className="aviso-vaga__status">
+        <Badge tone={STATUS[aviso.status].tom}>{STATUS[aviso.status].texto}</Badge>
+        {aviso.status === 'EXPIRADO' && (
+          <span className="aviso-vaga__motivo">{explicarExpiracao(aviso.motivo).rotulo}</span>
+        )}
+      </div>
     ) },
     { key: 'acoes', label: 'Ações', align: 'right', render: (aviso) => {
       if (aviso.status === 'AGENDADO' && aviso.consultaAgendadaId) {
@@ -106,11 +126,18 @@ export default function AvisosVagaPage() {
       if (aviso.status === 'DISPONIVEL') {
         return <Button size="sm" onClick={() => setSelecionado(aviso.id)}>Agendar vaga</Button>;
       }
-      return <Button to="/nova-consulta" variant="outline" size="sm">Buscar outra vaga</Button>;
+      return <SaidaDoAviso aviso={aviso} />;
     } },
   ];
 
   const horario = avisoAtual && dataHoraDaConsulta(avisoAtual);
+  // Depois de um 409, a lista recarregada diz por que a vaga se perdeu.
+  const avisoDoErro = resultado?.avisoId
+    ? lista.avisos.find((aviso) => aviso.id === resultado.avisoId) ?? resultado.aviso
+    : null;
+  const textoDoErro = avisoDoErro?.status === 'EXPIRADO' && avisoDoErro.motivo
+    ? explicarExpiracao(avisoDoErro.motivo).texto
+    : resultado?.erro;
 
   return (
     <div className="page">
@@ -121,10 +148,19 @@ export default function AvisosVagaPage() {
           Consulta agendada com sucesso.
         </Alert>
       )}
-      {resultado?.erro && <Alert>{resultado.erro}</Alert>}
+      {resultado?.erro && (
+        <Alert action={avisoDoErro?.status === 'AGENDADO' ? undefined : <SaidaDoAviso aviso={avisoDoErro} size="md" />}>
+          {textoDoErro}
+        </Alert>
+      )}
       <Card>
         <DataTable caption="Avisos de vaga" columns={colunas} rows={lista.avisos} loading={lista.carregando}
-          error={lista.erro} onRetry={atualizar} emptyMessage="Você ainda não recebeu avisos de vaga." />
+          error={lista.erro} onRetry={atualizar} emptyMessage={(
+            <>
+              Você ainda não recebeu avisos de vaga. Entre na <Link to="/fila-espera">fila de espera</Link> para
+              ser avisado quando um horário compatível for liberado.
+            </>
+          )} />
       </Card>
       {avisoAtual && (
         <Modal title="Confirmar agendamento" description={`${avisoAtual.medicoNome} · ${horario.data}, ${horario.periodo}`}
@@ -138,8 +174,8 @@ export default function AvisosVagaPage() {
             )}
             {erroConfirmacao && (!disponibilidadeVerificada || podeConfirmar) && <Alert>{erroConfirmacao}</Alert>}
             {disponibilidadeVerificada && avisoAtual.status === 'EXPIRADO' && (
-              <Alert action={<Button to="/nova-consulta" variant="outline" size="sm">Buscar outra vaga</Button>}>
-                A vaga deste aviso não está mais disponível.
+              <Alert action={<SaidaDoAviso aviso={avisoAtual} />}>
+                {explicarExpiracao(avisoAtual.motivo).texto}
               </Alert>
             )}
             {disponibilidadeVerificada && avisoAtual.status === 'AGENDADO' && (

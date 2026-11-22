@@ -454,3 +454,7 @@ code, pre { font: 0.875rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .app-nav__link svg {
   flex-shrink: 0;
 }
+
+/* Avisos de vaga (#58): motivo da expiração embaixo do selo. */
+.aviso-vaga__status { display: flex; flex-direction: column; gap: var(--space-1); }
+.aviso-vaga__motivo { color: var(--color-text-muted); font-size: 0.75rem; line-height: 1.3333; }
