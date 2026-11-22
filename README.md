@@ -83,7 +83,7 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Painel operacional: agenda do dia, próximas consultas e indicadores por perfil | ✅ #37 (refinamento visual na #47) |
 | Aceite ponta a ponta do MVP | ✅ Aceite manual local (#38); evidência final na #45 |
 
-A revalidação local de 22/11/2026 sobre a `develop` em `fe78ca2` e as alterações de interface aprovou 881 testes do backend com MongoDB 7 e 498 testes do frontend. O lint e o build do frontend passaram, o backend e o módulo `server/` geraram seus JARs com Java 21 e o backup restaurou as 10 coleções da demonstração. Os resultados detalhados e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
+A revalidação de 22/11/2026 sobre a `develop` em `8231632` (PR #132), como no workflow de CI, aprovou 910 testes do backend com MongoDB 7 e o servidor de CPF no ar, 535 testes do frontend em 33 arquivos e 16 testes do módulo `server/`, sem falhas. O lint e o build do frontend passaram. O [relatório de teste OO do servidor de CPF](docs/testes/Relatorio_Teste_OO.pdf) documenta os testes intraclasse e interclasse do PI IV. As validações anteriores e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
 
 ---
 
@@ -96,7 +96,7 @@ A revalidação local de 22/11/2026 sobre a `develop` em `fe78ca2` e as alteraç
 | Backend | **Java 21** (sem frameworks) | API REST e regras de negócio, sobre o servidor HTTP nativo do JDK (`com.sun.net.httpserver`) |
 | Backend | Maven | Build e gerenciamento de dependências |
 | Banco de dados | **MongoDB** (via MongoDB Java Driver) | Persistência em coleções de documentos |
-| Testes | **JUnit 5** | Testes de unidade e de integração da API, com MongoDB real |
+| Testes | **JUnit 5** e JUnit 4 | JUnit 5 nos testes de unidade e de integração da API, com MongoDB real; JUnit 4 no módulo `server/` |
 | Testes | **Vitest** + Testing Library | Testes das telas e dos serviços do frontend |
 | Design | Figma | Protótipo navegável |
 | Infraestrutura | Docker Compose | Execução local do MongoDB |
@@ -113,8 +113,16 @@ A aplicação segue o modelo **cliente-servidor**, com o frontend e o backend de
 ┌──────────────┐   HTTP / JSON   ┌───────────────────────┐   MongoDB Driver   ┌──────────┐
 │   Frontend   │ ──────────────► │       Backend         │ ─────────────────► │ MongoDB  │
 │  React (SPA) │ ◄────────────── │  Java 21 (API REST)   │ ◄───────────────── │          │
-└──────────────┘                 └───────────────────────┘                    └──────────┘
+└──────────────┘                 └───────────┬───────────┘                    └──────────┘
+                                             │ TCP 3001 (objetos Java serializados)
+                                             ▼
+                                 ┌───────────────────────┐
+                                 │   Servidor de CPF     │
+                                 │  Java 21 (server/)    │
+                                 └───────────────────────┘
 ```
+
+O cadastro e a edição de pacientes consultam o **servidor de validação de CPF** (módulo `server/`), um processo Java separado que recebe objetos serializados por socket TCP na porta 3001, atende cada conexão em uma thread e confere o formato e os dígitos verificadores. Sem ele no ar, a API recusa a gravação de pacientes com `503`.
 
 O backend é organizado em três camadas:
 
@@ -253,7 +261,7 @@ Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 Na raiz do repositório, instale o módulo Java de validação de CPF e deixe seu servidor rodando em um terminal:
 
 ```bash
-(cd server && mvn install)
+(cd server && ../backend/mvnw install)   # usa o Maven Wrapper do backend
 java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
 ```
 
@@ -328,10 +336,10 @@ O valor de cada variável quando ela não é definida, as variáveis usadas só 
 
 O índice completo está em [`docs/README.md`](docs/README.md):
 
-- **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite).
+- **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite) e apresentação.
 - **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
 - **API:** autenticação e health, pacientes, médicos e especialidades, agendamento, consultas, cancelamento, fila de espera, notificações, indicadores e alterações de agenda.
-- **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva e comandos.
+- **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva, comandos e relatório de teste OO do servidor de CPF.
 - **Operação:** backup e recuperação, roteiros por perfil, evidências de validação e preparação da tag/release.
 
 ---
@@ -367,8 +375,8 @@ consultafacil/
 ├── docs/                    # Documentação (índice em docs/README.md)
 │   ├── modelagem/           # Uma coleção por documento
 │   ├── api/                 # Contratos das rotas
-│   ├── operacao/            # Backup e recuperação
-│   └── testes/              # Estratégia de testes
+│   ├── operacao/            # Configuração, backup e roteiro de entrega
+│   └── testes/              # Estratégia e relatórios de testes
 ├── docker-compose.yml       # MongoDB para desenvolvimento local
 ├── .env.example             # Modelo das variáveis de ambiente
 └── README.md

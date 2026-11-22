@@ -68,6 +68,7 @@ especialidades ◄──── medicos.especialidadeIds[]   (N:N, referência po
 | `crmNumero` | string | sim | Número do CRM como **texto**, preservando zeros à esquerda (`^[0-9]{1,10}$`) |
 | `crmUf` | string | sim | UF do CRM, duas letras maiúsculas |
 | `especialidadeIds` | ObjectId[] | sim | Referências a `especialidades._id`. Mínimo 1, sem repetição |
+| `usuarioId` | ObjectId | não | Referência a `usuarios._id` do login do médico (perfil `MEDICO`). Único quando presente |
 | `ativo` | bool | sim | Permite desativar o cadastro sem apagá-lo |
 
 O par `crmUf` + `crmNumero` é único.
@@ -160,6 +161,7 @@ Leitura: Ana atende segunda das 08h às 12h e das 13h às 17h, e quarta das 08h 
 | `especialidades` | `uk_especialidade_codigo` | `codigo` | único | Impede código repetido |
 | `medicos` | `uk_medico_crm` | `crmUf`, `crmNumero` | único | Impede CRM repetido na mesma UF |
 | `medicos` | `ix_medico_especialidade` | `especialidadeIds`, `ativo` | multikey | Busca "médicos ativos de uma especialidade" |
+| `medicos` | `uk_medico_usuario` | `usuarioId` | único **parcial** (só com `usuarioId`) | Um login de médico fica vinculado a um único cadastro |
 | `agendas` | `uk_agenda_medico` | `medicoId` | único | Garante uma agenda por médico (D1) |
 | `bloqueios` | `ix_bloqueio_medico_periodo` | `medicoId`, `inicio`, `fim` | composto | Busca bloqueios que se sobrepõem a um período |
 

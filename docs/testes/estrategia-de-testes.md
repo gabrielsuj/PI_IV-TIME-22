@@ -57,6 +57,20 @@ Dois comportamentos confirmados pelo teste:
 
 > No Windows, rode o `npm test` a partir de um caminho com a letra do disco em maiúscula (`C:\...`). Com `c:\...`, o Vitest carrega o próprio módulo duas vezes e todos os arquivos falham com "Vitest failed to find the current suite", sem nenhum teste executado.
 
+### Execução após o PR #132 (22/11/2026)
+
+A execução usou a `develop` em `8231632` (PR #132), com Java 21, Node 22 e MongoDB 7, os schemas e a carga de demonstração aplicados e o servidor de CPF na porta 3001, como no workflow de CI.
+
+| Suíte | Comando | Resultado |
+|---|---|---|
+| Back-end, como no CI | `HISTORICO_MONGO_URI=... DEMO_MONGO_DB=... ./mvnw -DmongoTests=true test` | 910 testes, 0 falhas, 0 ignorados |
+| Módulo `server/` | `../backend/mvnw install` em `server/` | 16 testes (`ClienteTest` e `ParceiroTest`), 0 falhas |
+| Front-end | `npm test`, `npm run lint`, `npm run build` | 535 testes em 33 arquivos; lint e build sem erros |
+
+### Relatório de teste OO do servidor de CPF (PI IV)
+
+O [relatório de teste OO](Relatorio_Teste_OO.pdf) aplica teste intraclasse (particionamento por categorias, atributos e estados) e interclasse ao servidor de CPF, sobre a mesma revisão. Ele documenta dois defeitos em aberto: `ValidateCPF(null)` lança `NullPointerException`, e o construtor do `Cliente` não tem limite de tempo no handshake. Também registra dois defeitos corrigidos no PR #132. Os casos de teste do relatório não fazem parte da suíte do repositório, porque os dois que expõem defeitos falhariam no CI até a correção.
+
 ## Matriz de permissões
 
 Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (`RotasAutorizacaoTest.PERMISSOES`). Quando a rota é aceita, o serviço ainda confere se o registro pertence a quem chamou (por exemplo, o paciente só cancela a própria consulta).
@@ -136,7 +150,7 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 Na raiz do repositório, instale o módulo `server/` no repositório Maven local e deixe o processo TCP rodando em outro terminal. `ValidadorCpfTcpTest` e `AcessoPacientesMongoIntegrationTest` usam a porta padrão do servidor (3001), como a CI. A API pode continuar rodando na 3000 durante os testes.
 
 ```bash
-(cd server && mvn clean install)
+(cd server && ../backend/mvnw clean install)
 java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
 ```
 
@@ -186,7 +200,7 @@ docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /de
 
 A preparação recria os bancos de testes e de demonstração. Use uma demonstração descartável para essa validação e pause a API durante o preparo para não misturar gravações com a carga conferida. O comando do backend inclui os testes que a execução básica pode ignorar; confira o resumo do Surefire e as condições de ativação se houver testes ignorados.
 
-O `mvn clean install` do módulo `server/` também executa o teste desse módulo. A [verificação de backup](../../.github/workflows/backup-recuperacao.yml) executa `bash scripts/testes/restaurar-banco.test.sh` separadamente. A recuperação da carga entregue é conferida com `bash scripts/testar-recuperacao.sh consultafacil_demo`, conforme o [procedimento de operação](../operacao/backup-recuperacao.md).
+O `../backend/mvnw clean install` do módulo `server/` também executa os testes desse módulo (`ClienteTest` e `ParceiroTest`). A [verificação de backup](../../.github/workflows/backup-recuperacao.yml) executa `bash scripts/testes/restaurar-banco.test.sh` separadamente. A recuperação da carga entregue é conferida com `bash scripts/testar-recuperacao.sh consultafacil_demo`, conforme o [procedimento de operação](../operacao/backup-recuperacao.md).
 
 Os resultados de aceite e os SHAs já conferidos estão no [roteiro de entrega](../operacao/entrega-mvp.md). Uma nova release precisa registrar os resultados da revisão final, sem tratar contagens de uma revisão anterior como evidência do novo commit.
 

@@ -122,7 +122,7 @@ As contagens correspondem à carga gerada nessa execução. Os links da CI são 
 
 ### Revalidação local em 22/11/2026
 
-A execução usou a árvore da `develop` em `fe78ca2` com as alterações locais de interface e documentação. O ambiente usou Java 21, Node 26 e MongoDB 7.0.45, com bancos descartáveis exclusivos para teste, histórico e demonstração. O servidor TCP de CPF foi iniciado na porta 3000 para os testes de integração.
+A execução usou a árvore da `develop` em `fe78ca2` com as alterações locais de interface e documentação. O ambiente usou Java 21, Node 26 e MongoDB 7.0.45, com bancos descartáveis exclusivos para teste, histórico e demonstração. O servidor TCP de CPF foi iniciado na porta 3000 para os testes de integração (porta padrão na época; desde o PR #130 o padrão é 3001).
 
 | Verificação | Resultado |
 |---|---|
@@ -133,6 +133,18 @@ A execução usou a árvore da `develop` em `fe78ca2` com as alterações locais
 | Recuperação | `testar-recuperacao.sh consultafacil_demo` recuperou as 10 coleções com hashes, contagens, índices e validadores iguais aos da origem. `scripts/testes/restaurar-banco.test.sh` também passou, incluindo os casos de falha e retorno. |
 
 O resultado é da execução local. A versão publicada deve registrar o SHA da `main` e a CI da revisão integrada, conforme o procedimento abaixo.
+
+### Revalidação após o PR #132 (22/11/2026)
+
+A execução usou a `develop` em `8231632` (PR #132), com Java 21, Node 22 e MongoDB 7, os schemas e a carga de demonstração aplicados e o servidor de CPF na porta 3001, como no workflow de CI.
+
+| Verificação | Resultado |
+|---|---|
+| Backend com todos os testes de integração | `./mvnw -DmongoTests=true test` com `HISTORICO_MONGO_URI` e `DEMO_MONGO_DB`. 910 testes aprovados, sem falhas, erros ou ignorados. |
+| Módulo `server/` | `../backend/mvnw install` aprovou 16 testes (`ClienteTest` e `ParceiroTest`) e instalou o JAR usado pelo backend. |
+| Frontend | `npm test` aprovou 535 testes em 33 arquivos. `npm run lint` e `npm run build` passaram. |
+| Carga | `verificar-carga.js` aprovou a carga de demonstração. |
+| CI | A execução #73 do workflow, no merge do PR #132 na `develop`, passou. |
 
 ### Agenda e disponibilidade (#53)
 
