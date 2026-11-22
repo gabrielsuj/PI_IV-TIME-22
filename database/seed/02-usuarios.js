@@ -1,3 +1,7 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
 // Usuários de demonstração (#9). Todos com a senha: Demo@123
 // Executado depois de 01-agenda.js (os médicos já existem).
 //

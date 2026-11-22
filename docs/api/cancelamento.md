@@ -1,3 +1,8 @@
+<!--
+Autoria: Murilo Moraes
+RA: 25000073
+-->
+
 # API de cancelamento de consulta
 
 > Issue #27 (cancelamento de consulta) · Sprint 3

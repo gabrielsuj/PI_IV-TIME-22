@@ -1,3 +1,8 @@
+<!--
+Autoria: Murilo Moraes
+RA: 25000073
+-->
+
 # Configuração e variáveis de ambiente
 
 > Issue #50. Reúne, num lugar só, os processos do sistema, as portas, todas as variáveis lidas pelo código (com o valor usado quando a variável não existe) e as variáveis que só os testes usam. Para instalar e executar passo a passo, veja o [README principal](../../README.md).
