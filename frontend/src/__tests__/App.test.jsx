@@ -125,6 +125,7 @@ describe('verificação do /health', () => {
     expect(await screen.findByText('API disponível')).toBeInTheDocument();
     expect(screen.getByText('http://api.teste/health')).toBeInTheDocument();
     expect(screen.getByLabelText('Resposta da API')).toHaveTextContent('"status": "ok"');
+    expect(screen.getByText(/Não verifica o MongoDB nem o serviço de CPF/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('http://api.teste/health', expect.any(Object));
   });
 

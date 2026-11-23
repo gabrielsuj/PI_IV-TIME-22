@@ -80,11 +80,14 @@ public class ConsultaRepository implements PendenciasConsultaRepository {
     }
 
     /** Consultas ativas (de qualquer médico) que começam depois de "de" e até "ate", em ordem de início. Lembretes (#34). */
-    public List<Document> ativasComInicioEntre(Date de, Date ate, int limite) {
-        return col.find(Filters.and(
+    public List<Document> ativasComInicioEntre(Date de, Date ate, Date ultimoInicio, ObjectId ultimoId, int limite) {
+        var filtros = new ArrayList<>(List.of(
                         Filters.in("status", StatusConsulta.ATIVOS),
                         Filters.gt("inicio", de),
-                        Filters.lte("inicio", ate)))
+                        Filters.lte("inicio", ate)));
+        if (ultimoInicio != null) filtros.add(Filters.or(Filters.gt("inicio", ultimoInicio),
+                Filters.and(Filters.eq("inicio", ultimoInicio), Filters.gt("_id", ultimoId))));
+        return col.find(Filters.and(filtros))
                 .sort(Sorts.ascending("inicio", "_id"))
                 .limit(limite)
                 .into(new ArrayList<>());

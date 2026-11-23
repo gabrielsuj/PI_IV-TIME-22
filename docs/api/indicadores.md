@@ -80,7 +80,7 @@ Authorization: Bearer <token>
 | `confirmacao` | Consultas distintas com evento projetado `CONFIRMACAO` no histórico | Total de consultas |
 | `preenchimentoFila` | Consultas não canceladas vinculadas pelo campo `consultaAgendadaId` a uma inscrição `ATENDIDA`, contando cada consulta uma vez | Consultas não canceladas |
 
-Uma consulta pode ocupar mais de uma vaga da grade. Cada vaga conta uma vez na ocupação, inclusive se a consulta sobreposta começou antes do período. A taxa de confirmação usa o evento histórico e inclui consultas que depois foram concluídas ou canceladas. Para essa taxa, o intervalo considera a data de início da consulta. [Cálculo e disponibilidade de agenda](agendamento.md) · [Histórico das consultas](../modelagem/historico.md) · [API de fila de espera](fila-espera.md)
+Uma consulta pode ocupar mais de uma vaga da grade. Cada vaga conta uma vez na ocupação, inclusive se a consulta sobreposta começou antes do período. A taxa de confirmação usa o evento histórico e inclui consultas que depois foram concluídas ou canceladas. Para essa taxa, o intervalo considera a data de início da consulta. [Cálculo e disponibilidade de agenda](agendamento.md) · [Histórico das consultas](../dicionario/historico.md) · [API de fila de espera](fila-espera.md)
 
 ### Qualidade dos dados
 

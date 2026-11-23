@@ -13,14 +13,13 @@ public class AceitadoraDeConexao extends Thread {
 
     public AceitadoraDeConexao(String porta, ArrayList<Parceiro> usuarios) throws Exception {
         if(porta==null) throw new Exception ("Porta ausente");
+        if(usuarios==null) throw new Exception ("Usuarios ausentes");
 
         try {
             this.pedido = new ServerSocket (Integer.parseInt(porta));
         } catch(Exception  erro) {
             throw new Exception ("Porta invalida");
         }
-
-        if(usuarios==null) throw new Exception ("Usuarios ausentes");
 
         this.usuarios = usuarios;
     }
@@ -34,11 +33,12 @@ public class AceitadoraDeConexao extends Thread {
                 continue;
             }
 
-            SupervisoraDeConexao supervisoraDeConexao=null;
             try {
-                supervisoraDeConexao = new SupervisoraDeConexao(conexao, usuarios);
-            } catch(Exception ignored) {} // sei que passei parametros corretos para o construtor
-            supervisoraDeConexao.start();
+                SupervisoraDeConexao supervisoraDeConexao = new SupervisoraDeConexao(conexao, usuarios);
+                supervisoraDeConexao.start();
+            } catch(Exception erro) {
+                try { conexao.close(); } catch(Exception ignored) {}
+            }
         }
     }
 }

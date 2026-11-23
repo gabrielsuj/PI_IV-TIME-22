@@ -18,7 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Regras da agenda que o validador do banco não cobre (docs/modelagem/medicos-agenda.md, seção 5.2). */
+/** Regras da agenda que o validador do banco não cobre (docs/dicionario/medicos-agenda.md, seção 5.2). */
 public final class ValidadorAgenda {
     private ValidadorAgenda() {}
 

@@ -3,7 +3,7 @@ Autoria: Gabriel Martins de Almeida
 RA: 25006162
 */
 
-// Validadores e índices de especialidades, médicos, agendas e bloqueios
+// Validadores e índices de agendas e bloqueios
 function aplicarValidador(nome, validator) {
   if (db.getCollectionNames().includes(nome)) {
     db.runCommand({ collMod: nome, validator, validationLevel: "strict" });
@@ -11,27 +11,6 @@ function aplicarValidador(nome, validator) {
     db.createCollection(nome, { validator });
   }
 }
-
-aplicarValidador("especialidades", { $jsonSchema: {
-  bsonType: "object", required: ["codigo", "nome", "ativa"],
-  properties: {
-    codigo: { bsonType: "string", pattern: "^[a-z0-9-]+$" },
-    nome:   { bsonType: "string", minLength: 1 },
-    ativa:  { bsonType: "bool" }
-  }
-}});
-
-aplicarValidador("medicos", { $jsonSchema: {
-  bsonType: "object", required: ["nome", "crmNumero", "crmUf", "especialidadeIds", "ativo"],
-  properties: {
-    nome:      { bsonType: "string", minLength: 1 },
-    crmNumero: { bsonType: "string", pattern: "^[0-9]{1,10}$" },  //mantem o 0
-    crmUf:     { bsonType: "string", pattern: "^[A-Z]{2}$" },
-    especialidadeIds: { bsonType: "array", minItems: 1, uniqueItems: true,
-                        items: { bsonType: "objectId" } },
-    ativo:     { bsonType: "bool" }
-  }
-}});
 
 aplicarValidador("agendas", {
   $jsonSchema: {
@@ -77,8 +56,5 @@ aplicarValidador("bloqueios", {
 });
 
 // Índices
-db.especialidades.createIndex({ codigo: 1 }, { unique: true, name: "uk_especialidade_codigo" });
-db.medicos.createIndex({ crmUf: 1, crmNumero: 1 }, { unique: true, name: "uk_medico_crm" });
-db.medicos.createIndex({ especialidadeIds: 1, ativo: 1 }, { name: "ix_medico_especialidade" });
 db.agendas.createIndex({ medicoId: 1 }, { unique: true, name: "uk_agenda_medico" });   // 1 agenda por médico
 db.bloqueios.createIndex({ medicoId: 1, inicio: 1, fim: 1 }, { name: "ix_bloqueio_medico_periodo" });

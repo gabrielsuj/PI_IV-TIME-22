@@ -243,18 +243,10 @@ Neste cenário, horários ocupados por consultas ativas também saem da lista. O
 
 ## 8. Como executar e verificar
 
+Siga o [guia de atualização](../../README.md#3-subir-o-banco-de-dados-mongodb) para aplicar todos os schemas em ordem, guardando o backup e preservando documentos e volume existentes. Para os testes, use a [preparação do banco de testes](../../README.md#6-executar-os-testes).
+
+O verificador exige `consultafacil_demo` com os schemas e todos os seeds da [carga de demonstração](../../README.md#demonstração-com-dados-prontos) já aplicados:
+
 ```bash
-# Recriar o banco local (os scripts de database/init só rodam com volume vazio)
-docker compose down -v
-docker compose up -d mongo
-
-# Carregar os dados fictícios (pode ser executado mais de uma vez)
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet < database/seed/01-agenda.js
-
-# Verificar dados, índices e validações (todas as linhas devem começar com OK)
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet < scripts/verificar-modelagem.js
-
-# Banco de testes
-docker exec -i consultafacil-mongo mongosh consultafacil_test --quiet < database/init/02-esquema-agenda.js
-docker exec -i consultafacil-mongo mongosh consultafacil_test --quiet < database/seed/01-agenda.js
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet < scripts/verificar-modelagem.js
 ```

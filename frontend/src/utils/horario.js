@@ -41,6 +41,20 @@ export function hoje() {
   return new Date().toLocaleDateString('sv-SE');
 }
 
+export function janelaBloqueios(fusoHorario = 'America/Sao_Paulo', agora = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: fusoHorario, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(agora);
+  const valor = (tipo) => partes.find((parte) => parte.type === tipo).value;
+  const ano = Number(valor('year'));
+  const mes = Number(valor('month'));
+  const dia = Number(valor('day'));
+  const ultimoDia = new Date(Date.UTC(ano + 1, mes, 0)).getUTCDate();
+  const de = `${ano}-${valor('month')}-${valor('day')}`;
+  const ate = `${ano + 1}-${valor('month')}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`;
+  return { de, ate };
+}
+
 function dataBr(data) {
   const [ano, mes, dia] = data.split('-');
   return `${dia}/${mes}/${ano}`;

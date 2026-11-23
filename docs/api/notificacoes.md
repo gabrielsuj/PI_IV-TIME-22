@@ -61,7 +61,7 @@ Os dois endpoints recebem o mesmo corpo com `Content-Type: application/json`. Us
 - `POST /notificacoes/confirmar` confirma pelo lembrete entregue ao paciente. O servidor revalida titularidade, estado e horário da consulta. Na transição de `AGENDADA` para `CONFIRMADA`, o fluxo auditado registra o evento `CONFIRMACAO` no [histórico da consulta](consultas.md#5-telas-front-end). O servidor também registra a leitura e a confirmação na notificação.
 - Se a notificação já registrou a confirmação, repetir a chamada retorna 204. Caso a consulta já esteja confirmada por outro caminho e continue no horário do lembrete, ainda no futuro, a operação registra a confirmação na notificação sem criar outro evento no histórico.
 
-As duas ações retornam 204 sem corpo. A criação de lembretes também é idempotente. O índice de unicidade impede a reinserção da mesma combinação de consulta, tipo, destinatário, canal e antecedência em horas. Veja a [modelagem de notificações](../modelagem/notificacoes.md#índices).
+As duas ações retornam 204 sem corpo. A criação de lembretes também é idempotente. O índice de unicidade impede a reinserção da mesma combinação de consulta, tipo, destinatário, canal e antecedência em horas. Veja a [modelagem de notificações](../dicionario/notificacoes.md#índices).
 
 ## 4. Erros
 

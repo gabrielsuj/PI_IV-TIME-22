@@ -213,7 +213,7 @@ public final class SinalizacaoFilaService {
 
     /**
      * O horário de início da vaga atende ao turno preferido do interessado?
-     * MANHA, TARDE ou QUALQUER (docs/modelagem/filaEspera.md).
+     * MANHA, TARDE ou QUALQUER (docs/dicionario/filaEspera.md).
      */
     public static boolean turnoCompativel(String turnoPreferido, Instant inicioVaga) {
         // A hora é avaliada em São Paulo: 12:00Z ainda é 09:00 local (manhã).

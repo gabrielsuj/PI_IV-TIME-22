@@ -5,7 +5,7 @@ RA: 25006162
 
 # Entrega do ConsultaFácil
 
-Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Consolidado.pdf) (Quadro 4). A situação de cada funcionalidade está no [README](../../README.md#situação-atual-20112026).
+Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os cenários de aceite estão no [relatório do projeto](../ConsultaFacil_Relatorio_Ideação.pdf) (Quadro 4). A situação de cada funcionalidade está no [README](../../README.md#situação-atual-20112026).
 
 ## Cadastro e agendamento por perfil
 
@@ -148,7 +148,7 @@ A execução usou a `develop` em `8231632` (PR #132), com Java 21, Node 22 e Mon
 
 ### Agenda e disponibilidade (#53)
 
-O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de duração com bloqueio parcial passaram. A busca e a confirmação usam a disponibilidade da agenda, e os testes de fila aprovados cobrem a expiração do aviso após bloqueio ou mudança de jornada. Os contratos e a modelagem estão documentados. [API de agenda e bloqueios](../api/alteracoes-agenda.md) · [API de agendamento](../api/agendamento.md) · [Modelo de agendas e bloqueios](../modelagem/medicos-agenda.md)
+O teste `deveImpedirReservaEmPeriodoBloqueado` e a regressão de mudança de duração com bloqueio parcial passaram. A busca e a confirmação usam a disponibilidade da agenda, e os testes de fila aprovados cobrem a expiração do aviso após bloqueio ou mudança de jornada. Os contratos e a modelagem estão documentados. [API de agenda e bloqueios](../api/alteracoes-agenda.md) · [API de agendamento](../api/agendamento.md) · [Modelo de agendas e bloqueios](../dicionario/medicos-agenda.md)
 
 ## Conferências antes da entrega
 

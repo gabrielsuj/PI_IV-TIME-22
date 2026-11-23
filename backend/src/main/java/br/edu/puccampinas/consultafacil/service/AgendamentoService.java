@@ -37,7 +37,7 @@ import java.util.Optional;
  *
  * A gravação passa pelo RegistroConsultaService, que registra o histórico (#29).
  * Se duas pessoas confirmarem a mesma vaga ao mesmo tempo, o índice único de `consultas`
- * aceita só uma e a outra recebe 409 (ver docs/modelagem/consultas.md).
+ * aceita só uma e a outra recebe 409 (ver docs/dicionario/consultas.md).
  */
 public class AgendamentoService {
     /** Maior intervalo aceito na busca de vagas, em dias. */

@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.Map;
 
 public class HealthHandler implements HttpHandler {
+    // Indica apenas que o processo HTTP responde.
     @Override
     public void handle(HttpExchange ex) throws IOException {
         Http.sendJson(ex, 200, Map.of("status", "ok"));

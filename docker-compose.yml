@@ -9,6 +9,12 @@ services:
       - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_DATABASE: consultafacil
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.getSiblingDB('admin').runCommand({ ping: 1 }).ok === 1 ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 24
     volumes:
       - mongo-data:/data/db
       - ./database/init:/docker-entrypoint-initdb.d:ro

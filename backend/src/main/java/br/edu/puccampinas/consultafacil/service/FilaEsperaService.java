@@ -43,7 +43,7 @@ import java.util.Set;
 /**
  * Inscrição do paciente na fila de espera (#31): entrar, consultar e sair.
  * Paciente age só para si mesmo; a secretaria age por qualquer paciente. O médico não usa a fila.
- * Regras do modelo: docs/modelagem/filaEspera.md. Contrato: docs/api/fila-espera.md.
+ * Regras do modelo: docs/dicionario/filaEspera.md. Contrato: docs/api/fila-espera.md.
  */
 public class FilaEsperaService {
     /** Validade da inscrição sem dataFim, e limite para a dataFim (sugestão do modelo: 90 dias). */

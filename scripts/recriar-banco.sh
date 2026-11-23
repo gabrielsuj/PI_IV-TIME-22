@@ -6,13 +6,17 @@
 # e, exceto no banco de testes, carrega database/seed/*.js.
 #
 # Uso (a partir da raiz do projeto, com o container no ar):
-#   scripts/recriar-banco.sh                      # consultafacil (desenvolvimento)
+#   scripts/recriar-banco.sh consultafacil        # desenvolvimento
 #   scripts/recriar-banco.sh consultafacil_test   # testes (sem dados de exemplo)
 #   scripts/recriar-banco.sh consultafacil_demo   # demonstração
 # Autor: Gabriel (criador), Murilo Rigoni (modificador)
 set -euo pipefail
 
-BANCO="${1:-consultafacil}"
+if [ "$#" -ne 1 ]; then
+  echo "Uso: scripts/recriar-banco.sh <banco>" >&2
+  exit 1
+fi
+BANCO="$1"
 CONTAINER="${MONGO_CONTAINER:-consultafacil-mongo}"
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -20,6 +24,7 @@ case "$BANCO" in
   consultafacil|consultafacil_test|consultafacil_demo) ;;
   *) echo "Banco inválido: $BANCO (use consultafacil, consultafacil_test ou consultafacil_demo)" >&2; exit 1 ;;
 esac
+echo "Banco alvo: $BANCO"
 
 if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
   echo "Container $CONTAINER não está rodando. Execute: docker compose up -d mongo" >&2

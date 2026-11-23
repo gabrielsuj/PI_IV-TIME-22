@@ -43,7 +43,7 @@ public class Servidor {
                 comando = Teclado.getUmString();
             } catch(Exception ignored) {}
 
-            if(comando.toLowerCase().equals("desativar")) {
+            if(comando == null || comando.equalsIgnoreCase("desativar")) {
                 synchronized(usuarios) {
 					ComunicadoDeDesligamento comunicadoDeDesligamento = new ComunicadoDeDesligamento();
                     

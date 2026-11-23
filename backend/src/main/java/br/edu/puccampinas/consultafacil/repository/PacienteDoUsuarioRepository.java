@@ -15,7 +15,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 /**
  * Descobre o cadastro de paciente de quem fez login com perfil PACIENTE (#21).
- * O vínculo é `pacientes.usuarioId` → `usuarios._id`, conforme docs/modelagem/usuarios-pacientes.md.
+ * O vínculo é `pacientes.usuarioId` → `usuarios._id`, conforme docs/dicionario/usuarios-pacientes.md.
  * Paciente cadastrado só pela secretaria não tem usuarioId (não agenda sozinho).
  */
 public class PacienteDoUsuarioRepository {

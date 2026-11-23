@@ -6,8 +6,8 @@
 // Requer MongoDB 6 ou superior (índices parciais com $in).
 //
 // Executar:
-//   docker exec -i consultafacil-mongo mongosh consultafacil      --quiet < database/init/06-esquema-medicos.js
-//   docker exec -i consultafacil-mongo mongosh consultafacil_test --quiet < database/init/06-esquema-medicos.js
+//   docker exec -i consultafacil-mongo mongosh consultafacil      --quiet < database/init/07-esquema-medicos.js
+//   docker exec -i consultafacil-mongo mongosh consultafacil_test --quiet < database/init/07-esquema-medicos.js
 //
 // Ao inserir pelo mongosh, use NumberInt(...) nos campos "int". Violação do
 // validador retorna o código 121 (API: 400); violação de índice único, 11000 (API: 409).
