@@ -53,7 +53,7 @@ export default function HomePage() {
     ? perfil === 'MEDICO'
       ? 'Consulte sua agenda e acompanhe seus atendimentos.'
       : 'Organize a agenda e acompanhe os atendimentos da clínica.'
-    : 'Agende consultas e acompanhe seus atendimentos e avisos de vaga.';
+    : 'Acompanhe seus atendimentos, histórico, notificações e avisos de vaga.';
 
   return (
     <div className={`page home-page${operacional ? ' home-page--operacional' : ''}`}>

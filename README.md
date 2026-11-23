@@ -69,11 +69,11 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Cadastros de médicos e especialidades | ✅ |
 | Agenda: jornada semanal, duração e bloqueios, com aviso quando a mudança atinge consultas marcadas | ✅ |
 | Calendário operacional por médico (semana e dia) | ✅ |
-| Busca de vagas e agendamento (secretaria e paciente), com escolha de outro horário após conflito | ✅ #54 |
+| Busca de vagas e agendamento pela secretaria, com escolha de outro horário após conflito | ✅ #54 |
 | Registro e consulta do histórico no detalhe da consulta | ✅ #29, #46 |
 | Listagem, detalhe e cancelamento de consultas | ✅ |
 | Fila de espera na API: inscrição, sinalização da vaga após cancelamento e atualização quando a vaga é ocupada | ✅ #31, #32 |
-| Avisos de vaga para o paciente, com agendamento e expiração | ✅ #57 |
+| Avisos de vaga para leitura pelo paciente, com agendamento pela secretaria e expiração | ✅ #57 |
 | Telas da fila de espera (paciente e secretaria) | ✅ #33 |
 | Confirmação, conclusão e falta pela interface | ✅ #28 |
 | Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
@@ -266,9 +266,9 @@ Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes
 |---|---|
 | Secretaria | Cadastros de pacientes, médicos e especialidades; **Agenda** (jornada semanal e bloqueios, com aviso quando a mudança atinge consultas marcadas); **Calendário** por médico; **Nova consulta** para qualquer paciente; **Consultas** (todas, com detalhe e cancelamento) |
 | Médico (Ana) | **Agenda** e **Calendário** abrem diretamente o cadastro vinculado ao login; **Consultas** que atende; leitura de pacientes |
-| Paciente (Paulo) | **Nova consulta** para si mesmo; **Consultas** próprias, com cancelamento |
+| Paciente (Paulo) | **Consultas** próprias, com cancelamento e histórico; avisos de vaga e notificações. Agendamento somente pela secretaria |
 
-Em **Nova consulta** (`/nova-consulta`), os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
+A tela **Nova consulta** (`/nova-consulta`) é exclusiva da secretaria, inclusive para pacientes com conta. O perfil PACIENTE recebe 403 ao tentar criar uma consulta na API. Nessa tela, os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
 
 Para verificar a modelagem, use `consultafacil_demo` com os schemas e a carga de demonstração já aplicados:
 

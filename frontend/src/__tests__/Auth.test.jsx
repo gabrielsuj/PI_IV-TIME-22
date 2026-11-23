@@ -134,7 +134,7 @@ describe('menu e telas por perfil', () => {
   it('paciente vê início, consultas, avisos de vaga e perfis', () => {
     entrarComo({ id: 'u-paciente', nome: 'Paulo Paciente', perfil: 'PACIENTE' });
     renderAt('/perfis');
-    expect(menu()).toEqual(['Início', 'Nova consulta', 'Consultas', 'Fila de espera', 'Avisos de vaga', 'Notificações', 'Perfis de acesso']);
+    expect(menu()).toEqual(['Início', 'Consultas', 'Fila de espera', 'Avisos de vaga', 'Notificações', 'Perfis de acesso']);
   });
 
   it('bloqueia a tela aberta pelo endereço quando o perfil não tem acesso', () => {

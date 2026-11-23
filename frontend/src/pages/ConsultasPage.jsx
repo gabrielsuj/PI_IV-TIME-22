@@ -104,7 +104,7 @@ export default function ConsultasPage() {
       <PageHeader title={textos.titulo} description={textos.descricao}
         action={(retorno || perfil !== 'MEDICO') && <div className="cal-nav">
           {retorno && <Button to={retorno} variant="outline">‹ Voltar ao painel</Button>}
-          {perfil !== 'MEDICO' && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>}
+          {perfil === 'SECRETARIA_ADMIN' && <Button to="/nova-consulta" state={origem}>Nova consulta</Button>}
         </div>} />
 
       <Card className="search-card">

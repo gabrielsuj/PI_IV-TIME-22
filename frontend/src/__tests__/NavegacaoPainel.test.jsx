@@ -200,15 +200,16 @@ it('médico mantém detalhes e calendário próprios sem acesso à criação de 
   expect(fetchMock.mock.calls.slice(antes).every(([url]) => !['/pacientes', '/especialidades'].includes(new URL(url).pathname))).toBe(true);
 });
 
-it('paciente preserva o atalho de agendamento e a navegação pessoal existente', async () => {
+it('paciente mantém a navegação pessoal sem atalho de agendamento', async () => {
   entrarComo({ id: 'paciente', nome: 'Paciente', perfil: 'PACIENTE' });
   mockApi();
   const user = userEvent.setup();
   const router = abrir();
-  await user.click(within(screen.getByRole('main')).getByRole('link', { name: 'Nova consulta' }));
-  expect(router.state.location.state).toBeNull();
-  expect(await screen.findByRole('link', { name: 'Voltar ao início' })).toHaveAttribute('href', '/');
-  expect(screen.queryByRole('link', { name: 'Voltar ao painel' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+  await user.click(within(screen.getByRole('main')).getByRole('link', { name: 'Ver minhas consultas' }));
+  expect(router.state.location.pathname).toBe('/consultas');
+  expect(await screen.findByRole('heading', { name: 'Minhas consultas' })).toBeInTheDocument();
+  expect(document.querySelector('a[href="/nova-consulta"]')).not.toBeInTheDocument();
 });
 
 it('acesso direto ao detalhe preserva o retorno normal para consultas', async () => {

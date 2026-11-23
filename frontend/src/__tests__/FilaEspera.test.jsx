@@ -199,16 +199,17 @@ describe('vaga sinalizada que se perdeu', () => {
     return user;
   }
 
-  it('avisa que a inscrição voltou a aguardar e oferece outra busca', async () => {
+  it('mantém o paciente na fila sem oferecer agendamento', async () => {
     await perderVaga();
 
     expect(screen.getByText(/A inscrição continua aguardando outra oportunidade/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Buscar outra vaga' })).toHaveAttribute('href', '/nova-consulta');
+    expect(screen.queryByRole('link', { name: 'Buscar outra vaga' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Agendar vaga' })).not.toBeInTheDocument();
     expect(screen.getByText('Aguardando', { selector: '.badge' })).toBeInTheDocument();
   });
 
   it('abre a nova consulta com o médico e a especialidade da vaga perdida', async () => {
-    const user = await perderVaga();
+    const user = await perderVaga(SECRETARIA_TESTE);
 
     await user.click(screen.getByRole('link', { name: 'Buscar outra vaga' }));
 

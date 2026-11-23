@@ -12,6 +12,7 @@ import br.edu.puccampinas.consultafacil.api.dto.ConsultaResponse;
 import br.edu.puccampinas.consultafacil.api.dto.AgendamentoRequest;
 import br.edu.puccampinas.consultafacil.api.Rotas;
 import br.edu.puccampinas.consultafacil.api.handler.AvisoVagaHandler;
+import br.edu.puccampinas.consultafacil.api.handler.ConsultaHandler;
 import br.edu.puccampinas.consultafacil.api.handler.FilaEsperaHandler;
 import br.edu.puccampinas.consultafacil.api.middleware.Cors;
 import br.edu.puccampinas.consultafacil.api.handler.AgendaHandler;
@@ -116,7 +117,7 @@ class FilaEsperaIntegrationTest {
     private volatile CyclicBarrier barreiraDeReserva;
 
     @BeforeAll static void conectar() {
-        mongo = new MongoConnection("mongodb://localhost:27017/?serverSelectionTimeoutMS=3000", "consultafacil_test");
+        mongo = new MongoConnection(System.getProperty("mongoTestUri", "mongodb://localhost:27017/?serverSelectionTimeoutMS=3000"), "consultafacil_test");
     }
 
     @AfterAll static void fechar() { mongo.close(); }
@@ -203,7 +204,7 @@ class FilaEsperaIntegrationTest {
         // A montagem preserva os handlers de avisos e central; indicadores ficam
         // ausentes por não participarem deste fluxo de fila.
         var router = Rotas.router(cors, autorizacao,
-                new Rotas.Handlers(null, null, agendaHandler, bloqueioHandler, null, null, null, null, avisos, central, null));
+                new Rotas.Handlers(null, null, agendaHandler, bloqueioHandler, null, null, new ConsultaHandler(agendamento), null, avisos, central, null));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         threadsHttp = Executors.newFixedThreadPool(4);
         server.setExecutor(threadsHttp);
@@ -355,7 +356,7 @@ class FilaEsperaIntegrationTest {
         assertEquals(VAGA.toString(), s.get("dataHora").asText());
     }
 
-    @Test void doisPacientesDisputamAMesmaVagaPeloAviso() throws Exception {
+    @Test void secretariaDisputaVagaParaDoisPacientesComContaEAtualizaAvisos() throws Exception {
         assertEquals(201, inscrever(U1, ESPECIALIDADE, null).statusCode());
         assertEquals(201, inscrever(U2, ESPECIALIDADE, null).statusCode());
         liberarVaga(P3);
@@ -372,12 +373,12 @@ class FilaEsperaIntegrationTest {
         assertTrue(semValor(aviso1, "motivo"));
         assertEquals(MEDICO.toHexString(), aviso1.get("medicoId").asText());
         assertEquals(ESPECIALIDADE.toHexString(), aviso1.get("especialidadeId").asText());
-        assertEquals(404, enviar("POST", "/avisos-vaga", token1, Map.of("avisoId", id2)).statusCode());
+        assertEquals(403, enviar("POST", "/avisos-vaga", token1, Map.of("avisoId", id2)).statusCode());
 
         barreiraDeReserva = new CyclicBarrier(2);
-        var pedido1 = client.sendAsync(requisicao("POST", "/avisos-vaga", token1, Map.of("avisoId", id1)),
+        var pedido1 = client.sendAsync(requisicao("POST", "/consultas", secretaria(), pedidoDaVaga(P1)),
                 HttpResponse.BodyHandlers.ofString());
-        var pedido2 = client.sendAsync(requisicao("POST", "/avisos-vaga", token2, Map.of("avisoId", id2)),
+        var pedido2 = client.sendAsync(requisicao("POST", "/consultas", secretaria(), pedidoDaVaga(P2)),
                 HttpResponse.BodyHandlers.ofString());
         var resposta1 = pedido1.get(10, TimeUnit.SECONDS);
         var resposta2 = pedido2.get(10, TimeUnit.SECONDS);
@@ -434,6 +435,12 @@ class FilaEsperaIntegrationTest {
         conferirAvisoExpiradoEInscricaoAguardando(token, aviso);
     }
 
+    private Map<String, String> pedidoDaVaga(ObjectId paciente) {
+        return Map.of("pacienteId", paciente.toHexString(), "medicoId", MEDICO.toHexString(),
+                "especialidadeId", ESPECIALIDADE.toHexString(), "inicio", VAGA.toString(),
+                "fim", VAGA.plusSeconds(1800).toString());
+    }
+
     private JsonNode prepararAviso(String token) throws Exception {
         assertEquals(201, inscrever(U1, ESPECIALIDADE, null).statusCode());
         liberarVaga(P3);
@@ -460,7 +467,7 @@ class FilaEsperaIntegrationTest {
         // #58: a agenda mudou e o horário deixou de ser oferecido, sem outra consulta no lugar.
         assertEquals("OPORTUNIDADE_DESATUALIZADA", expirado.get("motivo").asText());
         assertEquals("CANCELADA", notificacao.getString("status"));
-        assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", idAviso)).statusCode());
+        assertEquals(403, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", idAviso)).statusCode());
         assertEquals(0, db.getCollection("consultas").countDocuments(Filters.and(
                 Filters.eq("medicoId", MEDICO), Filters.eq("inicio", Date.from(VAGA)), Filters.eq("status", "AGENDADA"))));
     }
@@ -476,7 +483,7 @@ class FilaEsperaIntegrationTest {
         JsonNode vencido = unicoAviso(token);
         assertEquals("EXPIRADO", vencido.get("status").asText());
         assertEquals("PRAZO_ENCERRADO", vencido.get("motivo").asText());
-        assertEquals(409, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", id)).statusCode());
+        assertEquals(403, enviar("POST", "/avisos-vaga", token, Map.of("avisoId", id)).statusCode());
     }
 
     // ---- apoio ----

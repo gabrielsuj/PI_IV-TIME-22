@@ -90,7 +90,7 @@ describe('roteamento', () => {
       expect(main.getByRole('link', { name: 'Ver consultas' })).toHaveAttribute('href', '/consultas');
       expect(main.queryByRole('link', { name: 'Ver avisos de vaga' })).not.toBeInTheDocument();
     }
-    if (perfil === 'MEDICO') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+    if (perfil !== 'SECRETARIA_ADMIN') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
     else expect(main.getByRole('link', { name: 'Nova consulta' })).toHaveAttribute('href', '/nova-consulta');
     if (paciente) expect(fetchMock.mock.calls.every(([url]) => url === 'http://api.teste/health')).toBe(true);
     else expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/indicadores')).toBe(true);

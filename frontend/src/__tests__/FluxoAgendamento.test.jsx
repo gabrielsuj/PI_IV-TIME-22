@@ -21,7 +21,7 @@ const horario = { inicio: '2026-12-01T12:00:00Z', fim: '2026-12-01T12:30:00Z' };
 const outroHorario = { inicio: '2026-12-01T13:00:00Z', fim: '2026-12-01T13:30:00Z' };
 const vagas = { horarios: [horario, outroHorario], fusoHorario: 'America/Sao_Paulo' };
 const pacientes = [
-  { id: 'p1', nome: 'Maria Teste', cpf: '01234567890' },
+  { id: 'p1', nome: 'Maria Teste', cpf: '01234567890', usuarioId: 'login-paciente' },
   { id: 'p2', nome: 'Paulo Teste', cpf: '52998224725' },
 ];
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -30,7 +30,7 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), { status
 // substituir as validações do agendamento.
 describe('integração da vaga sinalizada com o agendamento', () => {
   const propriedades = {
-    usuario: { id: 'u1', nome: 'Paciente Teste', perfil: 'PACIENTE' }, especialidade: { id: 'e1', nome: 'Cardiologia', ativa: true },
+    usuario: { id: 'secretaria', nome: 'Secretaria', perfil: 'SECRETARIA_ADMIN' }, paciente: pacientes[0], especialidade: { id: 'e1', nome: 'Cardiologia', ativa: true },
     medico: { id: 'm1', nome: 'Ana Teste', ativo: true, especialidadeIds: ['e1'] }, data: '2026-12-01', vagaInicial: horario.inicio,
   };
 
@@ -161,7 +161,7 @@ async function reautenticar(user) {
 beforeEach(() => { sessionStorage.clear(); });
 
 describe('fluxo integrado do frontend de agendamento', () => {
-  it.each(['SECRETARIA_ADMIN', 'PACIENTE'])('recupera contexto após 401 para %s sem buscar vagas nem confirmar automaticamente', async (perfil) => {
+  it.each(['SECRETARIA_ADMIN'])('recupera contexto após 401 para %s sem buscar vagas nem confirmar automaticamente', async (perfil) => {
     const { fetchMock } = renderFluxo({ perfil, buscarVagas: buscarVagasApi, confirmarAgendamento: confirmarAgendamentoApi });
     conectarApi(fetchMock, { perfil });
     const user = userEvent.setup();
@@ -301,16 +301,22 @@ describe('fluxo integrado do frontend de agendamento', () => {
     expect(screen.queryByRole('heading', { name: 'Agendamento realizado' })).not.toBeInTheDocument();
   });
 
-  it('paciente confirma para si sem enviar ID de usuário como pacienteId nem carregar outros pacientes', async () => {
-    const { confirmarAgendamento, fetchMock } = renderFluxo({ perfil: 'PACIENTE' });
+  it('paciente não abre o fluxo nem dispara busca ou confirmação', () => {
+    const { confirmarAgendamento, buscarVagas, fetchMock } = renderFluxo({ perfil: 'PACIENTE' });
+    expect(screen.getByRole('heading', { name: 'Acesso não permitido' })).toBeInTheDocument();
+    expect(confirmarAgendamento).not.toHaveBeenCalled();
+    expect(buscarVagas).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('secretaria agenda para paciente que possui conta usando o ID do cadastro', async () => {
+    const { confirmarAgendamento } = renderFluxo();
     const user = userEvent.setup();
-    await preencher(user, true);
+    await preencher(user);
     await revisar(user);
-    expect(screen.getByText('Usuário Teste (você)')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Confirmar agendamento' }));
     await screen.findByRole('heading', { name: 'Agendamento realizado' });
-    expect(confirmarAgendamento).toHaveBeenCalledExactlyOnceWith({ especialidadeId: 'e1', medicoId: 'm1', ...horario });
-    expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/pacientes')).toBe(false);
+    expect(confirmarAgendamento).toHaveBeenCalledExactlyOnceWith({ pacienteId: 'p1', especialidadeId: 'e1', medicoId: 'm1', ...horario });
   });
 
   it('impede envio duplo e bloqueia mudanças nos dados durante a confirmação', async () => {

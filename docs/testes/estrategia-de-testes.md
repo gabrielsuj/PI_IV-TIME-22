@@ -83,7 +83,7 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 | Ler pacientes (`/pacientes`, `/pacientes/{id}`) | — | ✅ | ✅ |
 | Cadastrar ou editar pacientes | — | — | ✅ |
 | Buscar vagas (`GET /vagas`) | ✅ | ✅ | ✅ |
-| Agendar (`POST /consultas`) | ✅ | — | ✅ |
+| Agendar (`POST /consultas`) | — | — | ✅ |
 | Listar, detalhar, cancelar, mudar status e ver histórico de consulta (`/consultas/...`) | ✅ | ✅ | ✅ |
 | Fila de espera (`/fila-espera`) | ✅ | — | ✅ |
 | Notificações: ler e marcar como lida | ✅ | ✅ | — |
@@ -122,7 +122,7 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 | `ConflitosAgendaIntegrationTest` | Bloqueio e mudança de jornada sobre consultas marcadas: 409 com lista e confirmação |
 | `SinalizacaoFilaIntegrationTest` | Cancelamento com o banco real: vaga liberada, histórico `CANCELAMENTO` + `SINALIZACAO_FILA`, só interessados compatíveis sinalizados (turno, especialidade, médico, validade, janela, sobreposição), um aviso por paciente, vaga no passado sem aviso; vaga sinalizada ocupada (`ATENDIDA` para quem agendou, `AGUARDANDO` para os demais) e sinalização vencida voltando a concorrer |
 | `FilaEsperaIntegrationTest` | Fila pela API (#31): inscrição do paciente e pela secretaria, validações, inscrição duplicada (409), saída da fila, expiração e a vaga sinalizada vista pelo paciente |
-| `FluxoEstadosHistoricoIndicadoresIntegrationTest` | Um dia de atendimento integrado (#48): agendamento pelo paciente e pela secretaria, confirmação, conclusão e falta, transições recusadas por estado e por perfil (sem evento no histórico), cancelamento sinalizando a fila e a vaga agendada pelo interessado, leitura do histórico com atores e motivo, e os cinco indicadores do dia com valores calculados à mão |
+| `FluxoEstadosHistoricoIndicadoresIntegrationTest` | Um dia de atendimento integrado (#48): criação das fixtures de consulta, confirmação, conclusão e falta, transições recusadas por estado e por perfil (sem evento no histórico), cancelamento sinalizando a fila e a vaga agendada pelo interessado, leitura do histórico com atores e motivo, e os cinco indicadores do dia com valores calculados à mão |
 | `IndicadoresDemonstracaoIntegrationTest` | Indicadores conferidos com a carga de demonstração (#48): para a clínica e para cada médico, as contagens e taxas de `GET /indicadores` batem com contagens independentes nas coleções, e nenhuma taxa fica incompleta. Opt-in por `DEMO_MONGO_DB` |
 | `CancelamentoIntegrationTest` | Cancelamento com o banco real: vaga liberada para a busca e para nova reserva, histórico com motivo e ator, consulta que já começou |
 | `NotificacoesIntegrationTest` | Lembretes e notificações (#34) com o validador real: confirmação entregue ao agendar, lembrete programado 24 h antes e enviado uma vez só, lembrete criado pelo agendador para consulta sem lembrete, consulta em cima da hora, cancelamento avisando as outras partes e descartando o lembrete, lembrete de horário alterado descartado, cópia em e-mail de teste com `FALHA` após 3 tentativas, nenhuma mensagem com CPF, e-mail ou nome do paciente |
@@ -141,7 +141,7 @@ Fonte: `api/Rotas.java`. Cada linha é testada com os três perfis e sem login (
 | `Agenda.test.jsx`, `AgendaConflitos.test.jsx` | Jornada semanal, bloqueios e aviso de consultas afetadas |
 | `Calendario.test.jsx` | Regras de exibição (livre, ocupado, remarcar, bloqueado, indisponível), navegação e visão do dia |
 | `Consultas.test.jsx` | Listagem, detalhe e cancelamento de consultas por perfil |
-| `NovaConsulta.test.jsx`, `FluxoAgendamento.test.jsx`, `FiltrosAgendamento.test.jsx`, `HorariosDisponiveis.test.jsx`, `ResumoAgendamento.test.jsx` e serviços de agendamento | Fluxo de agendamento: filtros, paciente, horários, resumo, confirmação e resultado incerto |
+| `NovaConsulta.test.jsx`, `FluxoAgendamento.test.jsx`, `FiltrosAgendamento.test.jsx`, `HorariosDisponiveis.test.jsx`, `ResumoAgendamento.test.jsx` e serviços de agendamento | Fluxo da secretaria: filtros, paciente com ou sem conta, horários, resumo, confirmação e resultado incerto; paciente sem acesso direto ou atalhos |
 
 ## Como executar
 

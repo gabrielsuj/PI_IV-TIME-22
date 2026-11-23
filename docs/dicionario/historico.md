@@ -76,7 +76,7 @@ Transições permitidas:
 
 | Evento | `statusAnterior` | `statusNovo` | Atores permitidos | Campos específicos |
 |--------|------------------|--------------|-------------------|--------------------|
-| `CRIACAO` | `null` | `AGENDADA` | `PACIENTE`, `SECRETARIA`, `ADMINISTRADOR` | — |
+| `CRIACAO` | `null` | `AGENDADA` | `SECRETARIA_ADMIN` em novos agendamentos; atores antigos preservados no histórico | — |
 | `CONFIRMACAO` | `AGENDADA` | `CONFIRMADA` | `PACIENTE`, `MEDICO`, `SECRETARIA`, `ADMINISTRADOR` | — |
 | `ALTERACAO` | `AGENDADA` ou `CONFIRMADA` | igual ao anterior | `SECRETARIA`, `ADMINISTRADOR` | `alteracoes` obrigatório |
 | `CANCELAMENTO` | `AGENDADA` ou `CONFIRMADA` | `CANCELADA` | `PACIENTE`, `MEDICO`, `SECRETARIA`, `ADMINISTRADOR` | `motivo` opcional |

@@ -65,7 +65,7 @@ O MongoDB não impõe integridade referencial: a existência dos documentos refe
 |--------|-------------|--------|--------|
 | `AGUARDANDO` | Interesse registrado; nenhuma vaga compatível sinalizada no momento. | Sim | Não |
 | `SINALIZADA` | Uma vaga compatível foi liberada e o paciente foi avisado; aguarda ação do paciente. | Sim | Não |
-| `ATENDIDA` | O paciente agendou a vaga (`consultaAgendadaId` preenchido). | Não | Sim |
+| `ATENDIDA` | A secretaria agendou a vaga para o paciente (`consultaAgendadaId` preenchido). | Não | Sim |
 | `CANCELADA` | O paciente desistiu ou a secretaria removeu o interesse. | Não | Sim |
 | `EXPIRADA` | `validoAte` vencido ou `dataFim` ultrapassada sem atendimento. | Não | Sim |
 
@@ -74,8 +74,8 @@ Transições permitidas:
 | De | Para | Gatilho |
 |----|------|---------|
 | `AGUARDANDO` | `SINALIZADA` | Consulta compatível passa a `CANCELADA`. |
-| `SINALIZADA` | `AGUARDANDO` | A vaga sinalizada foi ocupada por outro paciente ou deixou de estar disponível; o interessado mantém `criadoEm` (posição original). |
-| `AGUARDANDO` ou `SINALIZADA` | `ATENDIDA` | Paciente cria consulta (`AGENDADA`) para a vaga. |
+| `SINALIZADA` | `AGUARDANDO` | A vaga sinalizada foi ocupada para outro paciente pela secretaria ou deixou de estar disponível; o interessado mantém `criadoEm` (posição original). |
+| `AGUARDANDO` ou `SINALIZADA` | `ATENDIDA` | Secretaria cria consulta (`AGENDADA`) para o interessado na vaga. |
 | `AGUARDANDO` ou `SINALIZADA` | `CANCELADA` | Ação do paciente ou da secretaria. |
 | `AGUARDANDO` ou `SINALIZADA` | `EXPIRADA` | Rotina de expiração (`validoAte` ou `dataFim` vencidos). |
 
@@ -86,8 +86,8 @@ Os status da consulta (`AGENDADA`, `CONFIRMADA`, `CANCELADA`, `CONCLUIDA`, `FALT
 | Evento na consulta | Efeito em `filaEspera` |
 |--------------------|------------------------|
 | Consulta passa a `CANCELADA` | Busca interessados compatíveis (regra abaixo), na ordem de `criadoEm`; cada um vai a `SINALIZADA`, recebe `ultimaSinalizacao` e uma notificação `VAGA_LIBERADA`. |
-| Nova consulta `AGENDADA` na vaga sinalizada, pelo próprio interessado | Interesse vai a `ATENDIDA`, com `consultaAgendadaId` e `atendidaEm`. |
-| Nova consulta `AGENDADA` na mesma vaga, por outro paciente | Demais interessados `SINALIZADA` daquela vaga voltam a `AGUARDANDO`. |
+| Nova consulta `AGENDADA` na vaga sinalizada, para o próprio interessado pela secretaria | Interesse vai a `ATENDIDA`, com `consultaAgendadaId` e `atendidaEm`. |
+| Nova consulta `AGENDADA` na mesma vaga, para outro paciente pela secretaria | Demais interessados `SINALIZADA` daquela vaga voltam a `AGUARDANDO`. |
 | Consulta `CONFIRMADA`, `CONCLUIDA` ou `FALTA` | Sem efeito. |
 
 Regra de compatibilidade entre um interessado e a vaga liberada (todas devem ser verdadeiras):

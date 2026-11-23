@@ -8,7 +8,7 @@ RA: 25006162
 > Issue #31 (registro de interesse na fila) · Sprint 4
 > Relacionadas: #32 (sinalização após cancelamento), #57 (avisos de vaga). Modelo: [filaEspera.md](../dicionario/filaEspera.md)
 
-O paciente entra na fila de uma especialidade, com um médico específico ou com qualquer médico dela. Quando uma consulta compatível é cancelada, ele é avisado (#32) e quem agendar primeiro fica com a vaga.
+O paciente entra na fila de uma especialidade, com um médico específico ou com qualquer médico dela. Quando uma consulta compatível é cancelada, ele é avisado (#32) e pode procurar a secretaria para agendar. A primeira reserva confirmada pela secretaria fica com a vaga.
 
 ## 1. Rotas e permissões
 
@@ -84,7 +84,7 @@ Respostas de erro:
 - **Campos sem valor não aparecem na resposta** (a API omite `null`, como nas outras rotas). No front, trate campo ausente como vazio.
 - `medicoId`/`medicoNome` ficam sem valor quando a inscrição vale para qualquer médico.
 - `dataInicio`/`dataFim` são datas locais (`AAAA-MM-DD`), sem valor quando não foram informadas. Datas com hora estão em ISO 8601 UTC.
-- `ultimaSinalizacao` só aparece quando `status = SINALIZADA`: inclui o `notificacaoId` usado para o agendamento em `POST /avisos-vaga`.
+- `ultimaSinalizacao` só aparece quando `status = SINALIZADA`: inclui o `notificacaoId` usado para consultar o aviso de vaga.
 
 Status: `AGUARDANDO`, `SINALIZADA`, `ATENDIDA`, `CANCELADA`, `EXPIRADA` (significados em [filaEspera.md](../dicionario/filaEspera.md#status-do-interesse)).
 
@@ -100,7 +100,7 @@ Lista em ordem de chegada (`criadoEm`).
 
 Antes de responder, a fila é revisada: inscrições ativas vencidas passam a `EXPIRADA`, e sinalizações de vagas que já passaram voltam a `AGUARDANDO`.
 
-Uma inscrição `SINALIZADA` muda sozinha quando a vaga é ocupada: vira `ATENDIDA` se o próprio paciente agendou aquele horário (`POST /consultas` com o médico e o início da `ultimaSinalizacao`), ou volta a `AGUARDANDO` se outra pessoa agendou primeiro.
+Uma inscrição `SINALIZADA` muda sozinha quando a vaga é ocupada: vira `ATENDIDA` se a secretaria agendou aquele horário para o interessado (`POST /consultas` com o médico e o início da `ultimaSinalizacao`), ou volta a `AGUARDANDO` se a secretaria agendou primeiro para outro paciente.
 
 ## 5. DELETE /fila-espera/{id}
 
@@ -123,20 +123,20 @@ Remove a inscrição: o status passa a `CANCELADA` e a resposta (200) traz a ins
 
 Na tela da fila, o paciente abre o aviso indicado por `ultimaSinalizacao.notificacaoId`. A secretaria pode iniciar o agendamento em nome do paciente.
 
-A opção **Avisos de vaga** aparece no menu do paciente. O aviso nasce quando uma consulta é cancelada e há uma inscrição compatível. O paciente pode abrir o aviso, conferir o horário e confirmar a consulta. A tela atualiza a lista a cada 15 segundos, ao recuperar o foco e depois de uma tentativa de agendamento.
+A opção **Avisos de vaga** aparece no menu do paciente. O aviso nasce quando uma consulta é cancelada e há uma inscrição compatível. O paciente pode abrir o aviso e conferir o horário. Para agendar, deve procurar a secretaria; a tela não oferece confirmação nem links para Nova consulta. A lista atualiza a cada 15 segundos, ao recuperar o foco e pela atualização manual.
 
 | Método | Caminho | Resultado |
 |---|---|---|
 | GET | `/avisos-vaga` | Lista os próprios avisos de vaga, incluindo expirados e agendados, do mais recente ao mais antigo. |
-| POST | `/avisos-vaga` | Recebe `{ "avisoId": "…" }` e devolve 201 com a consulta criada. Médico, especialidade e horário vêm da consulta de origem do aviso. |
+| POST | `/avisos-vaga` | Agendamento pelo aviso desabilitado: 403 para qualquer perfil autenticado. A secretaria agenda em `POST /consultas`. |
 
-As rotas exigem token de paciente vinculado a um cadastro. ID malformado retorna 400. Aviso inexistente ou de outro paciente retorna 404. Aviso expirado, já usado ou horário indisponível retorna 409.
+A leitura exige token de paciente vinculado a um cadastro. Sem sessão, as rotas retornam 401. `POST /avisos-vaga` retorna 403 antes de processar o corpo; os próprios avisos continuam disponíveis em `GET /avisos-vaga`.
 
-Depois de salvar um bloqueio ou uma alteração de jornada, a API revalida as ofertas do médico com as regras de disponibilidade do agendamento. Se o intervalo já não puder ser reservado, o aviso aparece como `EXPIRADO`. A inscrição ainda válida volta a `AGUARDANDO` na posição original. A leitura e a confirmação do aviso também revalidam o intervalo.
+Depois de salvar um bloqueio ou uma alteração de jornada, a API revalida as ofertas do médico com as regras de disponibilidade do agendamento. Se o intervalo já não puder ser reservado, o aviso aparece como `EXPIRADO`. A inscrição ainda válida volta a `AGUARDANDO` na posição original. A leitura do aviso também revalida o intervalo; a secretaria revalida a disponibilidade ao confirmar a consulta.
 
 A lista devolve `id`, `medicoNome`, `medicoId`, `especialidadeId`, `inicio`, `fim`, `validoAte`, `status`, `motivo` e, quando agendado, `consultaAgendadaId`. Os horários estão em ISO 8601 UTC. A validade termina no início da vaga ou no vencimento da inscrição, o que ocorrer primeiro.
 
-- **`DISPONIVEL`**: o paciente pode tentar agendar. A confirmação revalida a jornada, os bloqueios e a ocupação.
+- **`DISPONIVEL`**: a oportunidade pode ser consultada pelo paciente, que deve solicitar o agendamento à secretaria.
 - **`AGENDADO`**: o paciente ficou com a vaga. A inscrição passa a `ATENDIDA`.
 - **`EXPIRADO`**: a vaga venceu, outra pessoa a ocupou ou a inscrição deixou de corresponder ao aviso. Ao perder a vaga para outro paciente, a inscrição volta a `AGUARDANDO` e mantém a posição.
 
@@ -146,10 +146,10 @@ Quando `status = EXPIRADO`, o campo `motivo` diz à tela qual mensagem mostrar. 
 
 | `motivo` | Quando acontece | O que a tela mostra |
 |---|---|---|
-| `VAGA_OCUPADA` | Outra consulta ativa já ocupa o horário (outro paciente confirmou antes, ou a secretaria agendou). | Avisa que a vaga já foi ocupada e oferece **Buscar outra vaga**. |
+| `VAGA_OCUPADA` | Outra consulta ativa já ocupa o horário (a secretaria reservou para outro paciente). | Avisa que a vaga já foi ocupada e mantém o acesso à **Fila de espera**. |
 | `PRAZO_ENCERRADO` | Chegou o horário da vaga ou venceu a inscrição na fila (`validoAte`). | Avisa que o prazo do aviso terminou. |
-| `OPORTUNIDADE_DESATUALIZADA` | A agenda mudou (bloqueio ou jornada), a inscrição foi cancelada ou recebeu outro aviso mais novo. | Avisa que a oferta ficou desatualizada e oferece **Buscar outra vaga**. |
+| `OPORTUNIDADE_DESATUALIZADA` | A agenda mudou (bloqueio ou jornada), a inscrição foi cancelada ou recebeu outro aviso mais novo. | Avisa que a oferta ficou desatualizada e mantém o acesso à **Fila de espera**. |
 
 A ordem de avaliação é `VAGA_OCUPADA` → `PRAZO_ENCERRADO` → `OPORTUNIDADE_DESATUALIZADA`: se o horário já tem dono, essa é a informação mais útil, mesmo que o prazo também tenha passado.
 
-`medicoId` e `especialidadeId` vêm da consulta de origem e servem para abrir **Nova consulta** já filtrada pelo mesmo médico e especialidade.
+`medicoId` e `especialidadeId` vêm da consulta de origem. O paciente consulta o aviso; somente a secretaria pode abrir **Nova consulta** e reservar o horário.
