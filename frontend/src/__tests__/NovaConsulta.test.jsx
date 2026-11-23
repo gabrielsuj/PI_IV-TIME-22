@@ -54,7 +54,7 @@ beforeEach(() => {
 // Os catálogos simulados mantêm vínculos de médico e especialidade para que o teste
 // percorra as escolhas válidas da tela.
 describe('tela de nova consulta', () => {
-  it.each(['SECRETARIA_ADMIN', 'PACIENTE'])('permite a escolha do atendimento para %s usando os catálogos reais', async (perfil) => {
+  it.each(['SECRETARIA_ADMIN'])('permite a escolha do atendimento para %s usando os catálogos reais', async (perfil) => {
     entrarComo({ id: 'u-teste', nome: 'Teste', perfil });
     const fetchMock = mockCatalogos();
     const user = userEvent.setup();
@@ -82,8 +82,8 @@ describe('tela de nova consulta', () => {
     expect(fetchMock.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
   });
 
-  it('bloqueia o médico sem carregar catálogos', () => {
-    entrarComo({ id: 'u-medico', nome: 'Médico', perfil: 'MEDICO' });
+  it.each(['MEDICO', 'PACIENTE'])('bloqueia %s pela URL sem carregar catálogos', (perfil) => {
+    entrarComo({ id: 'u-bloqueado', nome: 'Teste', perfil });
     const fetchMock = mockCatalogos();
     renderAt();
     expect(screen.getByRole('heading', { name: 'Acesso não permitido' })).toBeInTheDocument();
@@ -220,7 +220,7 @@ describe('tela de nova consulta', () => {
     const user = userEvent.setup();
     const router = renderAt('/');
     const main = within(screen.getByRole('main'));
-    if (perfil === 'MEDICO') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+    if (perfil !== 'SECRETARIA_ADMIN') expect(main.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
     else {
       await user.click(main.getByRole('link', { name: 'Nova consulta' }));
       expect(router.state.location.pathname).toBe('/nova-consulta');
@@ -231,13 +231,13 @@ describe('tela de nova consulta', () => {
 
 // #58: o botão "Buscar outra vaga" de um aviso expirado abre a busca já filtrada.
 describe('nova busca a partir de um aviso de vaga', () => {
-  function abrirComBusca(buscaVaga, perfil = 'PACIENTE') {
+  function abrirComBusca(buscaVaga, perfil = 'SECRETARIA_ADMIN') {
     entrarComo({ id: 'u-teste', nome: 'Teste', perfil });
     mockCatalogos();
     renderAt({ pathname: '/nova-consulta', state: { buscaVaga } });
   }
 
-  it('preenche a especialidade e o médico do aviso e deixa a data para o paciente', async () => {
+  it('preenche a especialidade e o médico do aviso e deixa a data para a secretaria', async () => {
     abrirComBusca({ especialidadeId: 'e1', medicoId: 'm1' });
     await screen.findByRole('option', { name: 'Cardiologia' });
 
@@ -264,7 +264,7 @@ describe('nova busca a partir de um aviso de vaga', () => {
     expect(screen.getByRole('combobox', { name: /Médico/ })).toHaveValue('');
   });
 
-  it('deixa o paciente trocar o médico sugerido', async () => {
+  it('deixa a secretaria trocar o médico sugerido', async () => {
     const user = userEvent.setup();
     abrirComBusca({ especialidadeId: 'e1', medicoId: 'm1' });
     await screen.findByRole('option', { name: 'Cardiologia' });

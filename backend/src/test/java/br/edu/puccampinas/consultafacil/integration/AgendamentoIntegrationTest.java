@@ -83,7 +83,7 @@ class AgendamentoIntegrationTest {
 
     @BeforeAll
     static void conectar() {
-        mongo = new MongoConnection("mongodb://localhost:27017/?serverSelectionTimeoutMS=3000", "consultafacil_test");
+        mongo = new MongoConnection(System.getProperty("mongoTestUri", "mongodb://localhost:27017/?serverSelectionTimeoutMS=3000"), "consultafacil_test");
     }
 
     @AfterAll
@@ -362,9 +362,9 @@ class AgendamentoIntegrationTest {
     }
 
     @Test
-    void pacienteAgendaParaSiMesmoSemInformarPacienteId() {
+    void secretariaAgendaParaPacienteComConta() {
         ConsultaResponse c = service.agendar(
-                pedido(null, "2026-10-26T11:00:00Z", "2026-10-26T11:30:00Z"), PACIENTE_LOGADO);
+                pedido(PACIENTE, "2026-10-26T11:00:00Z", "2026-10-26T11:30:00Z"), SECRETARIA);
         assertEquals(PACIENTE.toHexString(), c.pacienteId());
     }
 

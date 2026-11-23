@@ -108,7 +108,7 @@ Não há índice de `nome` nem índice único/parcial de `usuarioId` no script a
 - O CPF também passa pela verificação dos dígitos verificadores. A API valida o formato do e-mail e a unicidade de CPF/e-mail, complementada pelos índices do banco.
 - `SECRETARIA_ADMIN` pode cadastrar, listar, consultar e editar pacientes. O PUT exige novamente os três campos editáveis.
 - `MEDICO` pode listar e consultar o cadastro, em modo de leitura, sem filtro por atendimento no serviço atual.
-- `PACIENTE` não acessa `/pacientes`. O vínculo da sessão é usado nas rotas próprias de agendamento, consultas, fila e notificações.
+- `PACIENTE` não acessa `/pacientes`. O vínculo da sessão é usado nas rotas próprias de consultas, fila e notificações; o agendamento é realizado pela secretaria, inclusive para pacientes com conta.
 - Não há exclusão, desativação ou registro de alterações cadastrais em `historico` por esses endpoints. O histórico implementado acompanha os eventos das consultas.
 
 O contrato HTTP, a busca, os códigos de erro e os testes estão em [pacientes.md](../api/pacientes.md). As preferências de comunicação da especificação inicial não controlam o envio atual; consulte o [modelo de notificações](notificacoes.md) e a [API da central](../api/notificacoes.md).

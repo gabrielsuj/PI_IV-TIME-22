@@ -13,16 +13,14 @@ export const NOME_PERFIL = {
 const TODOS = ['SECRETARIA_ADMIN', 'MEDICO', 'PACIENTE'];
 const EQUIPE = ['SECRETARIA_ADMIN', 'MEDICO'];
 const SECRETARIA = ['SECRETARIA_ADMIN'];
-// O acesso a Nova consulta acompanha os perfis que podem agendar, mantendo o atalho
-// visível para secretaria e paciente.
-const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
+const FILA_ESPERA = ['SECRETARIA_ADMIN', 'PACIENTE'];
 
 /**
  * Itens do menu lateral e os perfis que podem abrir cada tela.
  *
  * Regra: cadastros-base (médicos, especialidades) e a área técnica (status)
  * ficam só com a secretaria. Médico usa pacientes (consulta) e agenda.
- * Secretaria e paciente podem iniciar agendamento. "Consultas" (#30) abre para
+ * Somente a secretaria pode iniciar agendamento. "Consultas" (#30) abre para
  * todos: o paciente vê as próprias, o médico as que atende e a secretaria todas.
  *
  * O servidor continua sendo quem bloqueia o acesso aos dados (403, ver
@@ -30,9 +28,9 @@ const AGENDAMENTO = ['SECRETARIA_ADMIN', 'PACIENTE'];
  */
 export const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true, perfis: TODOS },
-  { to: '/nova-consulta', label: 'Nova consulta', perfis: AGENDAMENTO },
+  { to: '/nova-consulta', label: 'Nova consulta', perfis: SECRETARIA },
   { to: '/consultas', label: 'Consultas', perfis: TODOS },
-  { to: '/fila-espera', label: 'Fila de espera', perfis: AGENDAMENTO },
+  { to: '/fila-espera', label: 'Fila de espera', perfis: FILA_ESPERA },
   { to: '/avisos-vaga', label: 'Avisos de vaga', perfis: ['PACIENTE'] },
   { to: '/notificacoes', label: 'Notificações', perfis: ['PACIENTE', 'MEDICO'] },
   { to: '/pacientes', label: 'Pacientes', perfis: EQUIPE },

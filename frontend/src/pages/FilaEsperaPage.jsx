@@ -285,7 +285,7 @@ export default function FilaEsperaPage() {
         )}
         {p.status === 'SINALIZADA' && p.ultimaSinalizacao && (
           <Button size="sm" onClick={() => agendarSinalizacao(p)} disabled={!!operandoId}>
-            Agendar vaga
+            {secretaria ? 'Agendar vaga' : 'Ver aviso de vaga'}
           </Button>
         )}
         {(p.status === 'AGUARDANDO' || p.status === 'SINALIZADA') && (
@@ -316,7 +316,7 @@ export default function FilaEsperaPage() {
       {avisosDeVaga.map((item) => (
         <div className="fila-v4__aviso" key={`${item.id}-${item.texto}`} role="status">
           <Alert tone="warning">{item.texto}</Alert>
-          {item.busca && <Button to={item.busca.to} state={item.busca.state} variant="outline" size="sm">Buscar outra vaga</Button>}
+          {secretaria && item.busca && <Button to={item.busca.to} state={item.busca.state} variant="outline" size="sm">Buscar outra vaga</Button>}
           <Button variant="ghost" size="sm" onClick={() => setAvisosDeVaga((prev) => prev.filter((a) => a !== item))}>Dispensar aviso</Button>
         </div>
       ))}

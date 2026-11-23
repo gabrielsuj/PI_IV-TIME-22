@@ -132,7 +132,7 @@ class RotasAutorizacaoTest {
         "GET,    /vagas,          PACIENTE,         200",
         "GET,    /vagas,          MEDICO,           200",
         "GET,    /vagas,          SECRETARIA_ADMIN, 200",
-        "POST,   /consultas,      PACIENTE,         200",
+        "POST,   /consultas,      PACIENTE,         403",
         "POST,   /consultas,      SECRETARIA_ADMIN, 200",
         "POST,   /consultas,      MEDICO,           403",
         // Cancelamento (#27): os três perfis; o serviço confere se a consulta é de quem chama
@@ -177,7 +177,7 @@ class RotasAutorizacaoTest {
         "POST,   /notificacoes/lida,          MEDICO,           200",
         "POST,   /notificacoes/confirmar,     MEDICO,           403",
         "GET,    /avisos-vaga,                PACIENTE,         200",
-        "POST,   /avisos-vaga,                PACIENTE,         200",
+        "POST,   /avisos-vaga,                PACIENTE,         403",
         "GET,    /avisos-vaga,                MEDICO,           403",
         "POST,   /avisos-vaga,                SECRETARIA_ADMIN, 403",
     })
@@ -185,6 +185,22 @@ class RotasAutorizacaoTest {
         var r = enviar(metodo, rota, token(perfil));
         assertEquals(esperado, r.statusCode(), r.body());
         if (esperado == 200) assertEquals(perfil.name(), json.readTree(r.body()).get("perfil").asText());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"/consultas", "/avisos-vaga"})
+    void pacienteNaoCriaConsultaMesmoEnviandoCorpoValido(String rota) throws Exception {
+        var pedido = HttpRequest.newBuilder(URI.create(base + rota))
+                .header("Authorization", "Bearer " + token(Perfil.PACIENTE))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"pacienteId\":\"400000000000000000000001\","
+                        + "\"medicoId\":\"100000000000000000000001\",\"especialidadeId\":\"000000000000000000000001\","
+                        + "\"inicio\":\"2026-12-01T12:00:00Z\",\"fim\":\"2026-12-01T12:30:00Z\","
+                        + "\"avisoId\":\"700000000000000000000001\"}"))
+                .build();
+        var resposta = client.send(pedido, HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, resposta.statusCode(), resposta.body());
+        assertEquals(403, json.readTree(resposta.body()).get("status").asInt());
     }
 
     private record Regra(String metodo, String rota, Set<Perfil> permitidos) {}
@@ -218,7 +234,7 @@ class RotasAutorizacaoTest {
             new Regra("GET", "/pacientes", equipe), new Regra("GET", "/pacientes/abc", equipe),
             new Regra("POST", "/pacientes", secretaria), new Regra("PUT", "/pacientes/abc", secretaria),
             // Vagas e agendamento
-            new Regra("GET", "/vagas", todos), new Regra("POST", "/consultas", pacienteESecretaria),
+            new Regra("GET", "/vagas", todos), new Regra("POST", "/consultas", secretaria),
             // Consulta: os três perfis; o serviço limita a consulta de quem chama
             new Regra("GET", "/consultas/lista", todos), new Regra("GET", "/consultas/abc", todos),
             new Regra("POST", "/consultas/abc/cancelamento", todos), new Regra("POST", "/consultas/abc/status", todos),
@@ -230,7 +246,7 @@ class RotasAutorizacaoTest {
             new Regra("GET", "/notificacoes", pacienteEMedico), new Regra("POST", "/notificacoes/lida", pacienteEMedico),
             new Regra("POST", "/notificacoes/confirmar", paciente),
             // Avisos de vaga (#57): só o paciente
-            new Regra("GET", "/avisos-vaga", paciente), new Regra("POST", "/avisos-vaga", paciente));
+            new Regra("GET", "/avisos-vaga", paciente), new Regra("POST", "/avisos-vaga", Set.of()));
     }
 
     static Stream<Arguments> matrizCompleta() {
@@ -274,7 +290,8 @@ class RotasAutorizacaoTest {
     /** O contexto "/consultas/" não pode engolir o "/consultas" sem barra, que continua no Router. */
     @Test void consultasSemBarraContinuaNoRouter() throws Exception {
         assertEquals(403, enviar("GET", "/consultas", token(Perfil.PACIENTE)).statusCode());
-        assertEquals(200, enviar("POST", "/consultas", token(Perfil.PACIENTE)).statusCode());
+        assertEquals(403, enviar("POST", "/consultas", token(Perfil.PACIENTE)).statusCode());
+        assertEquals(200, enviar("POST", "/consultas", token(Perfil.SECRETARIA_ADMIN)).statusCode());
         assertEquals(204, enviar("OPTIONS", "/consultas/abc/cancelamento", null).statusCode());
         assertEquals(204, enviar("OPTIONS", "/consultas/abc/status", null).statusCode());
         assertEquals(204, enviar("OPTIONS", "/consultas/abc/historico", null).statusCode());

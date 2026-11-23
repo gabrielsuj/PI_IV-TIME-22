@@ -12,8 +12,8 @@ Roteiro para demonstrar o MVP e publicar a versão entregue (#45). O escopo e os
 Use a carga e os logins de demonstração do [README](../../README.md#demonstração-com-dados-prontos).
 
 1. Na secretaria, busque Carla em **Pacientes**, abra o detalhe pelo nome e volte à lista. Confira a busca preservada e o acesso à edição. Repita com o login da médica Ana e confira a tela de leitura.
-2. Abra duas sessões independentes, uma de Paulo e outra da secretaria. Em **Nova consulta**, escolha Carla na sessão da secretaria. Nas duas sessões, escolha a mesma especialidade, médico, data futura e horário. Deixe os dois resumos abertos.
-3. Confirme com Paulo e depois com a secretaria. Na secretaria, confira o aviso de conflito e os dados preenchidos, escolha outra vaga e confirme pelo novo resumo. Escolha um dia com pelo menos dois horários livres.
+2. Abra duas sessões independentes da secretaria. Em **Nova consulta**, escolha Paulo em uma e Carla na outra, mesmo que ambos tenham conta. Escolha a mesma especialidade, médico, data futura e horário nas duas e deixe os resumos abertos.
+3. Confirme em uma sessão e depois na outra. Na segunda, confira o aviso de conflito e os dados preenchidos, escolha outra vaga e confirme pelo novo resumo. Escolha um dia com pelo menos dois horários livres.
 
 ## Demonstração do cancelamento e da fila
 
@@ -21,8 +21,8 @@ A carga de demonstração (`database/seed/08-fila-notificacoes.js`) inscreve Car
 
 1. Recrie o banco `consultafacil_demo` conforme o README e rode o verificador da carga. Copie o ID da linha "Consulta para a demonstração da fila".
 2. Entre com a secretaria, abra `/consultas/<id>` e cancele essa consulta. No histórico da consulta aparecem o cancelamento e a sinalização da fila.
-3. Abra sessões separadas de Carla e Diego (logins no README). Os dois veem a vaga em **Fila de espera** e em **Avisos de vaga**. Deixe a confirmação aberta nas duas sessões.
-4. Confirme nas duas. Quem confirmar primeiro fica com a consulta. O outro recebe a mensagem de que a vaga foi ocupada; depois da atualização, o aviso dele aparece como **Expirado** e a inscrição volta para **Aguardando**, na mesma posição da fila.
+3. Abra sessões separadas de Carla e Diego (logins no README). Os dois veem a vaga em **Fila de espera** e em **Avisos de vaga**, sem botões de agendamento. O acesso direto a `/nova-consulta` deve ser negado.
+4. Em duas sessões da secretaria, tente reservar a vaga para Carla e Diego. A primeira confirmação fica com a consulta. O outro paciente vê que a vaga foi ocupada; depois da atualização, o aviso dele aparece como **Expirado** e a inscrição volta para **Aguardando**, na mesma posição da fila.
 
 O cenário cobre os aceites "dois usuários escolhem a mesma vaga" e "cancelamento libera a vaga, atualiza o histórico e sinaliza a fila".
 
@@ -34,7 +34,7 @@ A central consome documentos do canal `SISTEMA` em estado `ENVIADA`, no formato 
 
 ## Demonstração dos lembretes e notificações (#34)
 
-1. Com a API no ar, entre como Paulo e agende uma consulta em **Nova consulta**. Em **Notificações** aparece "Consulta agendada" na hora.
+1. Com a API no ar, use a secretaria para agendar uma consulta para Paulo em **Nova consulta**. Na conta de Paulo, **Notificações** mostra "Consulta agendada" na hora.
 2. Para ver o lembrete sem esperar 24 horas, agende uma consulta para as próximas 24 horas: o lembrete é entregue no próximo ciclo do agendador (até `NOTIFICACOES_INTERVALO_SEGUNDOS`, padrão 60 s). Use **Confirmar presença** nele.
 3. Entre com a secretaria e cancele uma consulta de Paulo. Paulo e o médico recebem "Consulta cancelada"; o lembrete pendente dessa consulta é descartado.
 4. Opcional: com `NOTIFICACOES_EMAIL_TESTE=true` no `.env`, reinicie a API e repita o passo 1. O terminal da API mostra `[e-mail de teste] para p***@...` com a mesma mensagem, sem CPF ou dado de saúde.
@@ -78,6 +78,8 @@ Em 20/11/2026, o aceite rodou no navegador e foi repetido após as três correç
 A repetição local do aceite da #38 passou. A revisão final ainda precisa reunir as alterações de entrega e registrar a validação no commit escolhido.
 
 ### Segunda rodada do fluxo completo (22/11/2026)
+
+Registro histórico das permissões anteriores: atualmente o paciente não agenda nem usa o POST de avisos; o agendamento é exclusivo da secretaria.
 
 Executada sobre a `develop` em `ee03263` (com #58 e #50), com os quatro processos rodando juntos na mesma máquina: MongoDB (27017), servidor TCP de CPF (3001), API (3000, banco `consultafacil_demo` recriado) e front-end (5173). O fluxo foi percorrido no navegador com três perfis e conferido também pela API.
 

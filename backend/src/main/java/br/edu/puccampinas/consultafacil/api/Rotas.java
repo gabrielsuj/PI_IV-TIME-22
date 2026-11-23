@@ -32,13 +32,13 @@ import static br.edu.puccampinas.consultafacil.domain.enums.Perfil.*;
  *  GET /medicos, /especialidades[/{id}] | ✓ | ✓ | ✓
  *  POST/PUT desses cadastros    |    -     |   -    |   ✓
  *  GET  /vagas (#21)            |    ✓     |   ✓    |   ✓
- *  POST /consultas (#21)        |    ✓     |   -    |   ✓   (paciente só para si mesmo)
+ *  POST /consultas (#21)        |    -     |   -    |   ✓
  *  POST /consultas/{id}/cancelamento (#27) | ✓ | ✓  |   ✓   (paciente e médico só as próprias)
  *  POST /consultas/{id}/status (#28) | ✓ | ✓ | ✓ (serviço valida ação e propriedade)
  *  GET /consultas/{id}/historico (#46) | ✓ | ✓ | ✓ (paciente e médico só as próprias)
  *  GET  /consultas/lista, /consultas/{id} (#30) | ✓ | ✓ | ✓   (paciente e médico só as próprias)
  *  POST/GET /fila-espera, DELETE /fila-espera/{id} (#31) | ✓ | - | ✓ (paciente só as próprias)
- *  GET/POST /avisos-vaga (#57) | ✓ | - | - (paciente só os próprios)
+ *  GET /avisos-vaga (#57) | ✓ | - | - (paciente só os próprios)
  */
 public final class Rotas {
     private Rotas() {}
@@ -61,12 +61,12 @@ public final class Rotas {
             .add("POST", "/bloqueios", autz.exigir(h.bloqueios(), MEDICO, SECRETARIA_ADMIN))
             .add("DELETE", "/bloqueios", autz.exigir(h.bloqueios(), MEDICO, SECRETARIA_ADMIN))
             .add("GET", "/vagas", autz.exigir(h.vagas(), PACIENTE, MEDICO, SECRETARIA_ADMIN))
-            .add("POST", "/consultas", autz.exigir(h.consultas(), PACIENTE, SECRETARIA_ADMIN))
+            .add("POST", "/consultas", autz.exigir(h.consultas(), SECRETARIA_ADMIN))
             .add("GET", "/notificacoes", autz.exigir(h.notificacoes(), PACIENTE, MEDICO))
             .add("POST", "/notificacoes/lida", autz.exigir(h.notificacoes(), PACIENTE, MEDICO))
             .add("POST", "/notificacoes/confirmar", autz.exigir(h.notificacoes(), PACIENTE))
             .add("GET", "/avisos-vaga", autz.exigir(h.avisosVaga(), PACIENTE))
-            .add("POST", "/avisos-vaga", autz.exigir(h.avisosVaga(), PACIENTE))
+            .add("POST", "/avisos-vaga", autz.exigir(h.avisosVaga()))
             .add("GET", "/consultas", autz.exigir(h.calendario(), MEDICO, SECRETARIA_ADMIN));
     }
 

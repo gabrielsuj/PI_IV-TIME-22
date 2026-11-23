@@ -736,6 +736,16 @@ describe('ações de status da consulta (#28)', () => {
 });
 
 describe('listagem de consultas', () => {
+  it('paciente mantém a listagem sem menu, botão ou atalho para nova consulta', async () => {
+    entrarComo(PAULO);
+    const fetchMock = mockApi();
+    renderAt('/consultas');
+    await screen.findByRole('table');
+    expect(chamadas(fetchMock, '/consultas/lista')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Nova consulta' })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/nova-consulta"]')).not.toBeInTheDocument();
+  });
+
   it('paciente vê as próprias consultas próximas, sem a coluna de paciente', async () => {
     entrarComo(PAULO);
     const fetchMock = mockApi();

@@ -44,7 +44,7 @@ As rotas e os perfis autorizados estão em [Rotas.java](../backend/src/main/java
 | [consultas.md](api/consultas.md) | `GET /consultas/lista` e `GET /consultas/{id}` (listagem e detalhe por perfil) e as rotas de alteração de status e histórico |
 | [Calendário de consultas](api/consultas.md#7-get-consultas-calendário) | `GET /consultas` com período, escopo por médico e `fusoHorario` opcional |
 | [cancelamento.md](api/cancelamento.md) | `POST /consultas/{id}/cancelamento` (cancelamento por paciente, médico ou secretaria) |
-| [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` e `GET/POST /avisos-vaga` |
+| [fila-espera.md](api/fila-espera.md) | `POST/GET /fila-espera` e `DELETE /fila-espera/{id}` e `GET /avisos-vaga` (leitura pelo paciente) |
 | [Indicadores](api/indicadores.md) | `GET /indicadores` com período, escopo por perfil, contagens e taxas |
 | [Central de notificações](api/notificacoes.md) | `GET /notificacoes`, `POST /notificacoes/lida` e `POST /notificacoes/confirmar` |
 | [alteracoes-agenda.md](api/alteracoes-agenda.md) | `GET/PUT /agendas` e `GET/POST/DELETE /bloqueios`, incluindo confirmação quando a mudança atinge consultas marcadas |

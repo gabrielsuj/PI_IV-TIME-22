@@ -16,7 +16,7 @@ Todas as chamadas exigem `Authorization: Bearer <token>`.
 |---|---|---|---|
 | GET | `/vagas?medicoId=&especialidadeId=&data=AAAA-MM-DD` | 200, vagas de um dia | PACIENTE, MEDICO, SECRETARIA_ADMIN |
 | GET | `/vagas?medicoId=&especialidadeId=&de=AAAA-MM-DD&ate=AAAA-MM-DD` | 200, vagas do intervalo (até 31 dias, datas inclusivas) | PACIENTE, MEDICO, SECRETARIA_ADMIN |
-| POST | `/consultas` | 201, consulta criada | PACIENTE (só para si mesmo), SECRETARIA_ADMIN |
+| POST | `/consultas` | 201, consulta criada | SECRETARIA_ADMIN |
 
 A matriz completa de permissões fica em `api/Rotas.java` e é testada em `RotasAutorizacaoTest`.
 
@@ -84,8 +84,8 @@ Resposta 201:
 }
 ```
 
-- **Secretaria:** `pacienteId` é obrigatório (agenda em nome do paciente).
-- **Paciente:** pode omitir `pacienteId`. A API usa o cadastro ligado ao login (`pacientes.usuarioId`, ver [usuarios-pacientes.md](../dicionario/usuarios-pacientes.md)). Informar outro paciente → 403.
+- **Secretaria:** `pacienteId` é obrigatório. Agenda em nome de qualquer paciente cadastrado, inclusive quem possui conta.
+- **Paciente e médico:** não podem criar consultas; `POST /consultas` retorna 403, mesmo com `pacienteId` próprio ou corpo válido. O paciente mantém listagem, cancelamento, histórico e notificações.
 - A disponibilidade é **revalidada no momento da confirmação**. Se duas pessoas confirmarem a mesma vaga ao mesmo tempo, o índice único `uk_consulta_medico_inicio` aceita só uma (ver [consultas.md §5](../dicionario/consultas.md)).
 - A confirmação recusa qualquer sobreposição com outra consulta ativa do paciente, inclusive com outro médico e horários de início diferentes. Horários adjacentes são permitidos. Veja as [garantias de reserva](../testes/garantias-de-reserva.md).
 - A gravação passa pelo `RegistroConsultaService`, que registra o evento `CRIACAO` no histórico.
@@ -98,7 +98,7 @@ Formato: `{ "status": 409, "erro": "mensagem" }`.
 |---|---|
 | 400 | ID inválido, data fora do formato, intervalo invertido ou maior que 31 dias, médico que não atende a especialidade, secretaria sem `pacienteId` |
 | 401 | Sem sessão ou sessão expirada |
-| 403 | Perfil sem acesso; paciente agendando para outra pessoa; login de paciente sem cadastro ligado |
+| 403 | Perfil sem acesso; PACIENTE ou MEDICO tentando criar consulta |
 | 404 | Médico, especialidade ou paciente inexistente ou inativo |
 | 409 | A mensagem identifica consulta ativa do médico, conflito do paciente, bloqueio, jornada/grade incompatível, ausência de jornada ou horário passado |
 
@@ -107,7 +107,7 @@ Formato: `{ "status": 409, "erro": "mensagem" }`.
 | Arquivo | Precisa do MongoDB? | O que cobre |
 |---|---|---|
 | `unit/CalculadoraDisponibilidadeTest` | não | Jornada × duração, bloqueio (cenário de referência), consulta ativa, sobreposição parcial, dia sem jornada, horário passado, horário que não cabe na faixa |
-| `integration/AgendamentoIntegrationTest` | sim (`consultafacil_test`) | Busca por dia e por intervalo, médico sem agenda, especialidade errada, agendamento pela secretaria e pelo paciente, `deveImpedirReservaEmPeriodoBloqueado` (Quadro 4), fora da jornada, horário passado, 409 para horário já reservado e revalidação de duração e bloqueio parcial entre busca e confirmação |
+| `integration/AgendamentoIntegrationTest` | sim (`consultafacil_test`) | Busca por dia e por intervalo, médico sem agenda, especialidade errada, agendamento pela secretaria para pacientes com ou sem conta, `deveImpedirReservaEmPeriodoBloqueado` (Quadro 4), fora da jornada, horário passado, 409 para horário já reservado e revalidação de duração e bloqueio parcial entre busca e confirmação |
 | `integration/ReservasConcorrenciaIntegrationTest` | sim (`consultafacil_test`) | Sobreposição do mesmo paciente entre médicos diferentes e pedidos simultâneos com inícios diferentes |
 | `integration/RotasAutorizacaoTest` | não | Perfis de `/vagas` e `/consultas` |
 | `frontend/src/__tests__/agendamentoService.test.js` | não | Chamadas do front para `/vagas` e `/consultas` |
