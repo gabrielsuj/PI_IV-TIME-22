@@ -14,6 +14,8 @@
 - [Tecnologias utilizadas](#tecnologias-utilizadas)
 - [Arquitetura da aplicação](#arquitetura-da-aplicação)
 - [Pré-requisitos e guia inicial de execução](#pré-requisitos-e-guia-inicial-de-execução)
+- [Roteiro de entrega e demonstração](docs/operacao/entrega-mvp.md)
+- [Documentação](#documentação)
 - [Estrutura de pastas](#estrutura-de-pastas)
 - [Informações acadêmicas e autoria](#informações-acadêmicas-e-autoria)
 
@@ -58,6 +60,31 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 
 **Fora do MVP:** WhatsApp e SMS reais, teleconsulta, prontuário eletrônico, pagamentos e convênios, relatórios avançados, previsão de faltas por inteligência artificial e aplicativo móvel.
 
+### Situação atual (20/11/2026)
+
+| Funcionalidade | Situação |
+|---|---|
+| Login, sessão com expiração, logout e menu por perfil | ✅ |
+| Cadastro, busca e detalhe do paciente, com edição pela secretaria e leitura pelo médico | ✅ #14 |
+| Cadastros de médicos e especialidades | ✅ |
+| Agenda: jornada semanal, duração e bloqueios, com aviso quando a mudança atinge consultas marcadas | ✅ |
+| Calendário operacional por médico (semana e dia) | ✅ |
+| Busca de vagas e agendamento pela secretaria, com escolha de outro horário após conflito | ✅ #54 |
+| Registro e consulta do histórico no detalhe da consulta | ✅ #29, #46 |
+| Listagem, detalhe e cancelamento de consultas | ✅ |
+| Fila de espera na API: inscrição, sinalização da vaga após cancelamento e atualização quando a vaga é ocupada | ✅ #31, #32 |
+| Avisos de vaga para leitura pelo paciente, com agendamento pela secretaria e expiração | ✅ #57 |
+| Telas da fila de espera (paciente e secretaria) | ✅ #33 |
+| Confirmação, conclusão e falta pela interface | ✅ #28 |
+| Proteção contra consultas sobrepostas do mesmo paciente em médicos diferentes | ✅ #25 |
+| Central de notificações, leitura e confirmação de presença pelo lembrete | ✅ #35 |
+| Confirmação de agendamento, aviso de cancelamento e lembretes com envio periódico (e-mail de teste opcional) | ✅ #34 |
+| API de indicadores, conferida com a carga de demonstração | ✅ Validada (#36 e #48) |
+| Painel operacional: agenda do dia, próximas consultas e indicadores por perfil | ✅ #37 (refinamento visual na #47) |
+| Aceite ponta a ponta do MVP | ✅ Aceite manual local (#38); evidência final na #45 |
+
+A revalidação de 22/11/2026 sobre a `develop` em `8231632` (PR #132), como no workflow de CI, aprovou 910 testes do backend com MongoDB 7 e o servidor de CPF no ar, 535 testes do frontend em 33 arquivos e 16 testes do módulo `server/`, sem falhas. O lint e o build do frontend passaram. O [relatório de teste OO do servidor de CPF](docs/testes/Relatorio_Teste_OO.pdf) documenta os testes intraclasse e interclasse do PI IV. As validações anteriores e os passos até a versão final estão no [roteiro de entrega](docs/operacao/entrega-mvp.md).
+
 ---
 
 ## Tecnologias utilizadas
@@ -69,7 +96,8 @@ O **ConsultaFácil** centraliza a agenda, valida conflitos de horário e conecta
 | Backend | **Java 21** (sem frameworks) | API REST e regras de negócio, sobre o servidor HTTP nativo do JDK (`com.sun.net.httpserver`) |
 | Backend | Maven | Build e gerenciamento de dependências |
 | Banco de dados | **MongoDB** (via MongoDB Java Driver) | Persistência em coleções de documentos |
-| Testes | **JUnit 5** | Testes de unidade e de integração da API |
+| Testes | **JUnit 5** e JUnit 4 | JUnit 5 nos testes de unidade e de integração da API, com MongoDB real; JUnit 4 no módulo `server/` |
+| Testes | **Vitest** + Testing Library | Testes das telas e dos serviços do frontend |
 | Design | Figma | Protótipo navegável |
 | Infraestrutura | Docker Compose | Execução local do MongoDB |
 
@@ -85,8 +113,16 @@ A aplicação segue o modelo **cliente-servidor**, com o frontend e o backend de
 ┌──────────────┐   HTTP / JSON   ┌───────────────────────┐   MongoDB Driver   ┌──────────┐
 │   Frontend   │ ──────────────► │       Backend         │ ─────────────────► │ MongoDB  │
 │  React (SPA) │ ◄────────────── │  Java 21 (API REST)   │ ◄───────────────── │          │
-└──────────────┘                 └───────────────────────┘                    └──────────┘
+└──────────────┘                 └───────────┬───────────┘                    └──────────┘
+                                             │ TCP 3001 (objetos Java serializados)
+                                             ▼
+                                 ┌───────────────────────┐
+                                 │   Servidor de CPF     │
+                                 │  Java 21 (server/)    │
+                                 └───────────────────────┘
 ```
+
+O cadastro e a edição de pacientes consultam o **servidor de validação de CPF** (módulo `server/`), um processo Java separado que recebe objetos serializados por socket TCP na porta 3001, atende cada conexão em uma thread e confere o formato e os dígitos verificadores. Sem ele no ar, a API recusa a gravação de pacientes com `503`.
 
 O backend é organizado em três camadas:
 
@@ -94,13 +130,13 @@ O backend é organizado em três camadas:
 2. **Serviços:** concentram as regras de agendamento, conflitos, cancelamento, fila de espera e permissões.
 3. **Repositórios:** executam as consultas e gravações no banco.
 
-Os dados são organizados nas coleções `pacientes`, `medicos`, `especialidades`, `agendas`, `consultas`, `filaEspera` e `historico`. Na coleção `consultas`, um índice único composto (médico, data e horário), restrito às consultas ativas, garante no próprio banco que apenas uma reserva seja confirmada quando dois usuários disputam a mesma vaga, complementando a validação feita na API.
+Os dados são organizados nas coleções `usuarios`, `pacientes`, `medicos`, `especialidades`, `agendas`, `bloqueios`, `consultas`, `historico`, `filaEspera` e `notificacoes`, todas com validação (`$jsonSchema`) no próprio banco. Na coleção `consultas`, dois índices únicos parciais, (médico, início) e (paciente, início), restritos às consultas ativas, garantem no banco que apenas uma reserva seja confirmada quando dois usuários disputam a mesma vaga, complementando a validação feita na API. Detalhes em [`docs/`](docs/README.md).
 
 ---
 
 ## Pré-requisitos e guia inicial de execução
 
-> 🚧 **Projeto em fase inicial.** Os comandos abaixo serão atualizados conforme o código evoluir. Trechos marcados com `TODO` ainda dependem de implementação.
+> Resumo: suba o MongoDB, recrie o banco de demonstração, inicie a API e o frontend, e entre com um dos logins de demonstração.
 
 ### Pré-requisitos
 
@@ -109,40 +145,166 @@ Os dados são organizados nas coleções `pacientes`, `medicos`, `especialidades
 | Git | 2.x | `git --version` |
 | Java JDK | 21 | `java -version` |
 | Maven | 3.9+ (ou Maven Wrapper do projeto) | `mvn -version` |
-| Node.js e npm | 20 LTS ou superior | `node -v` e `npm -v` |
+| Node.js e npm | 22.22+ (exigido pelo React Router 8) | `node -v` e `npm -v` |
 | MongoDB | 7.x (local) **ou** Docker + Docker Compose | `mongod --version` / `docker --version` |
 
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/<organizacao-ou-usuario>/consultafacil.git
-cd consultafacil
+git clone https://github.com/gabrielsuj/PI_IV-TIME-22.git
+cd PI_IV-TIME-22
 ```
 
 ### 2. Configurar variáveis de ambiente
 
 ```bash
 cp .env.example .env
-# TODO: ajustar os valores em .env (string de conexão do MongoDB, porta da API, segredo do token)
+# para apresentar com os dados de demonstração, troque MONGODB_DATABASE para consultafacil_demo
 ```
+
+O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Execute os comandos de cada módulo a partir das respectivas pastas, como abaixo: o backend procura o `.env` no diretório pai. Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT` e reinicie os processos depois de alterar o arquivo.
+
+A API usa a porta 3000 (`SERVER_PORT`) e o servidor de CPF a 3001 (`CPF_SERVER_PORT`, também o padrão do próprio servidor). Se o seu `.env` foi criado antes dessa mudança e não tem `CPF_SERVER_PORT`, acrescente `CPF_SERVER_PORT=3001`. Sem `SERVER_PORT` no ambiente ou no `.env`, a API usa a porta 8080. Somente as variáveis prefixadas com `VITE_` são incorporadas ao frontend no build.
 
 ### 3. Subir o banco de dados (MongoDB)
 
 Com Docker Compose:
 
 ```bash
-docker compose up -d mongo   # TODO: docker-compose.yml e scripts em database/init/
+docker compose up -d --wait mongo
 ```
+
+O Compose aguarda o healthcheck do MongoDB (`ping` no banco `admin`) antes de concluir o comando com `--wait`. A porta continua publicada apenas em `127.0.0.1`.
+
+Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices no banco `consultafacil`, definido pelo Compose. Eles só rodam automaticamente com o volume vazio e não carregam os seeds. Para recriar um banco específico com dados de exemplo, use os scripts abaixo; mudar `MONGODB_DATABASE` no `.env` não inicializa o novo banco no Docker.
+
+> **Atualizar um banco que já existe.** O Docker não reaplica os scripts num volume já populado. Primeiro, guarde um backup com `bash scripts/backup-banco.sh <banco>`. Depois, `bash scripts/testar-recuperacao.sh <banco>` verifica a restauração em uma cópia temporária, sem alterar o banco original (veja [backup e recuperação](docs/operacao/backup-recuperacao.md)). Com o backup guardado e a recuperação conferida, rode para cada banco utilizado, com o container saudável:
+>
+> ```bash
+> (
+>   banco=consultafacil_demo # escolha explicitamente o banco
+>   for f in database/init/*.js; do
+>     docker exec -i consultafacil-mongo mongosh "$banco" --quiet --file /dev/stdin < "$f" || {
+>       printf 'Falha ao aplicar %s no banco %s\n' "$f" "$banco" >&2
+>       exit 1
+>     }
+>   done
+> )
+> ```
+>
+> Aplique todos os scripts `01` a `10`, em ordem: `02` mantém agendas/bloqueios; `06` especialidades; `07` médicos. Os scripts atualizam validadores e índices e preservam os documentos. Não apague o volume para atualizar schemas. A recriação com `bash scripts/recriar-banco.sh <banco>` apaga e recarrega o banco selecionado; use apenas quando esses dados puderem ser substituídos.
+
+#### Bancos por ambiente
+
+| Banco | Uso | Dados de exemplo |
+|---|---|---|
+| `consultafacil` | Desenvolvimento (padrão do `.env.example`) | sim |
+| `consultafacil_test` | Testes JUnit (os testes limpam as coleções que usam) | não |
+| `consultafacil_demo` | Apresentações, sem interferir no banco de desenvolvimento | sim |
+
+A API usa o banco definido em `MONGODB_DATABASE` no `.env`.
+
+Para atualizar um volume existente pelo PowerShell, preservando documentos (depois de conferir o backup):
+
+```powershell
+$banco = 'consultafacil_demo' # escolha explicitamente o banco
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+Get-ChildItem database/init/*.js | Sort-Object Name | ForEach-Object {
+    Get-Content -Raw -Encoding UTF8 $_.FullName | docker exec -i consultafacil-mongo mongosh $banco --quiet --file /dev/stdin
+    if ($LASTEXITCODE -ne 0) { throw "Falha em $($_.Name)" }
+}
+```
+
+Após atualizar a base de demonstração, confira validadores, índices e carga:
+
+```bash
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
+```
+
+Os seeds só são necessários para uma base com dados de exemplo; o healthcheck não verifica schemas, índices ou seeds. Em volume novo, a inicialização automática cria o banco `consultafacil`; para outro banco, aplique explicitamente todos os schemas e, no cenário de demonstração, os seeds em ordem.
+
+Para recriar qualquer um deles do zero (apaga o banco, executa `database/init/` e, exceto no de testes, `database/seed/`):
+
+```bash
+scripts/recriar-banco.sh consultafacil        # desenvolvimento
+scripts/recriar-banco.sh consultafacil_test
+scripts/recriar-banco.sh consultafacil_demo
+```
+
+#### Demonstração com dados prontos
+
+Com o container Mongo em funcionamento, execute na raiz do projeto:
+
+PowerShell (Windows):
+
+```powershell
+.\scripts\recriar-banco.ps1 consultafacil_demo
+```
+
+Bash (Linux, macOS ou Git Bash):
+
+```bash
+bash scripts/recriar-banco.sh consultafacil_demo
+```
+
+O comando apaga **somente o banco selecionado**, reaplica os schemas e índices e carrega, em ordem, os scripts de `database/seed/`. A recriação de `consultafacil_demo` não apaga os bancos de desenvolvimento ou testes. Os dois scripts exigem o nome explícito do banco e recusam nomes inválidos antes de apagar qualquer dado. Ambos deixam `consultafacil_test` sem seeds.
+
+A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico completo, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas: recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Os IDs fixos permitem repetir os seeds sem duplicar registros; o seed de usuários preserva senhas existentes, e a recriação completa restaura a senha de demonstração. Detalhes em [`docs/dicionario/carga-demonstracao.md`](docs/dicionario/carga-demonstracao.md).
+
+| Perfil | E-mail | Senha de demonstração |
+|---|---|---|
+| Secretaria/administrador | secretaria@consultafacil.demo, lucas.andrade@consultafacil.demo | Demo@123 |
+| Médico | ana.martins@consultafacil.demo (e os demais médicos: nome.sobrenome@consultafacil.demo) | Demo@123 |
+| Paciente | paciente@consultafacil.demo, carla.souza@consultafacil.demo, diego.santos@consultafacil.demo | Demo@123 |
+
+As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `SenhaHasher`. O login da médica está vinculado ao cadastro de Ana; Paulo aparece tanto como usuário quanto como paciente, com o mesmo CPF e e-mail.
+
+Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. O menu mostra só as telas de cada perfil, e o servidor recusa (403) o acesso a dados de outro perfil.
+
+| Perfil | O que mostrar |
+|---|---|
+| Secretaria | Cadastros de pacientes, médicos e especialidades; **Agenda** (jornada semanal e bloqueios, com aviso quando a mudança atinge consultas marcadas); **Calendário** por médico; **Nova consulta** para qualquer paciente; **Consultas** (todas, com detalhe e cancelamento) |
+| Médico (Ana) | **Agenda** e **Calendário** abrem diretamente o cadastro vinculado ao login; **Consultas** que atende; leitura de pacientes |
+| Paciente (Paulo) | **Consultas** próprias, com cancelamento e histórico; avisos de vaga e notificações. Agendamento somente pela secretaria |
+
+A tela **Nova consulta** (`/nova-consulta`) é exclusiva da secretaria, inclusive para pacientes com conta. O perfil PACIENTE recebe 403 ao tentar criar uma consulta na API. Nessa tela, os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
+
+Para verificar a modelagem, use `consultafacil_demo` com os schemas e a carga de demonstração já aplicados:
+
+```bash
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
+```
+
+Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobreposições, histórico e logins):
+
+```bash
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+```
+
+Detalhes da modelagem em [`docs/dicionario/medicos-agenda.md`](docs/dicionario/medicos-agenda.md) e [`docs/dicionario/consultas.md`](docs/dicionario/consultas.md).
 
 Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
 ### 4. Executar o backend
 
+Na raiz do repositório, instale o módulo Java de validação de CPF e deixe seu servidor rodando em um terminal:
+
+```bash
+(cd server && ../backend/mvnw install)   # usa o Maven Wrapper do backend
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
+```
+
+Em outro terminal, inicie a API:
+
 ```bash
 cd backend
-mvn clean install            # TODO: compilar e executar os testes JUnit
-mvn exec:java                # TODO: iniciar a API (porta padrão prevista: 8080)
+./mvnw compile exec:java     # inicia a API em http://localhost:3000 (SERVER_PORT do .env)
 ```
+
+A API lê o `.env` da raiz e mostra `Conectado ao Mongo: <banco>` e `Servidor rodando na porta 3000`. Sem Maven instalado, o wrapper (`./mvnw`, ou `mvnw.cmd` no Windows) baixa a versão correta. As sessões ficam em memória: ao reiniciar a API, é preciso entrar de novo.
+
+O cliente TCP didático não impõe timeout automático. A espera pela resposta ou pelo cabeçalho do stream pode continuar enquanto o outro lado mantiver a conexão aberta e silenciosa; uma mudança dessa política exige uma decisão específica sobre o requisito.
 
 ### 5. Executar o frontend
 
@@ -150,34 +312,73 @@ Em outro terminal:
 
 ```bash
 cd frontend
-npm install                  # TODO: instalar as dependências
-npm run dev                  # TODO: iniciar em modo de desenvolvimento (porta padrão prevista: 5173)
+npm install                  # instala as dependências
+npm run dev                  # inicia em http://localhost:5173
 ```
+
+A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API e indicam se o servidor HTTP responde; esse endpoint não faz um novo ping no banco. Também não consulta o serviço TCP de CPF. Para implantação, mantenha uma instância da API: as travas de intervalos coordenam essa instância, enquanto os índices únicos do MongoDB impedem reservas ativas com início igual. Os índices não impedem, sozinhos, sobreposições com inícios diferentes entre instâncias. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build) e `npm run lint` (ESLint). O build incorpora `VITE_API_BASE_URL`; se a URL da API mudar, gere novamente o build. Para usar o preview padrão em `http://localhost:4173`, inclua essa origem em `CORS_ALLOWED_ORIGINS` e reinicie a API.
 
 ### 6. Executar os testes
 
+Com o MongoDB no ar e o [módulo de CPF instalado e rodando na porta 3001](docs/testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf):
+
 ```bash
-cd backend && mvn test       # TODO: testes de unidade e de integração (JUnit 5)
-cd frontend && npm test      # TODO: testes do frontend, se adotados
+bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem dados
+(cd backend && ./mvnw test)                       # JUnit 5: unidade e integração
+(cd frontend && npm ci && npm test && npm run lint && npm run build)
 ```
 
-### Variáveis de ambiente (previstas)
+A estratégia de testes, a cobertura dos cenários de aceite e os testes opcionais estão em [`docs/testes/estrategia-de-testes.md`](docs/testes/estrategia-de-testes.md), incluindo o [comando completo equivalente à CI](docs/testes/estrategia-de-testes.md#validação-completa-como-na-ci). A execução básica acima não ativa a persistência opcional de histórico, os cadastros com schema real nem a conferência dos indicadores com a carga.
+
+Em cada pull request, o [workflow de CI](.github/workflows/ci.yml) roda o JUnit com MongoDB 7 e os checks do frontend com `npm test`, `npm run lint` e `npm run build`.
+
+### 7. Backup e recuperação
+
+```bash
+bash scripts/backup-banco.sh consultafacil_demo        # gera backups/<banco>-<data>.archive.gz
+bash scripts/testar-recuperacao.sh consultafacil_demo  # confere que o backup restaura tudo, sem alterar o banco
+bash scripts/testes/restaurar-banco.test.sh           # valida a recusa de backups inválidos em container descartável
+```
+
+Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bash scripts/restaurar-banco.sh`. O script pede confirmação e valida o arquivo em um banco temporário antes de substituir o destino. Consulte o [procedimento e o resultado da recuperação](docs/operacao/backup-recuperacao.md).
+
+### Variáveis de ambiente
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
-| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017` |
-| `MONGODB_DATABASE` | Base de dados da aplicação | `consultafacil` |
-| `SERVER_PORT` | Porta da API | `8080` |
-| `CORS_ALLOWED_ORIGIN` | Origem permitida do frontend | `http://localhost:5173` |
-| `VITE_API_BASE_URL` | URL da API usada pelo frontend | `http://localhost:8080` |
+| `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017/?serverSelectionTimeoutMS=5000` |
+| `MONGODB_DATABASE` | Banco usado pela API (ver "Bancos por ambiente") | `consultafacil` |
+| `SERVER_PORT` | Porta da API | `3000` |
+| `CPF_SERVER_HOST` | Endereço do servidor TCP de validação de CPF | `localhost` |
+| `CPF_SERVER_PORT` | Porta do servidor TCP de CPF (padrão 3001, diferente da API) | `3001` |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas do frontend, separadas por vírgula | `http://localhost:5173` |
+| `SESSION_TTL_MINUTES` | Duração da sessão, em minutos | `60` |
+| `NOTIFICACOES_ANTECEDENCIA_HORAS` | Quantas horas antes da consulta o lembrete é enviado (#34) | `24` |
+| `NOTIFICACOES_INTERVALO_SEGUNDOS` | Intervalo do agendador que gera e envia os lembretes | `60` |
+| `NOTIFICACOES_EMAIL_TESTE` | `true` grava uma cópia de cada notificação do paciente no canal `EMAIL_TESTE`, "enviada" para o log do servidor com o e-mail mascarado | `false` |
+| `VITE_API_BASE_URL` | URL da API usada pelo frontend (mesma porta de `SERVER_PORT`) | `http://localhost:3000` |
 
 > Nunca versione o arquivo `.env`. Utilize apenas o `.env.example`, sem segredos reais.
+
+O valor de cada variável quando ela não é definida, as variáveis usadas só pelos testes e uma tabela de problemas comuns (porta ocupada, CPF indisponível, CORS) estão em [docs/operacao/configuracao.md](docs/operacao/configuracao.md).
+
+---
+
+## Documentação
+
+O índice completo está em [`docs/README.md`](docs/README.md):
+
+- **Projeto:** relatório consolidado (ideação, requisitos, cronograma e cenários de aceite) e apresentação.
+- **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
+- **API:** autenticação e health, pacientes, médicos e especialidades, agendamento, consultas, cancelamento, fila de espera, notificações, indicadores e alterações de agenda.
+- **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva, comandos e relatório de teste OO do servidor de CPF.
+- **Operação:** backup e recuperação, roteiros por perfil, evidências de validação e preparação da tag/release.
 
 ---
 
 ## Estrutura de pastas
 
-Estrutura resumida (sujeita a ajustes durante o desenvolvimento):
+Estrutura resumida:
 
 ```text
 consultafacil/
@@ -186,14 +387,28 @@ consultafacil/
 │   └── src/
 │       ├── main/java/       # handlers, serviços, repositórios e domínio
 │       └── test/java/       # testes JUnit (unidade e integração)
-├── frontend/                # Aplicação React (JavaScript)
+├── frontend/                # Aplicação React (JavaScript) com Vite
 │   ├── package.json
+│   ├── vite.config.js       # build, servidor de desenvolvimento e testes
 │   └── src/
+│       ├── main.jsx         # ponto de entrada
+│       ├── routes/          # tabela de rotas (React Router)
 │       ├── pages/           # telas
 │       ├── components/      # componentes reutilizáveis
-│       └── services/        # comunicação com a API
-├── database/                # Scripts de inicialização do MongoDB (coleções, índices, dados de demonstração)
-├── docs/                    # Relatórios, modelagem, protótipo e demais artefatos acadêmicos
+│       ├── hooks/           # hooks de estado e efeitos
+│       ├── services/        # cliente HTTP centralizado (api.js) e serviços por recurso
+│       ├── styles/          # estilos globais
+│       └── __tests__/       # testes (Vitest + Testing Library)
+├── server/                  # Módulo Java separado de comunicação/validação de CPF
+├── database/
+│   ├── init/                # Coleções, validadores ($jsonSchema) e índices
+│   └── seed/                # Dados fictícios de demonstração
+├── scripts/                 # recriar-banco, backup/restauração/teste de recuperação e verificadores
+├── docs/                    # Documentação (índice em docs/README.md)
+│   ├── dicionario/          # Uma coleção por documento
+│   ├── api/                 # Contratos das rotas
+│   ├── operacao/            # Configuração, backup e roteiro de entrega
+│   └── testes/              # Estratégia e relatórios de testes
 ├── docker-compose.yml       # MongoDB para desenvolvimento local
 ├── .env.example             # Modelo das variáveis de ambiente
 └── README.md

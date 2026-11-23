@@ -1,0 +1,30 @@
+# Autor: Gabriel Martins de Almeida
+# RA: 25006162
+
+name: Backup e recuperação
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/backup-recuperacao.yml'
+      - 'scripts/backup-banco.sh'
+      - 'scripts/restaurar-banco.sh'
+      - 'scripts/testar-recuperacao.sh'
+      - 'scripts/testes/restaurar-banco.test.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  recuperacao:
+    name: Testes de backup e restauração
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Rodar testes com MongoDB descartável
+        shell: bash
+        run: bash scripts/testes/restaurar-banco.test.sh

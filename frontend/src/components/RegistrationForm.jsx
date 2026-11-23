@@ -1,0 +1,123 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+import { useEffect, useRef, useState } from 'react';
+import { useRecords } from '../hooks/useRecords';
+import { api } from '../services/api';
+import { guardarRascunho } from '../services/rascunhoPacientes';
+import { normalizarPaciente, validarPaciente } from '../utils/paciente';
+import Alert from './ui/Alert';
+import Button from './ui/Button';
+import Field from './ui/Field';
+import Modal from './ui/Modal';
+import CheckboxGroup from './ui/CheckboxGroup';
+
+function SpecialtyField({ field, value, error, onChange, disabled }) {
+  const { records, loading, error: loadError, refresh } = useRecords(field.source);
+  return (
+    <div className={field.wide ? 'form-grid__wide' : ''}>
+      <CheckboxGroup label={field.label} name={field.name} value={value} required={field.required} disabled={disabled || loading || Boolean(loadError)} onChange={onChange} error={error} options={records.filter((record) => record.ativa !== false || value.includes(record.id || record._id)).map((record) => ({ value: record.id || record._id, label: record.nome }))} />
+      {loading && <p className="field__hint" role="status">Carregando especialidades…</p>}
+      {loadError && <Alert action={<Button variant="outline" size="sm" onClick={refresh}>Tentar novamente</Button>}>Não foi possível carregar as especialidades.</Alert>}
+      {!loading && !loadError && records.length === 0 && <p className="field__hint">Cadastre uma especialidade antes de cadastrar o médico.</p>}
+    </div>
+  );
+}
+
+export default function RegistrationForm({ resource, schema, record, initialValues, restored, draftContext, returnFocusRef, onClose, onSaved }) {
+  const [values, setValues] = useState(() => Object.fromEntries(schema.fields.map((field) => {
+    const value = initialValues?.[field.name] ?? record?.[field.name] ?? field.defaultValue ?? '';
+    return [field.name, Array.isArray(value) ? value : String(value)];
+  })));
+  const [errors, setErrors] = useState({});
+  const [failure, setFailure] = useState('');
+  const [saving, setSaving] = useState(false);
+  const sending = useRef(false);
+  const failureRef = useRef(null);
+
+  useEffect(() => {
+    if (failure) failureRef.current?.focus();
+  }, [failure]);
+
+  function remember(nextValues) {
+    if (draftContext) guardarRascunho(draftContext.usuarioId, draftContext.rota, record, nextValues);
+  }
+
+  function change(event) {
+    const { name, value } = event.target;
+    const nextValues = { ...values, [name]: value };
+    remember(nextValues);
+    setValues(nextValues);
+    setErrors((current) => ({ ...current, [name]: undefined }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    // Bloqueia um segundo envio antes da próxima renderização, evitando cadastros
+    // repetidos por cliques rápidos.
+    if (sending.current) return;
+    const nextErrors = resource === 'pacientes' ? validarPaciente(values) : {};
+    if (resource !== 'pacientes') {
+      for (const field of schema.fields) {
+        const value = values[field.name];
+        if (field.required && (Array.isArray(value) ? value.length === 0 : !value.trim())) nextErrors[field.name] = 'Preencha este campo.';
+        if (field.type === 'email' && values[field.name] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[field.name])) nextErrors[field.name] = 'Informe um e-mail válido.';
+        if (field.pattern && value && !new RegExp(`^(?:${field.pattern})$`).test(value.trim())) nextErrors[field.name] = field.patternMessage;
+      }
+    }
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      const firstError = schema.fields.find((field) => nextErrors[field.name]).name;
+      event.currentTarget.querySelector(`[name="${firstError}"]`)?.focus();
+      return;
+    }
+    sending.current = true;
+    remember(values);
+    setSaving(true);
+    setFailure('');
+    const payload = resource === 'pacientes' ? normalizarPaciente(values) : Object.fromEntries(schema.fields.map((field) => {
+      const value = values[field.name];
+      return [field.name, field.dataType === 'boolean' ? value === 'true' : Array.isArray(value) ? value : value.trim()];
+    }));
+    try {
+      const savedRecord = record
+        ? await api.put(`/${resource}/${encodeURIComponent(record.id || record._id)}`, payload)
+        : await api.post(`/${resource}`, payload);
+      onSaved(record ? 'Cadastro atualizado.' : 'Cadastro realizado.', savedRecord);
+    } catch (error) {
+      setFailure(error.message);
+    } finally {
+      sending.current = false;
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={record ? `Editar ${schema.singular}` : schema.createLabel} description={schema.formDescription} busy={saving} returnFocusRef={returnFocusRef} onClose={onClose}>
+      <form onSubmit={submit} noValidate>
+        {restored && <Alert tone="info">Rascunho recuperado após entrar novamente. Confira os dados e selecione Salvar para concluir.</Alert>}
+        <p className="form-note">Campos com * são obrigatórios.</p>
+        <div className="form-grid">
+          {schema.fields.map(({ name, label, wide, options, source, defaultValue, ...props }) => {
+            delete props.dataType;
+            delete props.patternMessage;
+            return source ? (
+              <SpecialtyField key={name} field={{ name, label, wide, source, ...props }} value={values[name]} onChange={change} error={errors[name]} disabled={saving} />
+            ) : (
+              <Field key={name} {...props} name={name} label={label} className={wide ? 'form-grid__wide' : ''} as={options ? 'select' : props.as} value={values[name] ?? defaultValue ?? ''} onChange={change} disabled={saving} error={errors[name]}>
+                {options?.map((option) => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
+              </Field>
+            );
+          })}
+        </div>
+        {failure && <Alert ref={failureRef} tabIndex={-1}>{failure}</Alert>}
+        <footer className="form-actions">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button type="submit" loading={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}

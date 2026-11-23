@@ -1,0 +1,141 @@
+/*
+Autoria: Gabriel Martins de Almeida
+RA: 25006162
+*/
+
+package br.edu.puccampinas.consultafacil.service;
+
+import br.edu.puccampinas.consultafacil.api.ApiException;
+import br.edu.puccampinas.consultafacil.api.ConflitoComConsultasException;
+import br.edu.puccampinas.consultafacil.api.Query;
+import br.edu.puccampinas.consultafacil.api.dto.BloqueioRequest;
+import br.edu.puccampinas.consultafacil.api.dto.BloqueioResponse;
+import br.edu.puccampinas.consultafacil.repository.AgendaRepository;
+import br.edu.puccampinas.consultafacil.repository.BloqueioRepository;
+import br.edu.puccampinas.consultafacil.repository.MedicoRepository;
+import br.edu.puccampinas.consultafacil.repository.TravaAgenda;
+import org.bson.Document;
+import org.bson.types.ObjectId;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+
+public class BloqueioService {
+    private final BloqueioRepository bloqueios;
+    private final AgendaRepository agendas;
+    private final MedicoRepository medicos;
+    private final ConsultasAfetadas afetadas;
+    private final Consumer<ObjectId> aposAlteracao;
+
+    public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos,
+                           ConsultasAfetadas afetadas) {
+        this(bloqueios, agendas, medicos, afetadas, id -> {});
+    }
+
+    public BloqueioService(BloqueioRepository bloqueios, AgendaRepository agendas, MedicoRepository medicos,
+                           ConsultasAfetadas afetadas, Consumer<ObjectId> aposAlteracao) {
+        this.bloqueios = bloqueios;
+        this.agendas = agendas;
+        this.medicos = medicos;
+        this.afetadas = afetadas;
+        this.aposAlteracao = aposAlteracao;
+    }
+
+    public BloqueioResponse criar(BloqueioRequest r) { return criar(r, false); }
+
+    /**
+     * Cria o bloqueio. Se houver consultas ativas no período e o usuário ainda não confirmou,
+     * recusa com 409 listando as consultas (#44). Confirmado, grava o bloqueio e mantém as
+     * consultas, que aparecem como "Remarcar" no calendário (#23).
+     */
+    public BloqueioResponse criar(BloqueioRequest r, boolean confirmado) {
+        return criar(Query.objectId(r.medicoId(), "medicoId"), r, confirmado);
+    }
+
+    public BloqueioResponse criar(ObjectId medicoId, BloqueioRequest r, boolean confirmado) {
+        if (!medicos.existeAtivo(medicoId)) throw ApiException.notFound("Médico não encontrado ou inativo");
+
+        synchronized (TravaAgenda.porMedico(medicoId)) {
+            ZoneId fuso = fusoDo(medicoId);
+            Instant inicio = paraInstante(r.inicio(), "inicio", fuso);
+            Instant fim = paraInstante(r.fim(), "fim", fuso);
+            if (!inicio.isBefore(fim)) throw ApiException.badRequest("O início do bloqueio deve ser anterior ao fim");
+            if (r.motivo() != null && r.motivo().length() > 200) throw ApiException.badRequest("Motivo muito longo (máx. 200)");
+
+            if (!bloqueios.sobrepostos(medicoId, Date.from(inicio), Date.from(fim)).isEmpty())
+                throw ApiException.conflict("Já existe um bloqueio nesse período");
+            if (!confirmado) {
+                var atingidas = afetadas.noPeriodo(medicoId, inicio, fim, fuso);
+                if (!atingidas.isEmpty())
+                    throw new ConflitoComConsultasException("O período tem " + atingidas.size()
+                            + " consulta(s) marcada(s). Confirme para bloquear mesmo assim; elas precisarão ser remarcadas.", atingidas);
+            }
+
+            Document d = new Document("medicoId", medicoId)
+                    .append("inicio", Date.from(inicio))
+                    .append("fim", Date.from(fim));
+            if (r.motivo() != null && !r.motivo().isBlank()) d.append("motivo", r.motivo().strip());
+
+            var bloqueio = paraResposta(bloqueios.inserir(d), fuso);
+            aposAlteracao.accept(medicoId);
+            return bloqueio;
+        }
+    }
+
+    /** Sem de/ate lista todos; com de/ate (AAAA-MM-DD, inclusivos) lista os que tocam o período. */
+    public List<BloqueioResponse> listar(ObjectId medicoId, String de, String ate) {
+        ZoneId fuso = fusoDo(medicoId);
+        List<Document> docs;
+        if (de == null || ate == null) {
+            docs = bloqueios.doMedico(medicoId);
+        } else {
+            Instant ini = paraData(de, "de").atStartOfDay(fuso).toInstant();
+            Instant fim = paraData(ate, "ate").plusDays(1).atStartOfDay(fuso).toInstant();
+            docs = bloqueios.sobrepostos(medicoId, Date.from(ini), Date.from(fim));
+        }
+        return docs.stream().map(d -> paraResposta(d, fuso)).toList();
+    }
+
+    public void remover(ObjectId id, Optional<ObjectId> medicoAutorizado) {
+        if (!bloqueios.remover(id, medicoAutorizado)) throw ApiException.notFound("Bloqueio não encontrado");
+    }
+
+    private ZoneId fusoDo(ObjectId medicoId) {
+        return agendas.buscarPorMedico(medicoId)
+                .map(a -> ZoneId.of(a.getString("fusoHorario")))
+                .orElse(ZoneId.of(AgendaService.FUSO_PADRAO));
+    }
+
+    private static Instant paraInstante(String valor, String campo, ZoneId fuso) {
+        if (valor == null) throw ApiException.badRequest(campo + " é obrigatório");
+        try {
+            return LocalDateTime.parse(valor).atZone(fuso).toInstant();
+        } catch (DateTimeParseException e) {
+            throw ApiException.badRequest(campo + " deve estar no formato AAAA-MM-DDTHH:MM");
+        }
+    }
+
+    private static LocalDate paraData(String valor, String campo) {
+        try {
+            return LocalDate.parse(valor);
+        } catch (DateTimeParseException e) {
+            throw ApiException.badRequest(campo + " deve estar no formato AAAA-MM-DD");
+        }
+    }
+
+    private static BloqueioResponse paraResposta(Document d, ZoneId fuso) {
+        return new BloqueioResponse(
+                d.getObjectId("_id").toHexString(),
+                d.getObjectId("medicoId").toHexString(),
+                LocalDateTime.ofInstant(d.getDate("inicio").toInstant(), fuso).toString(),
+                LocalDateTime.ofInstant(d.getDate("fim").toInstant(), fuso).toString(),
+                d.getString("motivo"));
+    }
+}

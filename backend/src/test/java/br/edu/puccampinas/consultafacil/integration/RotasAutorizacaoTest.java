@@ -1,0 +1,355 @@
+/*
+Autoria: Murilo Moraes
+RA: 25000073
+*/
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+package br.edu.puccampinas.consultafacil.integration;
+
+import br.edu.puccampinas.consultafacil.api.Http;
+import br.edu.puccampinas.consultafacil.api.Rotas;
+import br.edu.puccampinas.consultafacil.api.middleware.Cors;
+import br.edu.puccampinas.consultafacil.domain.enums.Perfil;
+import br.edu.puccampinas.consultafacil.security.Autenticador;
+import br.edu.puccampinas.consultafacil.security.Autorizacao;
+import br.edu.puccampinas.consultafacil.security.Sessoes;
+import br.edu.puccampinas.consultafacil.security.UsuarioLogado;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Autorização por perfil (#10) usando a tabela real de Rotas.
+ * Os handlers de negócio são trocados por um eco que devolve 200 e o perfil de quem chamou,
+ * então o teste verifica só a permissão, sem banco.
+ */
+// A matriz percorre métodos, rotas e perfis para conferir que a autorização seja
+// aplicada antes do handler de destino.
+class RotasAutorizacaoTest {
+    private final Sessoes sessoes = new Sessoes(Duration.ofMinutes(60));
+    private final ObjectMapper json = new ObjectMapper();
+    private HttpServer server;
+    private HttpClient client;
+    private ExecutorService executor;
+    private String base;
+
+    /** Responde 200 com o perfil que a Autorizacao deixou na requisição. */
+    private static final HttpHandler ECO = ex -> {
+        UsuarioLogado u = Autorizacao.usuario(ex);
+        Http.sendJson(ex, 200, Map.of("perfil", u == null ? "ANONIMO" : u.perfil().name()));
+    };
+
+    @BeforeEach void iniciar() throws Exception {
+        var cors = new Cors(List.of());
+        var autz = new Autorizacao(new Autenticador(sessoes));
+        var router = Rotas.router(cors, autz, new Rotas.Handlers(ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO, ECO));
+
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        server.setExecutor(executor);
+        server.createContext("/", router);
+        server.createContext("/pacientes", Rotas.pacientes(cors, autz, ex -> { ECO.handle(ex); }));
+        server.createContext("/consultas/", Rotas.consultaPorId(cors, autz, ECO, ECO, ECO, ECO));
+        server.createContext("/fila-espera", Rotas.filaEspera(cors, autz, ECO));
+        // Catálogos, como no App.java (#40: antes ficavam fora da matriz).
+        server.createContext("/medicos", Rotas.catalogo(cors, autz, ECO));
+        server.createContext("/especialidades", Rotas.catalogo(cors, autz, ECO));
+        server.start();
+        base = "http://127.0.0.1:" + server.getAddress().getPort();
+        client = HttpClient.newHttpClient();
+    }
+
+    @AfterEach void encerrar() {
+        if (client != null) client.close();
+        if (server != null) server.stop(0);
+        if (executor != null) executor.shutdownNow();
+    }
+
+    /** Cenário do Quadro 4: acesso a uma função de outro perfil retorna 403. */
+    @Test void deveBloquearAcessoDePerfilNaoAutorizado() throws Exception {
+        String paciente = token(Perfil.PACIENTE);
+
+        var r = enviar("PUT", "/agendas?medicoId=100000000000000000000001", paciente);
+        assertEquals(403, r.statusCode());
+        assertEquals(403, json.readTree(r.body()).get("status").asInt());
+        assertFalse(json.readTree(r.body()).get("erro").asText().isBlank());
+    }
+
+    @ParameterizedTest(name = "{0} {1} como {2} → {3}")
+    @CsvSource({
+        // Agendas e bloqueios: médico e secretaria
+        "GET,    /agendas,        PACIENTE,         403",
+        "GET,    /agendas,        MEDICO,           200",
+        "PUT,    /agendas,        SECRETARIA_ADMIN, 200",
+        "GET,    /bloqueios,      PACIENTE,         403",
+        "POST,   /bloqueios,      MEDICO,           200",
+        "DELETE, /bloqueios,      SECRETARIA_ADMIN, 200",
+        // Calendário (#23): leitura das consultas por médico e secretaria
+        "GET,    /consultas,      PACIENTE,         403",
+        "GET,    /consultas,      MEDICO,           200",
+        "GET,    /consultas,      SECRETARIA_ADMIN, 200",
+        "GET,    /indicadores,    PACIENTE,         403",
+        "GET,    /indicadores,    MEDICO,           200",
+        "GET,    /indicadores,    SECRETARIA_ADMIN, 200",
+        "POST,   /indicadores,    SECRETARIA_ADMIN, 404",
+        "GET,    /indicadores/extra, MEDICO,         404",
+        // Pacientes: leitura médico e secretaria; escrita só secretaria
+        "GET,    /pacientes,      PACIENTE,         403",
+        "GET,    /pacientes,      MEDICO,           200",
+        "GET,    /pacientes/abc,  MEDICO,           200",
+        "POST,   /pacientes,      MEDICO,           403",
+        "PUT,    /pacientes/abc,  MEDICO,           403",
+        "POST,   /pacientes,      SECRETARIA_ADMIN, 200",
+        "PUT,    /pacientes/abc,  SECRETARIA_ADMIN, 200",
+        // Busca de vagas: todos os perfis; agendamento: paciente e secretaria (#21)
+        "GET,    /vagas,          PACIENTE,         200",
+        "GET,    /vagas,          MEDICO,           200",
+        "GET,    /vagas,          SECRETARIA_ADMIN, 200",
+        "POST,   /consultas,      PACIENTE,         403",
+        "POST,   /consultas,      SECRETARIA_ADMIN, 200",
+        "POST,   /consultas,      MEDICO,           403",
+        // Cancelamento (#27): os três perfis; o serviço confere se a consulta é de quem chama
+        "POST,   /consultas/abc/cancelamento, PACIENTE,         200",
+        "POST,   /consultas/abc/cancelamento, MEDICO,           200",
+        "POST,   /consultas/abc/cancelamento, SECRETARIA_ADMIN, 200",
+        "GET,    /consultas/abc/cancelamento, SECRETARIA_ADMIN, 404",
+        // Status (#28): ação e propriedade são validadas pelo serviço
+        "POST,   /consultas/abc/status, PACIENTE,         200",
+        "POST,   /consultas/abc/status, MEDICO,           200",
+        "POST,   /consultas/abc/status, SECRETARIA_ADMIN, 200",
+        "GET,    /consultas/abc/status, SECRETARIA_ADMIN, 404",
+        "POST,   /consultas/abc/status/extra, SECRETARIA_ADMIN, 404",
+        // Histórico (#46): o serviço aplica propriedade da consulta
+        "GET,    /consultas/abc/historico, PACIENTE,         200",
+        "GET,    /consultas/abc/historico, MEDICO,           200",
+        "GET,    /consultas/abc/historico, SECRETARIA_ADMIN, 200",
+        "POST,   /consultas/abc/historico, SECRETARIA_ADMIN, 404",
+        "GET,    /consultas/abc/historico/extra, SECRETARIA_ADMIN, 404",
+        // Listagem e detalhe (#30): os três perfis; o serviço limita ao que cada um pode ver
+        "GET,    /consultas/lista,            PACIENTE,         200",
+        "GET,    /consultas/lista,            MEDICO,           200",
+        "GET,    /consultas/lista,            SECRETARIA_ADMIN, 200",
+        "GET,    /consultas/abc,              PACIENTE,         200",
+        "POST,   /consultas/abc,              SECRETARIA_ADMIN, 404",
+        "GET,    /consultas/abc/def/ghi,      SECRETARIA_ADMIN, 404",
+        "POST,   /consultas/abc/outra-coisa,  SECRETARIA_ADMIN, 404",
+        // Fila de espera (#31): paciente e secretaria; o médico não usa a fila
+        "POST,   /fila-espera,                PACIENTE,         200",
+        "GET,    /fila-espera,                PACIENTE,         200",
+        "DELETE, /fila-espera/abc,            PACIENTE,         200",
+        "GET,    /fila-espera,                SECRETARIA_ADMIN, 200",
+        "DELETE, /fila-espera/abc,            SECRETARIA_ADMIN, 200",
+        "POST,   /fila-espera,                MEDICO,           403",
+        "GET,    /fila-espera,                MEDICO,           403",
+        "GET,    /fila-espera/abc/def,        PACIENTE,         404",
+        "GET,    /fila-esperaX,               PACIENTE,         404",
+        // Avisos (#57): somente o paciente
+        "GET,    /notificacoes,               PACIENTE,         200",
+        "GET,    /notificacoes,               MEDICO,           200",
+        "GET,    /notificacoes,               SECRETARIA_ADMIN, 403",
+        "POST,   /notificacoes/lida,          MEDICO,           200",
+        "POST,   /notificacoes/confirmar,     MEDICO,           403",
+        "GET,    /avisos-vaga,                PACIENTE,         200",
+        "POST,   /avisos-vaga,                PACIENTE,         403",
+        "GET,    /avisos-vaga,                MEDICO,           403",
+        "POST,   /avisos-vaga,                SECRETARIA_ADMIN, 403",
+    })
+    void matrizDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
+        var r = enviar(metodo, rota, token(perfil));
+        assertEquals(esperado, r.statusCode(), r.body());
+        if (esperado == 200) assertEquals(perfil.name(), json.readTree(r.body()).get("perfil").asText());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"/consultas", "/avisos-vaga"})
+    void pacienteNaoCriaConsultaMesmoEnviandoCorpoValido(String rota) throws Exception {
+        var pedido = HttpRequest.newBuilder(URI.create(base + rota))
+                .header("Authorization", "Bearer " + token(Perfil.PACIENTE))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"pacienteId\":\"400000000000000000000001\","
+                        + "\"medicoId\":\"100000000000000000000001\",\"especialidadeId\":\"000000000000000000000001\","
+                        + "\"inicio\":\"2026-12-01T12:00:00Z\",\"fim\":\"2026-12-01T12:30:00Z\","
+                        + "\"avisoId\":\"700000000000000000000001\"}"))
+                .build();
+        var resposta = client.send(pedido, HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, resposta.statusCode(), resposta.body());
+        assertEquals(403, json.readTree(resposta.body()).get("status").asInt());
+    }
+
+    private record Regra(String metodo, String rota, Set<Perfil> permitidos) {}
+
+    /**
+     * Quem pode cada operação da API (#10), uma linha por rota. É a matriz de permissões do projeto:
+     * o teste abaixo cruza cada linha com os três perfis, então nenhuma combinação fica sem teste.
+     * Quando a rota é aceita, o serviço ainda confere se o registro pertence a quem chamou.
+     */
+    private static final List<Regra> PERMISSOES;
+    static {
+        Set<Perfil> todos = Set.of(Perfil.values());
+        Set<Perfil> equipe = Set.of(Perfil.MEDICO, Perfil.SECRETARIA_ADMIN);
+        Set<Perfil> pacienteESecretaria = Set.of(Perfil.PACIENTE, Perfil.SECRETARIA_ADMIN);
+        Set<Perfil> pacienteEMedico = Set.of(Perfil.PACIENTE, Perfil.MEDICO);
+        Set<Perfil> paciente = Set.of(Perfil.PACIENTE);
+        Set<Perfil> secretaria = Set.of(Perfil.SECRETARIA_ADMIN);
+        PERMISSOES = List.of(
+            // Agenda, bloqueios, calendário e indicadores: equipe da clínica
+            new Regra("GET", "/agendas", equipe), new Regra("PUT", "/agendas", equipe),
+            new Regra("GET", "/bloqueios", equipe), new Regra("POST", "/bloqueios", equipe),
+            new Regra("DELETE", "/bloqueios", equipe),
+            new Regra("GET", "/consultas", equipe), new Regra("GET", "/indicadores", equipe),
+            // Catálogos: todos leem, só a secretaria mantém
+            new Regra("GET", "/medicos", todos), new Regra("GET", "/medicos/abc", todos),
+            new Regra("POST", "/medicos", secretaria), new Regra("PUT", "/medicos/abc", secretaria),
+            new Regra("DELETE", "/medicos/abc", secretaria),
+            new Regra("GET", "/especialidades", todos), new Regra("POST", "/especialidades", secretaria),
+            new Regra("PUT", "/especialidades/abc", secretaria),
+            // Pacientes: equipe lê, só a secretaria cadastra e edita
+            new Regra("GET", "/pacientes", equipe), new Regra("GET", "/pacientes/abc", equipe),
+            new Regra("POST", "/pacientes", secretaria), new Regra("PUT", "/pacientes/abc", secretaria),
+            // Vagas e agendamento
+            new Regra("GET", "/vagas", todos), new Regra("POST", "/consultas", secretaria),
+            // Consulta: os três perfis; o serviço limita a consulta de quem chama
+            new Regra("GET", "/consultas/lista", todos), new Regra("GET", "/consultas/abc", todos),
+            new Regra("POST", "/consultas/abc/cancelamento", todos), new Regra("POST", "/consultas/abc/status", todos),
+            new Regra("GET", "/consultas/abc/historico", todos),
+            // Fila de espera: paciente e secretaria
+            new Regra("POST", "/fila-espera", pacienteESecretaria), new Regra("GET", "/fila-espera", pacienteESecretaria),
+            new Regra("DELETE", "/fila-espera/abc", pacienteESecretaria),
+            // Notificações (#34, #35): paciente e médico; confirmar presença só o paciente
+            new Regra("GET", "/notificacoes", pacienteEMedico), new Regra("POST", "/notificacoes/lida", pacienteEMedico),
+            new Regra("POST", "/notificacoes/confirmar", paciente),
+            // Avisos de vaga (#57): só o paciente
+            new Regra("GET", "/avisos-vaga", paciente), new Regra("POST", "/avisos-vaga", Set.of()));
+    }
+
+    static Stream<Arguments> matrizCompleta() {
+        return PERMISSOES.stream().flatMap(r -> Stream.of(Perfil.values())
+                .map(p -> Arguments.of(r.metodo(), r.rota(), p, r.permitidos().contains(p) ? 200 : 403)));
+    }
+
+    @ParameterizedTest(name = "{0} {1} como {2} → {3}")
+    @MethodSource("matrizCompleta")
+    void matrizCompletaDePermissoes(String metodo, String rota, Perfil perfil, int esperado) throws Exception {
+        matrizDePermissoes(metodo, rota, perfil, esperado);
+    }
+
+    @ParameterizedTest(name = "{0} {1} sem login → 401")
+    @MethodSource("rotasProtegidas")
+    void todaRotaDaMatrizExigeLogin(String metodo, String rota) throws Exception {
+        assertEquals(401, enviar(metodo, rota, null).statusCode());
+    }
+
+    static Stream<Arguments> rotasProtegidas() {
+        return PERMISSOES.stream().map(r -> Arguments.of(r.metodo(), r.rota()));
+    }
+
+    @Test void semLoginRetorna401EmRotaProtegida() throws Exception {
+        assertEquals(401, enviar("GET", "/agendas", null).statusCode());
+        assertEquals(401, enviar("GET", "/indicadores", null).statusCode());
+        assertEquals(401, enviar("GET", "/pacientes", null).statusCode());
+        assertEquals(401, enviar("GET", "/bloqueios", "token-inventado").statusCode());
+        assertEquals(401, enviar("GET", "/vagas", null).statusCode());
+        assertEquals(401, enviar("POST", "/consultas", null).statusCode());
+        assertEquals(401, enviar("POST", "/consultas/abc/cancelamento", null).statusCode());
+        assertEquals(401, enviar("POST", "/consultas/abc/status", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/abc/historico", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/lista", null).statusCode());
+        assertEquals(401, enviar("GET", "/consultas/abc", null).statusCode());
+        assertEquals(401, enviar("GET", "/fila-espera", null).statusCode());
+        assertEquals(401, enviar("GET", "/avisos-vaga", null).statusCode());
+        assertEquals(401, enviar("POST", "/avisos-vaga", null).statusCode());
+    }
+
+    /** O contexto "/consultas/" não pode engolir o "/consultas" sem barra, que continua no Router. */
+    @Test void consultasSemBarraContinuaNoRouter() throws Exception {
+        assertEquals(403, enviar("GET", "/consultas", token(Perfil.PACIENTE)).statusCode());
+        assertEquals(403, enviar("POST", "/consultas", token(Perfil.PACIENTE)).statusCode());
+        assertEquals(200, enviar("POST", "/consultas", token(Perfil.SECRETARIA_ADMIN)).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/consultas/abc/cancelamento", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/consultas/abc/status", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/consultas/abc/historico", null).statusCode());
+    }
+
+    @Test void tokenDepoisDoLogoutRetorna401() throws Exception {
+        String t = token(Perfil.SECRETARIA_ADMIN);
+        sessoes.encerrar(t);
+        assertEquals(401, enviar("GET", "/agendas", t).statusCode());
+    }
+
+    @Test void pedidosSimultaneosMantemOsUsuariosSeparados() throws Exception {
+        var barreira = new CyclicBarrier(2);
+        var autz = new Autorizacao(new Autenticador(sessoes));
+        server.createContext("/sessao-concorrente", autz.exigir(ex -> {
+            try {
+                barreira.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new java.io.IOException(e);
+            } catch (java.util.concurrent.BrokenBarrierException | java.util.concurrent.TimeoutException e) {
+                throw new java.io.IOException(e);
+            }
+            Http.sendJson(ex, 200, Map.of("usuarioId", Autorizacao.usuario(ex).id()));
+            ex.close();
+        }, Perfil.PACIENTE));
+        var resposta1 = consultarSessao("paciente-1");
+        var resposta2 = consultarSessao("paciente-2");
+        assertEquals("paciente-1", json.readTree(resposta1.get(10, TimeUnit.SECONDS).body()).get("usuarioId").asText());
+        assertEquals("paciente-2", json.readTree(resposta2.get(10, TimeUnit.SECONDS).body()).get("usuarioId").asText());
+    }
+
+    @Test void rotasPublicasNaoExigemLogin() throws Exception {
+        assertEquals(200, enviar("GET", "/health", null).statusCode());
+    }
+
+    @Test void preflightCorsNaoExigeLogin() throws Exception {
+        assertEquals(204, enviar("OPTIONS", "/agendas", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/indicadores", null).statusCode());
+        assertEquals(204, enviar("OPTIONS", "/pacientes", null).statusCode());
+    }
+
+    // ---------------------------------------------------------------- apoio
+
+    private String token(Perfil perfil) {
+        return sessoes.criar(new UsuarioLogado("u-" + perfil, "Teste " + perfil, perfil)).token();
+    }
+
+    private java.util.concurrent.CompletableFuture<HttpResponse<String>> consultarSessao(String id) {
+        String token = sessoes.criar(new UsuarioLogado(id, id, Perfil.PACIENTE)).token();
+        var req = HttpRequest.newBuilder(URI.create(base + "/sessao-concorrente"))
+                .header("Authorization", "Bearer " + token).GET().build();
+        return client.sendAsync(req, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> enviar(String metodo, String rota, String token) throws Exception {
+        var b = HttpRequest.newBuilder(URI.create(base + rota)).method(metodo, HttpRequest.BodyPublishers.noBody());
+        if (token != null) b.header("Authorization", "Bearer " + token);
+        return client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+    }
+}

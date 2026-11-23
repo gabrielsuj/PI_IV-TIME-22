@@ -1,0 +1,90 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+import { createBrowserRouter, Outlet } from 'react-router';
+import AppLayout from '../components/AppLayout';
+import RequireAuth from '../components/RequireAuth';
+import AuthProvider from '../contexts/AuthProvider';
+import AgendaPage from '../pages/AgendaPage';
+import NotificacoesPage from '../pages/NotificacoesPage';
+import AvisosVagaPage from '../pages/AvisosVagaPage';
+import CalendarioPage from '../pages/CalendarioPage';
+import ConsultaDetalhePage from '../pages/ConsultaDetalhePage';
+import ConsultasPage from '../pages/ConsultasPage';
+import ErrorPage from '../pages/ErrorPage';
+import HomePage from '../pages/HomePage';
+import NotFoundPage from '../pages/NotFoundPage';
+import NovaConsultaPage from '../pages/NovaConsultaPage';
+import StatusPage from '../pages/StatusPage';
+import LoginPage from '../pages/LoginPage';
+import ProfilesPage from '../pages/ProfilesPage';
+import PacientesLayout, { ListaPacientes } from '../pages/PacientesLayout';
+import PacienteDetalhePage from '../pages/PacienteDetalhePage';
+import RegistrationPage from '../pages/RegistrationPage';
+import { buscarVagas, confirmarAgendamento } from '../services/agendamentoService';
+import FilaEsperaPage from '../pages/FilaEsperaPage';
+
+/**
+ * Tabela de rotas da aplicação.
+ *
+ * /login fica fora do layout (sem menu lateral). Todas as outras telas exigem
+ * login (RequireAuth) e entram como filhas de AppLayout para herdar o
+ * cabeçalho e a navegação.
+ */
+export const routes = [
+  {
+    element: (
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            path: '/',
+            element: <AppLayout />,
+            children: [
+              { index: true, element: <HomePage /> },
+              { path: 'status', element: <StatusPage /> },
+              { path: 'perfis', element: <ProfilesPage /> },
+              {
+                path: 'pacientes',
+                element: <PacientesLayout />,
+                children: [
+                  { index: true, element: <ListaPacientes /> },
+                  { path: ':id', element: <PacienteDetalhePage /> },
+                ],
+              },
+              { path: 'medicos', element: <RegistrationPage key="medicos" resource="medicos" /> },
+              { path: 'especialidades', element: <RegistrationPage key="especialidades" resource="especialidades" /> },
+              { path: 'agenda', element: <AgendaPage /> },
+              { path: 'calendario', element: <CalendarioPage /> },
+              { path: 'consultas', element: <ConsultasPage /> },
+              { path: 'consultas/:id', element: <ConsultaDetalhePage /> },
+              { path: 'notificacoes', element: <NotificacoesPage /> },
+              { path: 'avisos-vaga', element: <AvisosVagaPage /> },
+              {
+                path: 'nova-consulta',
+                element: <NovaConsultaPage buscarVagas={buscarVagas} confirmarAgendamento={confirmarAgendamento} />,
+              },
+              { path: 'fila-espera', element: <FilaEsperaPage /> },
+              { path: '*', element: <NotFoundPage /> },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+// A tabela compartilhada concentra os destinos para manter o layout e a proteção de
+// acesso consistentes na navegação.
+export function createAppRouter() {
+  return createBrowserRouter(routes);
+}

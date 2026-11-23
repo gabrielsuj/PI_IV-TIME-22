@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (JUnit e MongoDB)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - '27017:27017'
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Aplicar schemas e índices aos bancos de testes
+        env:
+          MONGO_CONTAINER: ${{ job.services.mongo.id }}
+        shell: bash
+        run: |
+          for banco in consultafacil_test consultafacil_historico_test; do
+            echo "Inicializando $banco"
+            for schema in database/init/*.js; do
+              docker exec -i "$MONGO_CONTAINER" mongosh "$banco" --quiet --file /dev/stdin < "$schema"
+            done
+          done
+
+      - name: Carregar e conferir a carga de demonstração
+        env:
+          MONGO_CONTAINER: ${{ job.services.mongo.id }}
+        shell: bash
+        run: |
+          # Usada pelo IndicadoresDemonstracaoIntegrationTest (#48).
+          for script in database/init/*.js database/seed/*.js; do
+            docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < "$script" > /dev/null
+          done
+          docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+          docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
+
+      - name: Preparar o Maven Wrapper
+        working-directory: backend
+        shell: bash
+        run: |
+          for tentativa in 1 2 3; do
+            ./mvnw --batch-mode --version && exit 0
+            echo "Download do Maven falhou (tentativa $tentativa). Nova tentativa em 15 s."
+            sleep 15
+          done
+          exit 1
+
+      - name: Instalar modulo server no Maven
+        working-directory: server
+        shell: bash
+        run: ../backend/mvnw --batch-mode --no-transfer-progress install
+
+
+      
+      - name: Rodar testes do backend
+        working-directory: .
+        shell: bash
+        env:
+          HISTORICO_MONGO_URI: mongodb://localhost:27017/?serverSelectionTimeoutMS=3000
+          DEMO_MONGO_DB: consultafacil_demo
+        run: |
+          # Inicia o servidor TCP de CPF.
+          coproc CPF_SERVER {
+            exec java -cp server/target/classes \
+              br.edu.puccampinas.consultafacil.Servidor \
+              > /tmp/cpf-server.log 2>&1
+          }
+
+          # Encerra o processo ao terminar.
+          trap 'kill "$CPF_SERVER_PID" 2>/dev/null || true' EXIT
+
+          # Aguarda o servidor ficar disponivel.
+          pronto=false
+          for tentativa in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/3001) 2>/dev/null; then
+              pronto=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$pronto" != "true" ]; then
+            echo "Servidor TCP de CPF nao iniciou."
+            cat /tmp/cpf-server.log
+            exit 1
+          fi
+
+          echo "Servidor TCP de CPF disponivel."
+
+          cd backend
+          ./mvnw --batch-mode --no-transfer-progress -DmongoTests=true test
+
+
+  frontend:
+    name: Frontend (testes, lint e build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Testar o verificador de modelagem
+        working-directory: .
+        run: node --test scripts/testes/verificar-modelagem.test.cjs
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes do frontend
+        run: npm test
+
+      - name: Rodar lint
+        run: npm run lint
+
+      - name: Gerar build de produção
+        run: npm run build

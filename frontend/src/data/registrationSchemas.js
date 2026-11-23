@@ -1,0 +1,60 @@
+/*
+Autoria: Vinicius Valim de Vechi Cardoso
+RA: 25000387
+*/
+
+// A definição compartilhada reúne campos e colunas para que formulário, busca e
+// listagem usem o mesmo cadastro.
+export const registrationSchemas = {
+  pacientes: {
+    title: 'Pacientes',
+    singular: 'paciente',
+    createLabel: 'Novo paciente',
+    description: 'Cadastro com apenas as informações necessárias ao funcionamento da agenda.',
+    formDescription: 'Preencha os dados de identificação e contato do paciente.',
+    searchLabel: 'Buscar por nome, CPF ou e-mail',
+    searchKeys: ['nome', 'cpf', 'email'],
+    fields: [
+      { name: 'nome', label: 'Nome', required: true, wide: true, autoComplete: 'name' },
+      { name: 'cpf', label: 'CPF', required: true, inputMode: 'numeric', maxLength: 14, placeholder: '000.000.000-00', hint: 'Informe 11 dígitos, com ou sem pontuação.', pattern: '[0-9]{11}|[0-9]{3}[.][0-9]{3}[.][0-9]{3}-[0-9]{2}', patternMessage: 'Informe 11 dígitos ou use 000.000.000-00.' },
+      { name: 'email', label: 'E-mail', type: 'email', required: true, maxLength: 254, autoComplete: 'email' },
+    ],
+    columns: [
+      { key: 'nome', label: 'Nome' },
+      { key: 'cpf', label: 'CPF' },
+      { key: 'email', label: 'E-mail' },
+    ],
+  },
+  medicos: {
+    title: 'Médicos',
+    singular: 'médico',
+    createLabel: 'Novo médico',
+    description: 'Profissionais de saúde e suas especialidades de atendimento.',
+    formDescription: 'Informe a identificação profissional e a especialidade do médico.',
+    searchLabel: 'Buscar por nome ou registro profissional',
+    searchKeys: ['nome', 'crmNumero', 'crmUf'],
+    cards: true,
+    fields: [
+      { name: 'nome', label: 'Nome', required: true, wide: true, autoComplete: 'name' },
+      { name: 'crmNumero', label: 'Número do CRM', placeholder: '000000', required: true, inputMode: 'numeric', pattern: '[0-9]{1,10}', patternMessage: 'Informe de 1 a 10 dígitos.' },
+      { name: 'crmUf', label: 'UF do CRM', required: true, options: ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'], defaultValue: 'SP' },
+      { name: 'especialidadeIds', label: 'Especialidades', source: 'especialidades', required: true, wide: true, defaultValue: [] },
+      { name: 'ativo', label: 'Status', options: [{ value: 'true', label: 'Ativo' }, { value: 'false', label: 'Inativo' }], defaultValue: 'true', dataType: 'boolean' },
+    ],
+  },
+  especialidades: {
+    title: 'Especialidades',
+    singular: 'especialidade',
+    createLabel: 'Nova especialidade',
+    description: 'Especialidades oferecidas pela clínica, usadas no agendamento e na fila de espera.',
+    formDescription: 'Cadastre as áreas de atendimento da clínica.',
+    searchLabel: 'Buscar especialidade',
+    searchKeys: ['nome', 'codigo'],
+    cards: true,
+    fields: [
+      { name: 'nome', label: 'Nome', required: true, wide: true },
+      { name: 'codigo', label: 'Código', required: true, wide: true, pattern: '[a-z0-9-]+', patternMessage: 'Use letras minúsculas, números e hífens.', hint: 'Identificador único, por exemplo: cardiologia.' },
+      { name: 'ativa', label: 'Status', options: [{ value: 'true', label: 'Ativo' }, { value: 'false', label: 'Inativo' }], defaultValue: 'true', dataType: 'boolean' },
+    ],
+  },
+};
