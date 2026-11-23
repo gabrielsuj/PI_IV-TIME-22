@@ -3,10 +3,12 @@
 # Autor: Murilo Rigoni (criador)
 param(
     [ValidateSet('consultafacil', 'consultafacil_test', 'consultafacil_demo')]
-    [string]$Banco = 'consultafacil_demo'
+    [string]$Banco
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($Banco)) { throw 'Informe o banco: recriar-banco.ps1 <banco>' }
+Write-Host "Banco alvo: $Banco"
 $Container = if ($env:MONGO_CONTAINER) { $env:MONGO_CONTAINER } else { 'consultafacil-mongo' }
 $Raiz = Split-Path -Parent $PSScriptRoot
 $EncodingAnterior = $OutputEncoding

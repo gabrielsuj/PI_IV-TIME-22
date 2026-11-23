@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 
 public class ValidarCPFHandler extends Comunicado {
     public static ValidarCPFResponse ValidateCPF(ValidarCPFRequest request) throws Exception {
+        if(request == null) return new ValidarCPFResponse(null, false, "CPF não foi fornecido.");
         Pattern regExCPF = Pattern.compile("[0-9]{11}");
 
         String cpf = request.getCPF();

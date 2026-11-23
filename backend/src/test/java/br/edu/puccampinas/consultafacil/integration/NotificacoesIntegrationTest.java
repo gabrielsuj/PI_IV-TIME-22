@@ -213,6 +213,37 @@ class NotificacoesIntegrationTest {
         assertEquals("ENVIADA", lembrete.getString("status"));
     }
 
+    @Test
+    void percorreMaisDeCemConsultasMesmoComPrimeiraPaginaJaNotificada() {
+        relogio.avancar(Duration.between(relogio.instant(), LEMBRETE).plusHours(2));
+        Sistema s = sistema();
+        List<ObjectId> ids = new ArrayList<>();
+        try {
+            for (int i = 0; i < 250; i++) {
+                Instant inicio = Instant.parse(INICIO).plusSeconds(i < 150 ? 0 : 3600);
+                Document consulta = new Document("_id", new ObjectId()).append("pacienteId", new ObjectId())
+                        .append("medicoId", new ObjectId()).append("especialidadeId", ESPECIALIDADE)
+                        .append("inicio", Date.from(inicio)).append("fim", Date.from(inicio.plusSeconds(1800)))
+                        .append("status", "AGENDADA").append("criadaEm", Date.from(relogio.instant()));
+                db.getCollection("consultas").insertOne(consulta);
+                ids.add(consulta.getObjectId("_id"));
+                if (i < 100) s.notificacoes().consultaAgendada(consulta);
+            }
+            var filtro = Filters.and(Filters.in("consultaId", ids), Filters.eq("tipo", "LEMBRETE_CONSULTA"),
+                    Filters.eq("canal", "SISTEMA"));
+            assertEquals(100, db.getCollection("notificacoes").countDocuments(filtro));
+            s.notificacoes().executarCiclo();
+            assertEquals(250, db.getCollection("notificacoes").countDocuments(filtro));
+            s.notificacoes().executarCiclo();
+            assertEquals(250, db.getCollection("notificacoes").countDocuments(filtro));
+            assertEquals(new java.util.HashSet<>(ids), new java.util.HashSet<>(db.getCollection("notificacoes")
+                    .distinct("consultaId", filtro, ObjectId.class).into(new ArrayList<>())));
+        } finally {
+            db.getCollection("notificacoes").deleteMany(Filters.in("consultaId", ids));
+            db.getCollection("consultas").deleteMany(Filters.in("_id", ids));
+        }
+    }
+
     // ------------------------------------------------------------------ cancelamento
 
     @Test

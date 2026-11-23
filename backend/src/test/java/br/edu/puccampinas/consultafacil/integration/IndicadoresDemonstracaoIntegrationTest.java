@@ -92,7 +92,7 @@ class IndicadoresDemonstracaoIntegrationTest {
                     "confirmação", r.confirmacao(), "preenchimento pela fila", r.preenchimentoFila());
             taxas.forEach((nome, taxa) -> assertTrue(taxa.situacao() == Situacao.DISPONIVEL || taxa.situacao() == Situacao.SEM_BASE,
                     nome + " ficou " + taxa.situacao() + " em " + periodo[0] + ".." + periodo[1]
-                            + " (se a carga for antiga, recrie o banco com scripts/recriar-banco.sh)"));
+                            + " (se a carga for antiga, recrie o banco com scripts/recriar-banco.sh consultafacil_demo)"));
             assertEquals(0, r.qualidade().medicosSemAgenda(), "médico inativo sem consultas não conta como 'sem agenda'");
             assertEquals(0, r.qualidade().consultasSemBaseHistorica(), "toda consulta concluída passou por CONFIRMACAO");
             assertEquals(0, r.qualidade().consultasComProjecaoPendente());

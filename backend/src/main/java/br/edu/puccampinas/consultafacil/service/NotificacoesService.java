@@ -122,9 +122,18 @@ public final class NotificacoesService {
         Date agora = agora();
         Date limite = Date.from(agora.toInstant().plus(antecedencia()));
         int criados = 0;
-        for (Document consulta : consultas.ativasComInicioEntre(agora, limite, LOTE)) {
-            if (notificacoes.temLembrete(consulta.getObjectId("_id"))) continue;
-            if (criarLembrete(consulta, nomeDoMedico(consulta), agora)) criados++;
+        Date ultimoInicio = null;
+        ObjectId ultimoId = null;
+        for (;;) {
+            List<Document> pagina = consultas.ativasComInicioEntre(agora, limite, ultimoInicio, ultimoId, LOTE);
+            if (pagina.isEmpty()) break;
+            for (Document consulta : pagina) {
+                if (notificacoes.temLembrete(consulta.getObjectId("_id"))) continue;
+                if (criarLembrete(consulta, nomeDoMedico(consulta), agora)) criados++;
+            }
+            Document ultima = pagina.get(pagina.size() - 1);
+            ultimoInicio = ultima.getDate("inicio");
+            ultimoId = ultima.getObjectId("_id");
         }
         return criados;
     }

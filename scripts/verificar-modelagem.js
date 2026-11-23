@@ -5,12 +5,19 @@ RA: 25006162
 
 const ana = ObjectId("100000000000000000000001");
 
+let falhas = 0;
 function confere(nome, obtido, esperado) {
+  if (obtido !== esperado) falhas++;
   print(obtido === esperado ? "OK     " : "FALHOU ", nome, "-> obtido:", obtido, "| esperado:", esperado);
 }
-function deveRecusar(nome, acao) {
-  try { acao(); print("FALHOU ", nome, "-> o banco ACEITOU, deveria recusar"); }
-  catch (e) { print("OK     ", nome, "-> recusado:", e.code, e.codeName || e.errmsg || ""); }
+function deveRecusar(nome, codigo, acao) {
+  try { acao(); falhas++; print("FALHOU ", nome, "-> o banco ACEITOU, deveria recusar"); }
+  catch (e) { confere(nome + " (código)", e.code, codigo); }
+}
+function usaIndice(plano, nome) {
+  if (!plano || typeof plano !== "object") return false;
+  if (plano.indexName === nome) return true;
+  return Object.entries(plano).some(([chave, valor]) => chave !== "rejectedPlans" && usaIndice(valor, nome));
 }
 
 // ---------- Positivos: os dados certos aparecem ----------
@@ -23,26 +30,29 @@ const manha26 = { medicoId: ana,
   inicio: { $lt: new Date("2026-10-26T15:00:00Z") },   // antes de 12h SP
   fim:    { $gt: new Date("2026-10-26T11:00:00Z") } }; // depois de 08h SP
 confere("bloqueios da Ana na manhã de 26/10", db.bloqueios.countDocuments(manha26), 1);
-confere("essa busca usa o índice", JSON.stringify(db.bloqueios.find(manha26).explain())
-  .includes("ix_bloqueio_medico_periodo"), true);
+confere("essa busca usa o índice", usaIndice(db.bloqueios.find(manha26).explain().queryPlanner.winningPlan,
+  "ix_bloqueio_medico_periodo"), true);
 
 // ---------- Negativos: dados errados são recusados ----------
-deveRecusar("bloqueio com fim antes do início", () => db.bloqueios.insertOne({
+deveRecusar("bloqueio com fim antes do início", 121, () => db.bloqueios.insertOne({
   medicoId: ana, inicio: new Date("2026-10-26T13:00:00Z"), fim: new Date("2026-10-26T12:00:00Z") }));
 
-deveRecusar("médico com CRM repetido", () => db.medicos.insertOne({
+deveRecusar("médico com CRM repetido", 11000, () => db.medicos.insertOne({
   nome: "Teste", crmNumero: "000123", crmUf: "SP",
   especialidadeIds: [ObjectId("000000000000000000000001")], ativo: true }));
 
-deveRecusar("médico sem especialidade", () => db.medicos.insertOne({
+deveRecusar("médico sem especialidade", 121, () => db.medicos.insertOne({
   nome: "Teste", crmNumero: "999999", crmUf: "SP", especialidadeIds: [], ativo: true }));
 
-deveRecusar("segunda agenda para a Ana", () => db.agendas.insertOne({
+deveRecusar("segunda agenda para a Ana", 11000, () => db.agendas.insertOne({
   medicoId: ana, fusoHorario: "America/Sao_Paulo", duracaoMinutos: 30, jornadas: [] }));
 
-deveRecusar("agenda com dia 8 e faixa invertida", () => db.agendas.insertOne({
+deveRecusar("agenda com dia 8 e faixa invertida", 121, () => db.agendas.insertOne({
   medicoId: ObjectId(), fusoHorario: "America/Sao_Paulo", duracaoMinutos: 30,
   jornadas: [{ diaSemana: 8, faixas: [{ inicioMinuto: 720, fimMinuto: 480 }] }] }));
 
-deveRecusar("especialidade com código repetido", () => db.especialidades.insertOne({
+deveRecusar("especialidade com código repetido", 11000, () => db.especialidades.insertOne({
   codigo: "cardiologia", nome: "Outra", ativa: true }));
+
+print(falhas === 0 ? "Todas as verificações passaram." : falhas + " verificação(ões) falharam.");
+quit(falhas > 0 ? 1 : 0);

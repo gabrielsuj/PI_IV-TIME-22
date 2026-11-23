@@ -27,7 +27,7 @@ export default function ApiStatus({ detailed = false }) {
   const { status, data, error, latencyMs, checkedAt, refresh } = useApiHealth();
 
   return (
-    <Card className="api-status" title="Conexão com a API" action={<Badge status={status} role="status">{LABELS[status]}</Badge>}>
+    <Card className="api-status" title="Conexão com a API" description="Verifica se o servidor HTTP responde. Não verifica o MongoDB nem o serviço de CPF." action={<Badge status={status} role="status">{LABELS[status]}</Badge>}>
 
       {status === 'offline' && error && <p className="api-status__error">{error.message}</p>}
 

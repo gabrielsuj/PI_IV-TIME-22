@@ -6,7 +6,7 @@ Autoria: Gabriel Martins de Almeida
 RA: 25006162
 */
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -86,7 +86,8 @@ describe('tela de agenda', () => {
       expect(chamadas(fetchMock, 'GET', '/medicos')).toHaveLength(0);
       const rotas = rota === '/agenda' ? ['/agendas', '/bloqueios'] : ['/agendas', '/bloqueios', '/consultas'];
       for (const caminho of rotas) {
-        expect(chamadas(fetchMock, 'GET', caminho).map(c => c.url.searchParams.get('medicoId'))).toEqual(['meu']);
+        await waitFor(() => expect(chamadas(fetchMock, 'GET', caminho).length).toBeGreaterThan(0));
+        expect(chamadas(fetchMock, 'GET', caminho).every(c => c.url.searchParams.get('medicoId') === 'meu')).toBe(true);
       }
     }
   );

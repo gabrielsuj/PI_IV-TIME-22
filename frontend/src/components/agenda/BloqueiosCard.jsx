@@ -4,8 +4,8 @@ RA: 25006162
 */
 
 import { useEffect, useRef, useState } from 'react';
-import { conflitoComConsultas, criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
-import { diaSeguinte, formatarPeriodo, hoje } from '../../utils/horario';
+import { buscarAgenda, conflitoComConsultas, criarBloqueio, listarBloqueios, removerBloqueio } from '../../services/agendaService';
+import { diaSeguinte, formatarPeriodo, janelaBloqueios } from '../../utils/horario';
 import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
@@ -60,9 +60,10 @@ export default function BloqueiosCard({ medicoId, onDirtyChange }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    const de = hoje();
-    const ate = `${Number(de.slice(0, 4)) + 1}${de.slice(4)}`;   // próximos 12 meses
-    listarBloqueios(medicoId, { de, ate, signal: controller.signal })
+    buscarAgenda(medicoId, { signal: controller.signal })
+      .then((agenda) => listarBloqueios(medicoId, {
+        ...janelaBloqueios(agenda?.fusoHorario), signal: controller.signal,
+      }))
       .then((lista) => { setBloqueios(lista); setErroCarga(null); })
       .catch((error) => { if (!controller.signal.aborted) setErroCarga(error); })
       .finally(() => { if (!controller.signal.aborted) setCarregando(false); });
