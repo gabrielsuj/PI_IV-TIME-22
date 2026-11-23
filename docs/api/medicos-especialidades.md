@@ -1,6 +1,6 @@
 # API de médicos e especialidades
 
-> Issue #13 (cadastro de médicos e especialidades). Modelagem: [medicos-agenda.md](../modelagem/medicos-agenda.md)
+> Issue #13 (cadastro de médicos e especialidades). Modelagem: [medicos-agenda.md](../dicionario/medicos-agenda.md)
 > (validadores em `database/init/06-esquema-especialidades.js` e `07-esquema-medicos.js`).
 
 ## Rotas e permissões

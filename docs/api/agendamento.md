@@ -30,7 +30,7 @@ Implementado em `service/CalculadoraDisponibilidade.java` (sem banco) e `service
 4. Remove os horários que se sobrepõem a um **bloqueio** ou a uma **consulta ativa** (`AGENDADA`/`CONFIRMADA`). Sobreposição: `inicio < outro.fim` e `fim > outro.inicio` (início incluído, fim excluído, igual ao banco).
 5. Remove os horários que **já começaram**.
 
-Exemplo (cenário de referência de [medicos-agenda.md §6](../modelagem/medicos-agenda.md)): Ana, segunda 26/10/2026, jornada 08h–12h, consultas de 30 min, bloqueio das 09h às 10h → `08:00, 08:30, 10:00, 10:30, 11:00, 11:30`.
+Exemplo (cenário de referência de [medicos-agenda.md §6](../dicionario/medicos-agenda.md)): Ana, segunda 26/10/2026, jornada 08h–12h, consultas de 30 min, bloqueio das 09h às 10h → `08:00, 08:30, 10:00, 10:30, 11:00, 11:30`.
 
 O mesmo cálculo é usado na confirmação (`DisponibilidadeService.exigirVagaLivre`). O horário enviado precisa ser **exatamente** uma das vagas livres, e por isso nunca se agenda fora da jornada, fora da grade de horários, em bloqueio ou no passado.
 
@@ -85,8 +85,8 @@ Resposta 201:
 ```
 
 - **Secretaria:** `pacienteId` é obrigatório (agenda em nome do paciente).
-- **Paciente:** pode omitir `pacienteId`. A API usa o cadastro ligado ao login (`pacientes.usuarioId`, ver [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md)). Informar outro paciente → 403.
-- A disponibilidade é **revalidada no momento da confirmação**. Se duas pessoas confirmarem a mesma vaga ao mesmo tempo, o índice único `uk_consulta_medico_inicio` aceita só uma (ver [consultas.md §5](../modelagem/consultas.md)).
+- **Paciente:** pode omitir `pacienteId`. A API usa o cadastro ligado ao login (`pacientes.usuarioId`, ver [usuarios-pacientes.md](../dicionario/usuarios-pacientes.md)). Informar outro paciente → 403.
+- A disponibilidade é **revalidada no momento da confirmação**. Se duas pessoas confirmarem a mesma vaga ao mesmo tempo, o índice único `uk_consulta_medico_inicio` aceita só uma (ver [consultas.md §5](../dicionario/consultas.md)).
 - A confirmação recusa qualquer sobreposição com outra consulta ativa do paciente, inclusive com outro médico e horários de início diferentes. Horários adjacentes são permitidos. Veja as [garantias de reserva](../testes/garantias-de-reserva.md).
 - A gravação passa pelo `RegistroConsultaService`, que registra o evento `CRIACAO` no histórico.
 

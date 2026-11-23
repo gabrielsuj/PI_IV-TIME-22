@@ -25,7 +25,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Lembretes e notificações simuladas (#34). Modelo em docs/modelagem/notificacoes.md.
+ * Lembretes e notificações simuladas (#34). Modelo em docs/dicionario/notificacoes.md.
  *
  * Geração:
  *  - consulta agendada  -> CONFIRMACAO_AGENDAMENTO (imediata) e LEMBRETE_CONSULTA (início − antecedência) ao paciente;

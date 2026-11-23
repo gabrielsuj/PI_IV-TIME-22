@@ -61,11 +61,11 @@ As sessões ficam em memória e expiram após `SESSION_TTL_MINUTES` (padrão 60)
 
 Essas rotas usam o formato `{"status":401,"erro":"mensagem"}`. O logout é idempotente: sem token válido também retorna `204`.
 
-Não há rota de autocadastro ou manutenção de usuários no MVP. As contas de demonstração são criadas pelos [seeds](../modelagem/carga-demonstracao.md); o cadastro de um paciente pela secretaria não cria uma conta de login.
+Não há rota de autocadastro ou manutenção de usuários no MVP. As contas de demonstração são criadas pelos [seeds](../dicionario/carga-demonstracao.md); o cadastro de um paciente pela secretaria não cria uma conta de login.
 
 ## Verificação
 
-Na pasta `backend`, `./mvnw test -Dtest=AuthHandlerTest,RotasAutorizacaoTest,SenhaHasherTest,SessoesTest` cobre login, sessão, expiração, logout, hash e autorização. A modelagem está em [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md).
+Na pasta `backend`, `./mvnw test -Dtest=AuthHandlerTest,RotasAutorizacaoTest,SenhaHasherTest,SessoesTest` cobre login, sessão, expiração, logout, hash e autorização. A modelagem está em [usuarios-pacientes.md](../dicionario/usuarios-pacientes.md).
 
 Esses testes usam usuários em memória. O `AcessoPacientesMongoIntegrationTest` (#50) repete o fluxo com a coleção `usuarios` do MongoDB, gravada pelo validador `$jsonSchema`, e com a mesma montagem de rotas do `App.java`:
 

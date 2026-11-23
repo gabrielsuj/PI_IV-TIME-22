@@ -25,7 +25,7 @@ import java.time.Instant;
  * que muda o status, registra o evento CANCELAMENTO no histórico e protege contra alteração simultânea.
  *
  * A vaga é liberada pela própria mudança de status: os índices únicos de `consultas` e o cálculo de
- * disponibilidade só consideram consultas AGENDADA/CONFIRMADA (docs/modelagem/consultas.md).
+ * disponibilidade só consideram consultas AGENDADA/CONFIRMADA (docs/dicionario/consultas.md).
  */
 public class CancelamentoService {
     private static final Logger LOG = LoggerFactory.getLogger(CancelamentoService.class);

@@ -178,13 +178,18 @@ O Compose aguarda o healthcheck do MongoDB (`ping` no banco `admin`) antes de co
 
 Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices no banco `consultafacil`, definido pelo Compose. Eles só rodam automaticamente com o volume vazio e não carregam os seeds. Para recriar um banco específico com dados de exemplo, use os scripts abaixo; mudar `MONGODB_DATABASE` no `.env` não inicializa o novo banco no Docker.
 
-> **Atualizar um banco que já existe.** O Docker não reaplica os scripts num volume já populado. Antes da atualização, faça um backup e confira a restauração com `bash scripts/testar-recuperacao.sh <banco>` (veja [backup e recuperação](docs/operacao/backup-recuperacao.md)). Depois, com o container saudável, rode para cada banco utilizado:
+> **Atualizar um banco que já existe.** O Docker não reaplica os scripts num volume já populado. Primeiro, guarde um backup com `bash scripts/backup-banco.sh <banco>`. Depois, `bash scripts/testar-recuperacao.sh <banco>` verifica a restauração em uma cópia temporária, sem alterar o banco original (veja [backup e recuperação](docs/operacao/backup-recuperacao.md)). Com o backup guardado e a recuperação conferida, rode para cada banco utilizado, com o container saudável:
 >
 > ```bash
-> banco=consultafacil_demo # escolha explicitamente o banco
-> for f in database/init/*.js; do
->   docker exec -i consultafacil-mongo mongosh "$banco" --quiet --file /dev/stdin < "$f" || break
-> done
+> (
+>   banco=consultafacil_demo # escolha explicitamente o banco
+>   for f in database/init/*.js; do
+>     docker exec -i consultafacil-mongo mongosh "$banco" --quiet --file /dev/stdin < "$f" || {
+>       printf 'Falha ao aplicar %s no banco %s\n' "$f" "$banco" >&2
+>       exit 1
+>     }
+>   done
+> )
 > ```
 >
 > Aplique todos os scripts `01` a `10`, em ordem: `02` mantém agendas/bloqueios; `06` especialidades; `07` médicos. Os scripts atualizam validadores e índices e preservam os documentos. Não apague o volume para atualizar schemas. A recriação com `bash scripts/recriar-banco.sh <banco>` apaga e recarrega o banco selecionado; use apenas quando esses dados puderem ser substituídos.
@@ -245,7 +250,7 @@ bash scripts/recriar-banco.sh consultafacil_demo
 
 O comando apaga **somente o banco selecionado**, reaplica os schemas e índices e carrega, em ordem, os scripts de `database/seed/`. A recriação de `consultafacil_demo` não apaga os bancos de desenvolvimento ou testes. Os dois scripts exigem o nome explícito do banco e recusam nomes inválidos antes de apagar qualquer dado. Ambos deixam `consultafacil_test` sem seeds.
 
-A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico completo, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas: recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Os IDs fixos permitem repetir os seeds sem duplicar registros; o seed de usuários preserva senhas existentes, e a recriação completa restaura a senha de demonstração. Detalhes em [`docs/modelagem/carga-demonstracao.md`](docs/modelagem/carga-demonstracao.md).
+A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico completo, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas: recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Os IDs fixos permitem repetir os seeds sem duplicar registros; o seed de usuários preserva senhas existentes, e a recriação completa restaura a senha de demonstração. Detalhes em [`docs/dicionario/carga-demonstracao.md`](docs/dicionario/carga-demonstracao.md).
 
 | Perfil | E-mail | Senha de demonstração |
 |---|---|---|
@@ -265,10 +270,10 @@ Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes
 
 Em **Nova consulta** (`/nova-consulta`), os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
 
-Para verificar a modelagem:
+Para verificar a modelagem, use `consultafacil_demo` com os schemas e a carga de demonstração já aplicados:
 
 ```bash
-docker exec -i consultafacil-mongo mongosh consultafacil --quiet --file /dev/stdin < scripts/verificar-modelagem.js
+docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
 ```
 
 Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobreposições, histórico e logins):
@@ -277,7 +282,7 @@ Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobr
 docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
 ```
 
-Detalhes da modelagem em [`docs/modelagem/medicos-agenda.md`](docs/modelagem/medicos-agenda.md) e [`docs/modelagem/consultas.md`](docs/modelagem/consultas.md).
+Detalhes da modelagem em [`docs/dicionario/medicos-agenda.md`](docs/dicionario/medicos-agenda.md) e [`docs/dicionario/consultas.md`](docs/dicionario/consultas.md).
 
 Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
 
@@ -400,7 +405,7 @@ consultafacil/
 │   └── seed/                # Dados fictícios de demonstração
 ├── scripts/                 # recriar-banco, backup/restauração/teste de recuperação e verificadores
 ├── docs/                    # Documentação (índice em docs/README.md)
-│   ├── modelagem/           # Uma coleção por documento
+│   ├── dicionario/          # Uma coleção por documento
 │   ├── api/                 # Contratos das rotas
 │   ├── operacao/            # Configuração, backup e roteiro de entrega
 │   └── testes/              # Estratégia e relatórios de testes

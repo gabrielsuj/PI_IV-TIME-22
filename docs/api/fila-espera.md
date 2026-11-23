@@ -6,7 +6,7 @@ RA: 25006162
 # API da fila de espera
 
 > Issue #31 (registro de interesse na fila) · Sprint 4
-> Relacionadas: #32 (sinalização após cancelamento), #57 (avisos de vaga). Modelo: [filaEspera.md](../modelagem/filaEspera.md)
+> Relacionadas: #32 (sinalização após cancelamento), #57 (avisos de vaga). Modelo: [filaEspera.md](../dicionario/filaEspera.md)
 
 O paciente entra na fila de uma especialidade, com um médico específico ou com qualquer médico dela. Quando uma consulta compatível é cancelada, ele é avisado (#32) e quem agendar primeiro fica com a vaga.
 
@@ -86,7 +86,7 @@ Respostas de erro:
 - `dataInicio`/`dataFim` são datas locais (`AAAA-MM-DD`), sem valor quando não foram informadas. Datas com hora estão em ISO 8601 UTC.
 - `ultimaSinalizacao` só aparece quando `status = SINALIZADA`: inclui o `notificacaoId` usado para o agendamento em `POST /avisos-vaga`.
 
-Status: `AGUARDANDO`, `SINALIZADA`, `ATENDIDA`, `CANCELADA`, `EXPIRADA` (significados em [filaEspera.md](../modelagem/filaEspera.md#status-do-interesse)).
+Status: `AGUARDANDO`, `SINALIZADA`, `ATENDIDA`, `CANCELADA`, `EXPIRADA` (significados em [filaEspera.md](../dicionario/filaEspera.md#status-do-interesse)).
 
 ## 4. GET /fila-espera
 

@@ -59,7 +59,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * (scripts/recriar-banco.sh consultafacil_test).
  *
  * O relógio fica parado em 20/10/2026, antes da segunda-feira 26/10 do cenário de referência
- * (docs/modelagem/medicos-agenda.md §6). Horários em UTC: 08:00 em São Paulo = 11:00Z.
+ * (docs/dicionario/medicos-agenda.md §6). Horários em UTC: 08:00 em São Paulo = 11:00Z.
  */
 class AgendamentoIntegrationTest {
     private static final ObjectId ESPECIALIDADE = new ObjectId("a00000000000000000000001");

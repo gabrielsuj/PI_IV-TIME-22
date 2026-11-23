@@ -69,7 +69,7 @@ A execução usou a `develop` em `8231632` (PR #132), com Java 21, Node 22 e Mon
 
 ### Relatório de teste OO do servidor de CPF (PI IV)
 
-O [relatório de teste OO](Relatorio_Teste_OO.pdf) aplica teste intraclasse (particionamento por categorias, atributos e estados) e interclasse ao servidor de CPF, sobre a mesma revisão. Ele documenta dois defeitos em aberto: `ValidateCPF(null)` lança `NullPointerException`, e o construtor do `Cliente` não tem limite de tempo no handshake. Também registra dois defeitos corrigidos no PR #132. Os casos de teste do relatório não fazem parte da suíte do repositório, porque os dois que expõem defeitos falhariam no CI até a correção.
+O [relatório de teste OO](Relatorio_Teste_OO.pdf) aplica teste intraclasse (particionamento por categorias, atributos e estados) e interclasse ao servidor de CPF, sobre a mesma revisão. O PDF histórico analisa o commit `8231632` e foi preservado. Na branch atual, a requisição nula e o fim da entrada do console já foram tratados e têm regressões em `ValidarCPFHandlerTest` e `ServidorTest`. A espera pelo cabeçalho ou pela resposta do TCP permanece sem timeout automático por decisão da versão didática. As observações do relatório descrevem aquela revisão, não o estado atual dessas correções.
 
 ## Matriz de permissões
 

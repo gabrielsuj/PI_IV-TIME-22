@@ -56,6 +56,7 @@ jobs:
             docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < "$script" > /dev/null
           done
           docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
+          docker exec -i "$MONGO_CONTAINER" mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
 
       - name: Preparar o Maven Wrapper
         working-directory: backend
@@ -131,6 +132,10 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Testar o verificador de modelagem
+        working-directory: .
+        run: node --test scripts/testes/verificar-modelagem.test.cjs
 
       - name: Instalar dependências
         run: npm ci

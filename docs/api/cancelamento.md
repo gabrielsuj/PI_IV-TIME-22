@@ -30,7 +30,7 @@ Corpo **opcional**:
 { "motivo": "Imprevisto no trabalho" }
 ```
 
-- `motivo`: texto de até 255 caracteres. Espaços nas pontas são removidos, e motivo em branco conta como ausente. **Não escreva dados clínicos** (ver [historico.md](../modelagem/historico.md)).
+- `motivo`: texto de até 255 caracteres. Espaços nas pontas são removidos, e motivo em branco conta como ausente. **Não escreva dados clínicos** (ver [historico.md](../dicionario/historico.md)).
 - Sem corpo, ou com `{}`, a consulta é cancelada sem motivo.
 
 Exemplo:
@@ -62,8 +62,8 @@ Mesmo formato do `POST /consultas`:
 ## 4. O que acontece ao cancelar
 
 1. O status passa a `CANCELADA` e o motivo é gravado em `consultas.motivoCancelamento`.
-2. O histórico recebe um evento `CANCELAMENTO`, com status anterior e novo, motivo, quem cancelou (perfil e id) e a data. A gravação passa pelo `RegistroConsultaService` (ver [historico-implementacao.md](../modelagem/historico-implementacao.md)).
-3. **O horário é liberado sem passo extra.** O cálculo de vagas e os índices únicos de `consultas` só consideram consultas `AGENDADA`/`CONFIRMADA` (índices parciais, ver [consultas.md](../modelagem/consultas.md)). Por isso o horário volta a aparecer em `GET /vagas` e aceita uma nova reserva.
+2. O histórico recebe um evento `CANCELAMENTO`, com status anterior e novo, motivo, quem cancelou (perfil e id) e a data. A gravação passa pelo `RegistroConsultaService` (ver [historico-implementacao.md](../dicionario/historico-implementacao.md)).
+3. **O horário é liberado sem passo extra.** O cálculo de vagas e os índices únicos de `consultas` só consideram consultas `AGENDADA`/`CONFIRMADA` (índices parciais, ver [consultas.md](../dicionario/consultas.md)). Por isso o horário volta a aparecer em `GET /vagas` e aceita uma nova reserva.
 4. A fila de espera é acionada pelo gancho `AposCancelamento.vagaLiberada(consulta)`. Hoje o App usa `AposCancelamento.NENHUM`, que não faz nada; a #32 troca pela implementação real. Uma falha na fila é registrada no log e **não** desfaz o cancelamento.
 
 ## 5. Regra de prazo

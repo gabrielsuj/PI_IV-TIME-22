@@ -22,7 +22,7 @@ import java.util.Optional;
 
 /**
  * Inscrições na fila de espera: cadastro, consulta e remoção (#31) e sinalização após cancelamento (#32).
- * Regras de compatibilidade: docs/modelagem/filaEspera.md.
+ * Regras de compatibilidade: docs/dicionario/filaEspera.md.
  */
 public class FilaEsperaRepository {
     private final MongoCollection<Document> col;

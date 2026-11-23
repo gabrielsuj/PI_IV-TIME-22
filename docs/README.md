@@ -12,7 +12,7 @@ RA: 25006162
 | Documento | Conteúdo |
 |---|---|
 | [Apresentação (PDF)](ConsultaFacil_apresentação.pdf) | Slides do projeto: problema, perfis, tecnologias, comunicação entre os módulos e validação de CPF |
-| [Relatório consolidado (PDF)](ConsultaFacil_Relatorio_Consolidado.pdf) | Problema, ideação e classificação das ideias, SWOT, requisitos, escopo do MVP, cronograma por sprints (5W2H), matriz de responsabilidades e cenários de aceite (Quadro 4) |
+| [Relatório consolidado (PDF)](ConsultaFacil_Relatorio_Ideação.pdf) | Problema, ideação e classificação das ideias, SWOT, requisitos, escopo do MVP, cronograma por sprints (5W2H), matriz de responsabilidades e cenários de aceite (Quadro 4) |
 
 O relatório consolidado registra o planejamento feito na ideação (outubro de 2026). A implementação evoluiu a partir dele: o banco tem 10 coleções (inclusive `usuarios`, `bloqueios` e `notificacoes`), dois índices únicos parciais protegem as reservas e a validação de CPF é feita por um servidor Java separado, via TCP. A modelagem atual está nos documentos abaixo.
 
@@ -22,14 +22,14 @@ Os validadores (`$jsonSchema`) e índices ficam em [`database/init/`](../databas
 
 | Documento | Coleções |
 |---|---|
-| [usuarios-pacientes.md](modelagem/usuarios-pacientes.md) | `usuarios` (login, senha PBKDF2, perfil) e `pacientes` |
-| [medicos-agenda.md](modelagem/medicos-agenda.md) | `especialidades`, `medicos`, `agendas` (jornada semanal e duração) e `bloqueios` |
-| [consultas.md](modelagem/consultas.md) | `consultas`, status e índices únicos parciais que protegem as reservas |
-| [historico.md](modelagem/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
-| [historico-implementacao.md](modelagem/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
-| [filaEspera.md](modelagem/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
-| [notificacoes.md](modelagem/notificacoes.md) | `notificacoes` (avisos de vaga, lembretes simulados e dados da central) |
-| [carga-demonstracao.md](modelagem/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
+| [usuarios-pacientes.md](dicionario/usuarios-pacientes.md) | `usuarios` (login, senha PBKDF2, perfil) e `pacientes` |
+| [medicos-agenda.md](dicionario/medicos-agenda.md) | `especialidades`, `medicos`, `agendas` (jornada semanal e duração) e `bloqueios` |
+| [consultas.md](dicionario/consultas.md) | `consultas`, status e índices únicos parciais que protegem as reservas |
+| [historico.md](dicionario/historico.md) | `historico`: dicionário de dados, eventos e transições de status |
+| [historico-implementacao.md](dicionario/historico-implementacao.md) | Como o back-end grava o histórico (eventos pendentes, versão, recuperação) |
+| [filaEspera.md](dicionario/filaEspera.md) | `filaEspera` (fila de espera: inscrição pela API na #31, sinalização após cancelamento na #32) |
+| [notificacoes.md](dicionario/notificacoes.md) | `notificacoes` (avisos de vaga, lembretes simulados e dados da central) |
+| [carga-demonstracao.md](dicionario/carga-demonstracao.md) | Dados fictícios de demonstração (`database/seed/`) e o verificador de coerência |
 
 ## API REST
 
@@ -64,5 +64,5 @@ Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localiza
 | Documento | Conteúdo |
 |---|---|
 | [estrategia-de-testes.md](testes/estrategia-de-testes.md) | Como os testes foram feitos, cobertura dos cenários de aceite (Quadro 4), bancos usados e comandos |
-| [Relatório de teste OO do servidor de CPF (PDF)](testes/Relatorio_Teste_OO.pdf) | Teste intraclasse e interclasse em JUnit do servidor de CPF (PI IV), com falhas, anomalias e melhorias encontradas |
+| [Relatório de teste OO do servidor de CPF (PDF)](testes/Relatorio_Teste_OO.pdf) | Teste intraclasse e interclasse em JUnit do servidor de CPF (PI IV), sobre o commit `8231632`. Documento histórico preservado; a requisição nula e o fim da entrada do console já foram tratados na branch atual |
 | [garantias-de-reserva.md](testes/garantias-de-reserva.md) | Como as reservas são protegidas (API + índices únicos parciais) e os testes de concorrência pela API |

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Cálculo de disponibilidade (#20), sem banco.
  * Usa a agenda da Ana do seed (database/seed/01-agenda.js) e o cenário de referência
- * de docs/modelagem/medicos-agenda.md §6. Horários em UTC: 08:00 em São Paulo = 11:00Z.
+ * de docs/dicionario/medicos-agenda.md §6. Horários em UTC: 08:00 em São Paulo = 11:00Z.
  */
 class CalculadoraDisponibilidadeTest {
     /** Segunda-feira do cenário de referência. */

@@ -67,7 +67,7 @@ Os erros produzidos pelo cadastro usam `{"mensagem":"texto"}`. A autorização, 
 
 ## Modelagem e verificação
 
-O schema, os índices `uk_paciente_cpf` e `uk_paciente_email` e o vínculo opcional de login estão em [usuarios-pacientes.md](../modelagem/usuarios-pacientes.md) e em [`04-esquema-pacientes.js`](../../database/init/04-esquema-pacientes.js).
+O schema, os índices `uk_paciente_cpf` e `uk_paciente_email` e o vínculo opcional de login estão em [usuarios-pacientes.md](../dicionario/usuarios-pacientes.md) e em [`04-esquema-pacientes.js`](../../database/init/04-esquema-pacientes.js).
 
 Na pasta `backend`, `./mvnw test -Dtest=PacienteValidatorTest,PacienteServiceTest,PacienteHandlerTest,RotasAutorizacaoTest,ValidadorCpfTcpTest` verifica validação, unicidade, consulta/edição, contratos HTTP, acesso por perfil e o validador TCP. Prepare o [servidor de CPF para os testes](../testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf). Na pasta `frontend`, `npm test -- src/__tests__/UxPacientes.test.jsx src/__tests__/Registration.test.jsx` cobre busca, detalhe, edição e preservação dos dados em erros.
 

@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * Cálculo de disponibilidade (#20): os horários livres de um médico em um dia.
  *
- * Regras (ver docs/modelagem/medicos-agenda.md):
+ * Regras (ver docs/dicionario/medicos-agenda.md):
  *  - os horários saem das faixas da jornada do dia da semana, de "duracaoMinutos" em "duracaoMinutos";
  *  - o horário só entra se couber inteiro na faixa;
  *  - sai da lista o horário que se sobrepõe a um bloqueio ou a uma consulta ativa
