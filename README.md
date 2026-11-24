@@ -14,6 +14,7 @@
 - [Tecnologias utilizadas](#tecnologias-utilizadas)
 - [Arquitetura da aplicação](#arquitetura-da-aplicação)
 - [Pré-requisitos e guia inicial de execução](#pré-requisitos-e-guia-inicial-de-execução)
+  - [Início rápido](#início-rápido)
 - [Roteiro de entrega e demonstração](docs/operacao/entrega-mvp.md)
 - [Documentação](#documentação)
 - [Estrutura de pastas](#estrutura-de-pastas)
@@ -136,17 +137,106 @@ Os dados são organizados nas coleções `usuarios`, `pacientes`, `medicos`, `es
 
 ## Pré-requisitos e guia inicial de execução
 
-> Resumo: suba o MongoDB, recrie o banco de demonstração, inicie a API e o frontend, e entre com um dos logins de demonstração.
+> Para rodar o projeto pela primeira vez, siga o [início rápido](#início-rápido): com um comando só ([opção 1](#opção-1-um-comando)) ou pelo passo a passo ([opção 2](#opção-2-passo-a-passo)). As explicações de cada etapa vêm logo depois.
 
 ### Pré-requisitos
 
-| Ferramenta | Versão sugerida | Verificação |
+| Ferramenta | Versão | Verificação |
 |---|---|---|
 | Git | 2.x | `git --version` |
-| Java JDK | 21 | `java -version` |
-| Maven | 3.9+ (ou Maven Wrapper do projeto) | `mvn -version` |
-| Node.js e npm | 22.22+ (exigido pelo React Router 8) | `node -v` e `npm -v` |
-| MongoDB | 7.x (local) **ou** Docker + Docker Compose | `mongod --version` / `docker --version` |
+| Java JDK | **21** | `java -version` |
+| Node.js e npm | **22.22 ou superior** (exigido pelo React Router 8) | `node -v` e `npm -v` |
+| Docker Desktop (ou Docker Engine + Compose) | qualquer versão recente, **aberto e em execução** | `docker --version` e `docker ps` |
+
+Não é preciso instalar o Maven nem o MongoDB. O Maven Wrapper (`mvnw`) baixa a versão correta do Maven, e o MongoDB roda no Docker. Se o `node -v` mostrar uma versão anterior à 22.22, atualize o Node (pelo [nvm](https://github.com/nvm-sh/nvm) ou pelo [nvm-windows](https://github.com/coreybutler/nvm-windows), por exemplo), senão o `npm install` falha.
+
+### Início rápido
+
+#### Opção 1: um comando
+
+Com os pré-requisitos instalados e o Docker aberto:
+
+```bash
+git clone https://github.com/gabrielsuj/PI_IV-TIME-22.git
+cd PI_IV-TIME-22
+bash scripts/iniciar.sh            # Linux, macOS ou Git Bash
+```
+
+No Windows (PowerShell), troque a última linha por `.\scripts\iniciar.ps1`. Se a política de execução bloquear o script, use `powershell -ExecutionPolicy Bypass -File .\scripts\iniciar.ps1`.
+
+O script faz, em ordem, tudo o que a opção 2 faz à mão:
+
+1. Confere o Java 21+, o Node 22.22+ e se o Docker está respondendo. Também confere se as portas 3000, 3001 e 5173 estão livres.
+2. Cria o `.env` a partir do `.env.example`, se ele ainda não existir.
+3. Sobe o MongoDB e, se o banco do `.env` estiver vazio, carrega os dados de exemplo.
+4. Instala o módulo `server/` no Maven local e roda o `npm install` do frontend quando necessário.
+5. Inicia o servidor de CPF e a API, espera a API responder e inicia o frontend.
+
+Quando aparecer **Tudo pronto**, abra http://localhost:5173. Na primeira vez, o processo leva alguns minutos, por causa dos downloads do Maven e do npm. Nas seguintes, ele pula o que já está pronto e mantém os dados do banco.
+
+- **Encerrar:** Ctrl+C no terminal do script encerra o frontend, a API e o servidor de CPF. O MongoDB continua no ar; para pará-lo, use `docker compose stop mongo`.
+- **Onde ver as mensagens:**
+  - No Bash, as mensagens do servidor de CPF e da API ficam em `logs/cpf.log` e `logs/api.log`.
+  - No PowerShell, cada um abre em uma janela própria.
+- **Recarregar os dados de exemplo:** `bash scripts/iniciar.sh --recriar` (ou `.\scripts\iniciar.ps1 -Recriar`) apaga e recarrega o banco definido no `.env`.
+
+#### Opção 2: passo a passo
+
+Os mesmos passos do script, feitos à mão.
+
+**1. Baixar o projeto, criar o `.env` e preparar o banco.** Na raiz do repositório:
+
+```bash
+git clone https://github.com/gabrielsuj/PI_IV-TIME-22.git
+cd PI_IV-TIME-22
+cp .env.example .env                            # PowerShell: Copy-Item .env.example .env | cmd: copy .env.example .env
+docker compose up -d --wait mongo               # sobe o MongoDB e espera ele ficar pronto
+bash scripts/recriar-banco.sh consultafacil     # cria as coleções e carrega os dados de exemplo
+```
+
+No Windows sem Git Bash, troque a última linha por `powershell -ExecutionPolicy Bypass -File .\scripts\recriar-banco.ps1 consultafacil`.
+
+> **Não pule o `recriar-banco`.** O Docker cria o banco só com as coleções, sem dados. Sem esse passo, as contas de demonstração não existem e o login falha.
+
+**2. Iniciar os três processos, cada um em um terminal aberto na raiz do projeto e nesta ordem:**
+
+| Terminal | Linux, macOS ou Git Bash | Windows (PowerShell) |
+|---|---|---|
+| 1. Servidor de CPF (porta 3001) | `(cd server && ../backend/mvnw install -DskipTests)`<br>`java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor` | `cd server; ..\backend\mvnw.cmd install -DskipTests; cd ..`<br>`java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor` |
+| 2. API (porta 3000) | `cd backend && ./mvnw compile exec:java` | `cd backend; .\mvnw.cmd compile exec:java` |
+| 3. Frontend (porta 5173) | `cd frontend && npm install && npm run dev` | `cd frontend; npm install; npm run dev` |
+
+O terminal 1 precisa vir primeiro: a API depende do módulo `server` instalado no Maven local para compilar. Na primeira vez, o Maven e o npm baixam as dependências, e isso pode levar alguns minutos.
+
+#### Conferir se deu certo
+
+Vale para as duas opções:
+
+- O terminal da API (ou o `logs/api.log`, na opção 1 pelo Bash) mostra `Conectado ao Mongo: consultafacil` e `Servidor rodando na porta 3000`.
+- Em http://localhost:5173/status, a API aparece como disponível.
+- Em http://localhost:5173/login, entre com `secretaria@consultafacil.demo` e a senha `Demo@123`. As outras contas estão em [Demonstração com dados prontos](#demonstração-com-dados-prontos).
+
+#### Problemas comuns na primeira execução
+
+| Sintoma | Causa provável | Solução |
+|---|---|---|
+| O script `iniciar` para em "Conferindo pré-requisitos" | Falta uma ferramenta ou a versão é antiga | Siga a mensagem de erro e instale ou atualize o que ela indicar |
+| `Cannot connect to the Docker daemon` ou `docker compose` falha | O Docker Desktop está fechado | Abra o Docker Desktop, espere ele iniciar e repita o comando |
+| Login inválido com as contas de demonstração | O banco está sem dados | Rode `bash scripts/recriar-banco.sh consultafacil` e entre de novo |
+| `Could not find artifact ...:server:jar` ao iniciar a API | O módulo `server` não foi instalado | Rode o primeiro comando do terminal 1 antes do terminal 2 |
+| Salvar paciente retorna `503` | O servidor de CPF não está rodando | Inicie o terminal 1 e deixe-o aberto |
+| `npm install` reclama da versão do Node (`EBADENGINE`) | O Node é anterior à 22.22 | Atualize o Node |
+| `Address already in use` | Um processo antigo ainda ocupa a porta 3000 ou 3001 | Encerre o processo antigo (ou feche o terminal antigo) e inicie de novo |
+| `./mvnw: Permission denied` | O arquivo perdeu a permissão de execução | `chmod +x backend/mvnw` |
+| `UnsupportedClassVersionError ... class file version 71.0` | A IDE recompilou o `server/` com um JDK mais novo | `cd server && ../backend/mvnw clean install -DskipTests` |
+| O PowerShell não deixa rodar `recriar-banco.ps1` | Política de execução de scripts | Use `powershell -ExecutionPolicy Bypass -File .\scripts\recriar-banco.ps1 consultafacil` |
+| Erro de CORS ou o front aponta para `localhost:8080` | `.env` ausente ou incompleto | Recrie o `.env` a partir do `.env.example` e reinicie a API e o front |
+
+A tabela completa está em [docs/operacao/configuracao.md](docs/operacao/configuracao.md#6-problemas-comuns).
+
+---
+
+Os passos abaixo detalham o início rápido.
 
 ### 1. Clonar o repositório
 
@@ -159,98 +249,36 @@ cd PI_IV-TIME-22
 
 ```bash
 cp .env.example .env
-# para apresentar com os dados de demonstração, troque MONGODB_DATABASE para consultafacil_demo
 ```
 
-O mesmo `.env` da raiz é lido pelo backend e pelo frontend (o Vite está configurado com `envDir: '..'`). Execute os comandos de cada módulo a partir das respectivas pastas, como abaixo: o backend procura o `.env` no diretório pai. Mantenha `VITE_API_BASE_URL` apontando para a porta definida em `SERVER_PORT` e reinicie os processos depois de alterar o arquivo.
-
-A API usa a porta 3000 (`SERVER_PORT`) e o servidor de CPF a 3001 (`CPF_SERVER_PORT`, também o padrão do próprio servidor). Se o seu `.env` foi criado antes dessa mudança e não tem `CPF_SERVER_PORT`, acrescente `CPF_SERVER_PORT=3001`. Sem `SERVER_PORT` no ambiente ou no `.env`, a API usa a porta 8080. Somente as variáveis prefixadas com `VITE_` são incorporadas ao frontend no build.
+Os valores do `.env.example` já funcionam para rodar localmente, sem nenhuma alteração. Há um único `.env`, na raiz, lido pela API e pelo frontend. Por isso, rode cada módulo a partir da sua pasta (`backend/`, `frontend/`), como nos comandos deste guia. Depois de alterar o `.env`, reinicie a API e o frontend. A descrição de cada variável está em [Variáveis de ambiente](#variáveis-de-ambiente).
 
 ### 3. Subir o banco de dados (MongoDB)
 
-Com Docker Compose:
-
 ```bash
 docker compose up -d --wait mongo
+bash scripts/recriar-banco.sh consultafacil      # Windows: .\scripts\recriar-banco.ps1 consultafacil
 ```
 
-O Compose aguarda o healthcheck do MongoDB (`ping` no banco `admin`) antes de concluir o comando com `--wait`. A porta continua publicada apenas em `127.0.0.1`.
+O primeiro comando sobe o MongoDB 7 em um container (`consultafacil-mongo`, porta 27017 publicada só em `127.0.0.1`) e espera o banco responder. O segundo apaga **somente o banco informado**, recria as coleções, os validadores e os índices de `database/init/` e carrega os dados de exemplo de `database/seed/`.
 
-Na primeira execução, os scripts de `database/init/` criam as coleções, os validadores e os índices no banco `consultafacil`, definido pelo Compose. Eles só rodam automaticamente com o volume vazio e não carregam os seeds. Para recriar um banco específico com dados de exemplo, use os scripts abaixo; mudar `MONGODB_DATABASE` no `.env` não inicializa o novo banco no Docker.
+Para parar o banco, use `docker compose stop mongo`. Os dados ficam guardados no volume do Docker e voltam no próximo `docker compose up`, então não é preciso rodar o `recriar-banco` de novo.
 
-> **Atualizar um banco que já existe.** O Docker não reaplica os scripts num volume já populado. Primeiro, guarde um backup com `bash scripts/backup-banco.sh <banco>`. Depois, `bash scripts/testar-recuperacao.sh <banco>` verifica a restauração em uma cópia temporária, sem alterar o banco original (veja [backup e recuperação](docs/operacao/backup-recuperacao.md)). Com o backup guardado e a recuperação conferida, rode para cada banco utilizado, com o container saudável:
->
-> ```bash
-> (
->   banco=consultafacil_demo # escolha explicitamente o banco
->   for f in database/init/*.js; do
->     docker exec -i consultafacil-mongo mongosh "$banco" --quiet --file /dev/stdin < "$f" || {
->       printf 'Falha ao aplicar %s no banco %s\n' "$f" "$banco" >&2
->       exit 1
->     }
->   done
-> )
-> ```
->
-> Aplique todos os scripts `01` a `10`, em ordem: `02` mantém agendas/bloqueios; `06` especialidades; `07` médicos. Os scripts atualizam validadores e índices e preservam os documentos. Não apague o volume para atualizar schemas. A recriação com `bash scripts/recriar-banco.sh <banco>` apaga e recarrega o banco selecionado; use apenas quando esses dados puderem ser substituídos.
+Atualizar um banco que já existe sem apagar os dados, usar um MongoDB instalado na máquina e conferir a carga são procedimentos descritos em [docs/operacao/banco.md](docs/operacao/banco.md).
 
 #### Bancos por ambiente
 
 | Banco | Uso | Dados de exemplo |
 |---|---|---|
-| `consultafacil` | Desenvolvimento (padrão do `.env.example`) | sim |
+| `consultafacil` | Desenvolvimento (padrão do `.env.example`) | sim, depois do `recriar-banco` |
+| `consultafacil_demo` | Apresentações, sem interferir no banco de desenvolvimento | sim, depois do `recriar-banco` |
 | `consultafacil_test` | Testes JUnit (os testes limpam as coleções que usam) | não |
-| `consultafacil_demo` | Apresentações, sem interferir no banco de desenvolvimento | sim |
 
-A API usa o banco definido em `MONGODB_DATABASE` no `.env`.
-
-Para atualizar um volume existente pelo PowerShell, preservando documentos (depois de conferir o backup):
-
-```powershell
-$banco = 'consultafacil_demo' # escolha explicitamente o banco
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-Get-ChildItem database/init/*.js | Sort-Object Name | ForEach-Object {
-    Get-Content -Raw -Encoding UTF8 $_.FullName | docker exec -i consultafacil-mongo mongosh $banco --quiet --file /dev/stdin
-    if ($LASTEXITCODE -ne 0) { throw "Falha em $($_.Name)" }
-}
-```
-
-Após atualizar a base de demonstração, confira validadores, índices e carga:
-
-```bash
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
-```
-
-Os seeds só são necessários para uma base com dados de exemplo; o healthcheck não verifica schemas, índices ou seeds. Em volume novo, a inicialização automática cria o banco `consultafacil`; para outro banco, aplique explicitamente todos os schemas e, no cenário de demonstração, os seeds em ordem.
-
-Para recriar qualquer um deles do zero (apaga o banco, executa `database/init/` e, exceto no de testes, `database/seed/`):
-
-```bash
-scripts/recriar-banco.sh consultafacil        # desenvolvimento
-scripts/recriar-banco.sh consultafacil_test
-scripts/recriar-banco.sh consultafacil_demo
-```
+A API usa o banco definido em `MONGODB_DATABASE` no `.env`. Para apresentar com um banco separado, rode `bash scripts/recriar-banco.sh consultafacil_demo`, troque `MONGODB_DATABASE` para `consultafacil_demo` e reinicie a API.
 
 #### Demonstração com dados prontos
 
-Com o container Mongo em funcionamento, execute na raiz do projeto:
-
-PowerShell (Windows):
-
-```powershell
-.\scripts\recriar-banco.ps1 consultafacil_demo
-```
-
-Bash (Linux, macOS ou Git Bash):
-
-```bash
-bash scripts/recriar-banco.sh consultafacil_demo
-```
-
-O comando apaga **somente o banco selecionado**, reaplica os schemas e índices e carrega, em ordem, os scripts de `database/seed/`. A recriação de `consultafacil_demo` não apaga os bancos de desenvolvimento ou testes. Os dois scripts exigem o nome explícito do banco e recusam nomes inválidos antes de apagar qualquer dado. Ambos deixam `consultafacil_test` sem seeds.
-
-A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico completo, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas: recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Os IDs fixos permitem repetir os seeds sem duplicar registros; o seed de usuários preserva senhas existentes, e a recriação completa restaura a senha de demonstração. Detalhes em [`docs/dicionario/carga-demonstracao.md`](docs/dicionario/carga-demonstracao.md).
+A carga de demonstração simula uma clínica em funcionamento: 9 especialidades (1 desativada), 11 médicos (1 inativo), 10 agendas semanais, bloqueios, 15 usuários, 150 pacientes e cerca de 880 consultas com histórico, distribuídas entre 3 semanas antes e 3 semanas depois do dia da carga. As datas são relativas, então recriar o banco sempre gera consultas passadas (concluídas, faltas e cancelamentos) e futuras (agendadas e confirmadas). Detalhes em [`docs/dicionario/carga-demonstracao.md`](docs/dicionario/carga-demonstracao.md).
 
 | Perfil | E-mail | Senha de demonstração |
 |---|---|---|
@@ -258,9 +286,7 @@ A carga de demonstração simula uma clínica em funcionamento: 9 especialidades
 | Médico | ana.martins@consultafacil.demo (e os demais médicos: nome.sobrenome@consultafacil.demo) | Demo@123 |
 | Paciente | paciente@consultafacil.demo, carla.souza@consultafacil.demo, diego.santos@consultafacil.demo | Demo@123 |
 
-As senhas são armazenadas pelo seed existente com PBKDF2 compatível com `SenhaHasher`. O login da médica está vinculado ao cadastro de Ana; Paulo aparece tanto como usuário quanto como paciente, com o mesmo CPF e e-mail.
-
-Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes de entrar em `/login`. O menu mostra só as telas de cada perfil, e o servidor recusa (403) o acesso a dados de outro perfil.
+O menu mostra só as telas de cada perfil, e o servidor recusa (403) o acesso a dados de outro perfil.
 
 | Perfil | O que mostrar |
 |---|---|
@@ -268,59 +294,45 @@ Configure `MONGODB_DATABASE=consultafacil_demo` no `.env` e reinicie a API antes
 | Médico (Ana) | **Agenda** e **Calendário** abrem diretamente o cadastro vinculado ao login; **Consultas** que atende; leitura de pacientes |
 | Paciente (Paulo) | **Consultas** próprias, com cancelamento e histórico; avisos de vaga e notificações. Agendamento somente pela secretaria |
 
-A tela **Nova consulta** (`/nova-consulta`) é exclusiva da secretaria, inclusive para pacientes com conta. O perfil PACIENTE recebe 403 ao tentar criar uma consulta na API. Nessa tela, os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos estão em [docs/api/](docs/README.md#api-rest).
-
-Para verificar a modelagem, use `consultafacil_demo` com os schemas e a carga de demonstração já aplicados:
-
-```bash
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-modelagem.js
-```
-
-Para conferir a coerência da carga de demonstração (jornadas, bloqueios, sobreposições, histórico e logins):
-
-```bash
-docker exec -i consultafacil-mongo mongosh consultafacil_demo --quiet --file /dev/stdin < scripts/verificar-carga.js
-```
-
-Detalhes da modelagem em [`docs/dicionario/medicos-agenda.md`](docs/dicionario/medicos-agenda.md) e [`docs/dicionario/consultas.md`](docs/dicionario/consultas.md).
-
-Ou use uma instância local do MongoDB, apontando `MONGODB_URI` para ela.
+A tela **Nova consulta** (`/nova-consulta`) é exclusiva da secretaria. Os horários livres consideram a jornada, a duração das consultas, os bloqueios e as consultas já marcadas. Ao cancelar uma consulta, a vaga volta para a busca e os pacientes compatíveis da fila de espera são avisados. Os contratos da API estão em [docs/api/](docs/README.md#api-rest).
 
 ### 4. Executar o backend
 
-Na raiz do repositório, instale o módulo Java de validação de CPF e deixe seu servidor rodando em um terminal:
+O backend tem dois processos Java: o servidor de validação de CPF (`server/`, porta 3001) e a API (`backend/`, porta 3000). Sem o servidor de CPF, a API não compila e recusa gravar pacientes com `503`.
+
+**Terminal 1: servidor de CPF.** Na raiz do repositório:
 
 ```bash
-(cd server && ../backend/mvnw install)   # usa o Maven Wrapper do backend
-java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor   # porta 3001
+(cd server && ../backend/mvnw install -DskipTests)   # instala o módulo no Maven local (só na primeira vez ou quando server/ mudar)
+java -cp server/target/classes br.edu.puccampinas.consultafacil.Servidor
 ```
 
-Em outro terminal, inicie a API:
+No PowerShell: `cd server; ..\backend\mvnw.cmd install -DskipTests; cd ..` e depois o mesmo comando `java`.
+
+**Terminal 2: API.**
 
 ```bash
 cd backend
-./mvnw compile exec:java     # inicia a API em http://localhost:3000 (SERVER_PORT do .env)
+./mvnw compile exec:java          # Windows: .\mvnw.cmd compile exec:java
 ```
 
-A API lê o `.env` da raiz e mostra `Conectado ao Mongo: <banco>` e `Servidor rodando na porta 3000`. Sem Maven instalado, o wrapper (`./mvnw`, ou `mvnw.cmd` no Windows) baixa a versão correta. As sessões ficam em memória: ao reiniciar a API, é preciso entrar de novo.
-
-O cliente TCP didático não impõe timeout automático. A espera pela resposta ou pelo cabeçalho do stream pode continuar enquanto o outro lado mantiver a conexão aberta e silenciosa; uma mudança dessa política exige uma decisão específica sobre o requisito.
+A API mostra `Conectado ao Mongo: <banco>` e `Servidor rodando na porta 3000`. As sessões ficam em memória, então, ao reiniciar a API, é preciso entrar de novo.
 
 ### 5. Executar o frontend
 
-Em outro terminal:
+**Terminal 3:**
 
 ```bash
 cd frontend
-npm install                  # instala as dependências
+npm install                  # instala as dependências (só na primeira vez)
 npm run dev                  # inicia em http://localhost:5173
 ```
 
-A página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API e indicam se o servidor HTTP responde; esse endpoint não faz um novo ping no banco. Também não consulta o serviço TCP de CPF. Para implantação, mantenha uma instância da API: as travas de intervalos coordenam essa instância, enquanto os índices únicos do MongoDB impedem reservas ativas com início igual. Os índices não impedem, sozinhos, sobreposições com inícios diferentes entre instâncias. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build) e `npm run lint` (ESLint). O build incorpora `VITE_API_BASE_URL`; se a URL da API mudar, gere novamente o build. Para usar o preview padrão em `http://localhost:4173`, inclua essa origem em `CORS_ALLOWED_ORIGINS` e reinicie a API.
+A tela **Status do sistema** (`/status`) indica se a API responde. Outros scripts: `npm run build` (build de produção em `dist/`), `npm run preview` (serve o build em `http://localhost:4173`) e `npm run lint` (ESLint). Observações sobre build, preview e implantação estão em [docs/operacao/configuracao.md](docs/operacao/configuracao.md#7-observações-sobre-execução-e-implantação).
 
 ### 6. Executar os testes
 
-Com o MongoDB no ar e o [módulo de CPF instalado e rodando na porta 3001](docs/testes/estrategia-de-testes.md#preparar-o-servidor-tcp-de-cpf):
+Com o MongoDB no ar e o servidor de CPF rodando na porta 3001 (terminal 1):
 
 ```bash
 bash scripts/recriar-banco.sh consultafacil_test   # validadores e índices, sem dados
@@ -337,10 +349,9 @@ Em cada pull request, o [workflow de CI](.github/workflows/ci.yml) roda o JUnit 
 ```bash
 bash scripts/backup-banco.sh consultafacil_demo        # gera backups/<banco>-<data>.archive.gz
 bash scripts/testar-recuperacao.sh consultafacil_demo  # confere que o backup restaura tudo, sem alterar o banco
-bash scripts/testes/restaurar-banco.test.sh           # valida a recusa de backups inválidos em container descartável
 ```
 
-Para restaurar um arquivo salvo, passe o caminho exibido no fim do backup a `bash scripts/restaurar-banco.sh`. O script pede confirmação e valida o arquivo em um banco temporário antes de substituir o destino. Consulte o [procedimento e o resultado da recuperação](docs/operacao/backup-recuperacao.md).
+Para restaurar, passe o arquivo gerado a `bash scripts/restaurar-banco.sh`. Consulte o [procedimento completo](docs/operacao/backup-recuperacao.md).
 
 ### Variáveis de ambiente
 
@@ -372,7 +383,7 @@ O índice completo está em [`docs/README.md`](docs/README.md):
 - **Modelagem do banco:** um documento por coleção, além da carga de demonstração.
 - **API:** autenticação e health, pacientes, médicos e especialidades, agendamento, consultas, cancelamento, fila de espera, notificações, indicadores e alterações de agenda.
 - **Testes:** estratégia, cobertura do Quadro 4, garantias de reserva, comandos e relatório de teste OO do servidor de CPF.
-- **Operação:** backup e recuperação, roteiros por perfil, evidências de validação e preparação da tag/release.
+- **Operação:** configuração, manutenção do banco, backup e recuperação, roteiros por perfil, evidências de validação e preparação da tag/release.
 
 ---
 
@@ -403,7 +414,7 @@ consultafacil/
 ├── database/
 │   ├── init/                # Coleções, validadores ($jsonSchema) e índices
 │   └── seed/                # Dados fictícios de demonstração
-├── scripts/                 # recriar-banco, backup/restauração/teste de recuperação e verificadores
+├── scripts/                 # iniciar (sobe tudo), recriar-banco, backup/restauração/teste de recuperação e verificadores
 ├── docs/                    # Documentação (índice em docs/README.md)
 │   ├── dicionario/          # Uma coleção por documento
 │   ├── api/                 # Contratos das rotas
