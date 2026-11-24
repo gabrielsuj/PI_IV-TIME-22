@@ -115,7 +115,7 @@ O contrato HTTP, a busca, os códigos de erro e os testes estão em [pacientes.m
 
 ## Inicialização e conferência
 
-Execute os scripts versionados em `database/init/`, em vez de copiar um schema deste documento. Eles criam ou atualizam os validadores e índices preservando os documentos existentes. Os comandos de [atualização de banco existente](../../README.md#3-subir-o-banco-de-dados-mongodb) aplicam todos os scripts, incluindo dependências entre coleções.
+Execute os scripts versionados em `database/init/`, em vez de copiar um schema deste documento. Eles criam ou atualizam os validadores e índices preservando os documentos existentes. Os comandos de [atualização de banco existente](../operacao/banco.md#2-atualizar-um-banco-que-já-existe-preservando-os-dados) aplicam todos os scripts, incluindo dependências entre coleções.
 
 Para um banco novo de demonstração, `bash scripts/recriar-banco.sh consultafacil_demo` instala os schemas e os seeds; esse comando apaga o banco selecionado. A carga e os vínculos de login estão em [carga-demonstracao.md](carga-demonstracao.md).
 
