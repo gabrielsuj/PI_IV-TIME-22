@@ -87,3 +87,10 @@ Os bancos de teste precisam dos validadores e índices de `database/init/`. O pa
 | Backend não compila: `Could not find artifact ...:server:jar` | O módulo `server` não foi instalado no Maven local | `cd server && ../backend/mvnw install -DskipTests` |
 | `UnsupportedClassVersionError ... class file version 71.0` ao iniciar o servidor de CPF | A extensão Java do VS Code recompilou `server/target/classes` com um JDK mais novo, e o Maven não recompilou porque a classe parecia atualizada | `cd server && ../backend/mvnw clean install -DskipTests` |
 | Testes de integração falham com erro de schema ou de índice | `consultafacil_test` sem os scripts de `database/init/` | Recrie o banco de testes como em [estrategia-de-testes.md](../testes/estrategia-de-testes.md#como-executar) |
+
+## 7. Observações sobre execução e implantação
+
+- **Health:** a página inicial e a tela **Status do sistema** (`/status`) consultam o `GET /health` da API. Esse endpoint indica se o servidor HTTP responde, mas não faz um novo ping no banco nem consulta o serviço TCP de CPF.
+- **Uma instância da API:** as travas de intervalos coordenam uma única instância. Os índices únicos do MongoDB impedem reservas ativas com início igual, mas não impedem, sozinhos, sobreposições com inícios diferentes entre instâncias. Para implantação, mantenha uma instância.
+- **Build do frontend:** o `npm run build` incorpora `VITE_API_BASE_URL` no momento do build. Se a URL da API mudar, gere o build de novo. Para usar o `npm run preview` (`http://localhost:4173`), inclua essa origem em `CORS_ALLOWED_ORIGINS` e reinicie a API.
+- **Cliente TCP de CPF:** o cliente didático não impõe timeout automático. A espera pela resposta ou pelo cabeçalho do stream pode continuar enquanto o outro lado mantiver a conexão aberta e silenciosa. Mudar essa política exige uma decisão específica sobre o requisito.

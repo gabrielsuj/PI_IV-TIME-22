@@ -57,6 +57,7 @@ Consulte a [estratégia de testes](testes/estrategia-de-testes.md) para localiza
 |---|---|
 | [configuracao.md](operacao/configuracao.md) | Processos e portas, todas as variáveis de ambiente (com o padrão do código), configuração dos testes, acesso e permissões, problemas comuns (#50) |
 | [Entrega do MVP](operacao/entrega-mvp.md) | Demonstração por perfil, fila e lembretes, pendências de homologação e preparação da versão final |
+| [banco.md](operacao/banco.md) | Inicialização, atualização de banco existente preservando dados, verificação da carga e uso de MongoDB local |
 | [backup-recuperacao.md](operacao/backup-recuperacao.md) | Backup, restauração e teste de recuperação dos bancos, com um comando cada |
 
 ## Testes
